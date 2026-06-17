@@ -57,6 +57,7 @@ func TestOIDCSessionMigrationHasCoreTables(t *testing.T) {
 		"CREATE TABLE oidc_oauth_requests",
 		"CREATE TABLE oidc_refresh_tokens",
 		"offline_access",
+		"refresh_token",
 	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("0003 up missing %q", want)

@@ -33,7 +33,10 @@ CREATE INDEX idx_oidc_refresh_request   ON oidc_refresh_tokens (request_id);
 CREATE INDEX idx_oidc_refresh_session   ON oidc_refresh_tokens (session_id);
 CREATE INDEX idx_oidc_refresh_subject   ON oidc_refresh_tokens (subject);
 
--- Demo client gains offline_access so the SSO e2e can exercise refresh.
+-- Demo client gains the offline_access scope AND the refresh_token grant so the
+-- SSO e2e can exercise refresh-token rotation (fosite rejects the refresh grant
+-- unless the client lists refresh_token in grant_types).
 UPDATE oidc_clients
-   SET scopes = '{openid,profile,email,roles,offline_access}'
+   SET scopes      = '{openid,profile,email,roles,offline_access}',
+       grant_types = '{authorization_code,refresh_token}'
  WHERE id = 'demo-web';
