@@ -28,6 +28,16 @@ func (s *Service) Me(ctx context.Context, sessionID string) (model.Identity, err
 	return id, nil
 }
 
+// GetByID fetches a single identity by its primary-key ID.
+func (s *Service) GetByID(ctx context.Context, id string) (model.Identity, error) {
+	return s.store.GetByID(ctx, id)
+}
+
+// GetProfile fetches the profile for an identity by its primary-key ID.
+func (s *Service) GetProfile(ctx context.Context, id string) (model.Profile, error) {
+	return s.store.GetProfile(ctx, id)
+}
+
 // Logout clears a single session. (Session-bound refresh-token revocation is
 // milestone 4; no refresh tokens exist yet.)
 func (s *Service) Logout(ctx context.Context, sessionID string) error {
