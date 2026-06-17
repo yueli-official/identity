@@ -43,19 +43,24 @@ func main() {
 	svc := logic.New(store, logic.DefaultConfig())
 	authCtl := controller.New(svc, secureCookie)
 
-	// ── OIDC / OAuth2 (milestone ③) ─────────────────────────────────────────
+	// ── OIDC / OAuth2 (milestone ③ + ④) ────────────────────────────────────
 	mgr, err := oidc.NewManager(ctx, daoPG)
 	if err != nil {
 		panic(fmt.Sprintf("oidc.NewManager: %v", err))
 	}
-	// TODO(task9): swap NewMemBackend for the PG-backed Backend (durable
-	// sessions/refresh tokens + real transactions). Memory backend is interim.
-	oidcStore := oidc.NewStore(oidc.NewMemBackend(), daoPG)
+	// Durable PG-backed OIDC store: persists OAuth requests and refresh tokens
+	// across restarts (milestone ④). Access tokens remain stateless JWTs.
+	oidcStore := oidc.NewStore(oidc.NewPGBackend(g.DB()), daoPG)
+	// Wire passive logout: logic.Service calls RevokeRefreshBySession on logout,
+	// which revokes all refresh tokens belonging to that identity session.
+	svc.SetRefreshRevoker(oidcStore)
+	refreshTTL := g.Cfg().MustGet(ctx, "oidc.refreshTtl", "720h").Duration()
 	provider := oidc.NewProvider(oidcStore, oidc.Config{
 		Issuer:       issuer,
 		GlobalSecret: []byte(globalSecret),
 		AccessTTL:    10 * time.Minute,
 		IDTTL:        10 * time.Minute,
+		RefreshTTL:   refreshTTL,
 	}, mgr.KeyGetter)
 	oidcCtl := controller.NewOIDC(provider, mgr, svc, issuer, loginURL)
 
@@ -76,6 +81,8 @@ func main() {
 		grp.GET("/oauth2/authorize", oidcCtl.Authorize)
 		grp.POST("/oauth2/token", oidcCtl.Token)
 		grp.ALL("/oauth2/userinfo", oidcCtl.Userinfo)
+		grp.POST("/oauth2/revoke", oidcCtl.Revoke)         // RFC 7009 token revocation
+		grp.ALL("/oauth2/end_session", oidcCtl.EndSession)  // OIDC RP-initiated logout (MVP)
 	})
 
 	g.Log().Info(ctx, "identity-service starting")
