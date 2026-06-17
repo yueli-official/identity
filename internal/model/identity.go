@@ -12,12 +12,12 @@ const (
 )
 
 type Identity struct {
-	ID            string
-	Email         string // canonical
-	EmailVerified bool
-	Status        Status
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID            string    `orm:"id"`
+	Email         string    `orm:"email"` // canonical
+	EmailVerified bool      `orm:"email_verified"`
+	Status        Status    `orm:"status"`
+	CreatedAt     time.Time `orm:"created_at"`
+	UpdatedAt     time.Time `orm:"updated_at"`
 }
 
 type Profile struct {
