@@ -1,0 +1,31 @@
+// Package v1 holds identity-service request/response types. g.Meta drives the
+// auto-generated OpenAPI document (backend-platform-conventions).
+package v1
+
+import "github.com/gogf/gf/v2/frame/g"
+
+type RegisterReq struct {
+	g.Meta      `path:"/api/v1/auth/register" method:"post" tags:"auth" summary:"Register with email+password"`
+	Email       string `json:"email" v:"required|email"`
+	Password    string `json:"password" v:"required|length:8,128"`
+	DisplayName string `json:"displayName"`
+}
+type RegisterRes struct {
+	ID    string `json:"id"`
+	Email string `json:"email"`
+}
+
+type LoginReq struct {
+	g.Meta   `path:"/api/v1/auth/login" method:"post" tags:"auth" summary:"Email+password login"`
+	Email    string `json:"email" v:"required|email"`
+	Password string `json:"password" v:"required"`
+}
+type LoginRes struct {
+	ID    string `json:"id"`
+	Email string `json:"email"`
+}
+
+type LogoutReq struct {
+	g.Meta `path:"/api/v1/auth/logout" method:"post" tags:"auth" summary:"Log out current session"`
+}
+type LogoutRes struct{}
