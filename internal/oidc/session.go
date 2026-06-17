@@ -24,6 +24,11 @@ type Session struct {
 	// token, whose claims live in DefaultSession.Claims).
 	JWTClaims *jwt.JWTClaims
 	JWTHeader *jwt.Headers
+
+	// IdPSessionID binds tokens minted in this request to the IdP login session
+	// (id_session cookie). Persisted on refresh rows for session-bound (passive)
+	// logout. Survives fosite store round-trips via Clone (deepcopy) + JSON.
+	IdPSessionID string `json:"idp_session_id,omitempty"`
 }
 
 // GetJWTClaims implements oauth2.JWTSessionContainer.

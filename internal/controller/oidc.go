@@ -76,7 +76,7 @@ func (c *OIDCController) Authorize(r *ghttp.Request) {
 
 	profile, _ := c.svc.GetProfile(ctx, id.ID) // empty profile is acceptable
 	session := oidc.BuildSession(
-		c.issuer, ar.GetClient().GetID(), c.keys.ActiveKID(),
+		c.issuer, ar.GetClient().GetID(), c.keys.ActiveKID(), sid,
 		id, profile, ar.GetGrantedScopes(), time.Now().UTC(),
 	)
 

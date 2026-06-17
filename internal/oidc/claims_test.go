@@ -48,8 +48,18 @@ func TestBuildSessionSubjectAndClaims(t *testing.T) {
 	now := time.Unix(1700000000, 0).UTC()
 	id := model.Identity{ID: "u1", Email: "a@b.com", EmailVerified: true}
 	p := model.Profile{DisplayName: "A", Username: "alice", Locale: "zh-CN"}
-	s := oidc.BuildSession("iss", "client1", "kid1", id, p, []string{"openid", "email", "roles"}, now)
+	s := oidc.BuildSession("iss", "client1", "kid1", "", id, p, []string{"openid", "email", "roles"}, now)
 	if s.GetSubject() != "u1" {
 		t.Fatalf("subject = %q", s.GetSubject())
+	}
+}
+
+func TestBuildSessionCarriesIdPSessionID(t *testing.T) {
+	id := model.Identity{ID: "id-1", Email: "a@b.com", EmailVerified: true}
+	p := model.Profile{DisplayName: "A"}
+	s := oidc.BuildSession("iss", "client-1", "kid-1", "sess-xyz", id, p,
+		[]string{"openid", "offline_access"}, time.Now().UTC())
+	if s.IdPSessionID != "sess-xyz" {
+		t.Fatalf("IdPSessionID = %q, want sess-xyz", s.IdPSessionID)
 	}
 }
