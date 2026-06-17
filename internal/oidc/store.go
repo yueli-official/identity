@@ -23,8 +23,11 @@ func NewStore(be Backend, clients repo.ClientRepo) *Store {
 	return &Store{be: be, clients: clients}
 }
 
-func (s *Store) resolveClient(id string) (fosite.Client, error) {
-	c, err := s.clients.GetClient(context.Background(), id)
+// resolveClient re-hydrates a client by id. clientResolver is ctx-less, so
+// callers bind the request ctx in a closure (preserves deadline/cancellation
+// and request-scoped tracing values).
+func (s *Store) resolveClient(ctx context.Context, id string) (fosite.Client, error) {
+	c, err := s.clients.GetClient(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +88,7 @@ func (s *Store) getGeneric(ctx context.Context, kind, sig string) (fosite.Reques
 	if err != nil {
 		return nil, false, err
 	}
-	req, err := unmarshalRequest(rec.Data, s.resolveClient)
+	req, err := unmarshalRequest(rec.Data, func(id string) (fosite.Client, error) { return s.resolveClient(ctx, id) })
 	if err != nil {
 		return nil, false, err
 	}
@@ -160,7 +163,7 @@ func (s *Store) GetRefreshTokenSession(ctx context.Context, sig string, _ fosite
 		return nil, fosite.ErrNotFound
 	}
 	if errors.Is(err, ErrBackendInactive) {
-		req, derr := unmarshalRequest(rec.Data, s.resolveClient)
+		req, derr := unmarshalRequest(rec.Data, func(id string) (fosite.Client, error) { return s.resolveClient(ctx, id) })
 		if derr != nil {
 			return nil, derr
 		}
@@ -169,7 +172,7 @@ func (s *Store) GetRefreshTokenSession(ctx context.Context, sig string, _ fosite
 	if err != nil {
 		return nil, err
 	}
-	return unmarshalRequest(rec.Data, s.resolveClient)
+	return unmarshalRequest(rec.Data, func(id string) (fosite.Client, error) { return s.resolveClient(ctx, id) })
 }
 
 func (s *Store) DeleteRefreshTokenSession(ctx context.Context, sig string) error {

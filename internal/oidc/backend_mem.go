@@ -109,6 +109,9 @@ func (b *memBackend) RevokeRefreshByRequestID(_ context.Context, reqID string) e
 }
 
 func (b *memBackend) RevokeRefreshBySession(_ context.Context, sessionID string) error {
+	if sessionID == "" {
+		return nil // never mass-revoke rows with an empty session_id (parity with pgBackend)
+	}
 	b.revokeWhere(func(r RefreshRecord) bool { return r.SessionID == sessionID })
 	return nil
 }
