@@ -16,9 +16,11 @@ func scopeSet(scopes []string) map[string]bool {
 }
 
 // BuildSession assembles the fosite session (ID-token + access-token claims) for
-// an authenticated identity and the granted scopes. now is injected for tests.
+// an authenticated identity and the granted scopes. sessionID is the IdP login
+// session id (id_session cookie) that binds the minted tokens to the login
+// session for passive logout. now is injected for tests.
 // roles is an empty placeholder until RBAC (milestone ⑥).
-func BuildSession(issuer, clientID, kid string, id model.Identity, p model.Profile, scopes []string, now time.Time) *Session {
+func BuildSession(issuer, clientID, kid, sessionID string, id model.Identity, p model.Profile, scopes []string, now time.Time) *Session {
 	has := scopeSet(scopes)
 	idExtra := map[string]interface{}{}
 	accessExtra := map[string]interface{}{}
@@ -36,7 +38,9 @@ func BuildSession(issuer, clientID, kid string, id model.Identity, p model.Profi
 		idExtra["email"] = id.Email
 		idExtra["email_verified"] = id.EmailVerified
 	}
-	return NewSession(issuer, id.ID, clientID, kid, idExtra, accessExtra, now)
+	s := NewSession(issuer, id.ID, clientID, kid, idExtra, accessExtra, now)
+	s.IdPSessionID = sessionID
+	return s
 }
 
 // Userinfo returns the /userinfo response body for the granted scopes.

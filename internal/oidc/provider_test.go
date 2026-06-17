@@ -10,6 +10,7 @@ import (
 	"github.com/ory/fosite/storage"
 
 	"platform/services/identity/internal/oidc"
+	"platform/services/identity/internal/repo"
 )
 
 // The session must satisfy BOTH interfaces (the JWT-access-token gotcha).
@@ -40,5 +41,17 @@ func TestNewSessionShape(t *testing.T) {
 	}
 	if s.Clone() == nil {
 		t.Fatal("clone nil")
+	}
+}
+
+func TestNewProviderWithRefreshConfig(t *testing.T) {
+	r := repo.NewMemory()
+	st := oidc.NewStore(oidc.NewMemBackend(), r)
+	p := oidc.NewProvider(st, oidc.Config{
+		Issuer: "http://localhost", GlobalSecret: []byte("0123456789012345678901234567890123"),
+		AccessTTL: 10 * time.Minute, IDTTL: 10 * time.Minute, RefreshTTL: 720 * time.Hour,
+	}, func(ctx context.Context) (interface{}, error) { return nil, nil })
+	if p == nil {
+		t.Fatal("nil provider")
 	}
 }

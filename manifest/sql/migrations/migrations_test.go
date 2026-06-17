@@ -46,3 +46,24 @@ func TestOIDCMigrationHasCoreTables(t *testing.T) {
 		t.Errorf("0002 down missing: %v", err)
 	}
 }
+
+func TestOIDCSessionMigrationHasCoreTables(t *testing.T) {
+	up, err := os.ReadFile("0003_oidc_sessions.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(up)
+	for _, want := range []string{
+		"CREATE TABLE oidc_oauth_requests",
+		"CREATE TABLE oidc_refresh_tokens",
+		"offline_access",
+		"refresh_token",
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("0003 up missing %q", want)
+		}
+	}
+	if _, err := os.Stat("0003_oidc_sessions.down.sql"); err != nil {
+		t.Errorf("0003 down missing: %v", err)
+	}
+}

@@ -38,9 +38,13 @@ func (s *Service) GetProfile(ctx context.Context, id string) (model.Profile, err
 	return s.store.GetProfile(ctx, id)
 }
 
-// Logout clears a single session. (Session-bound refresh-token revocation is
-// milestone 4; no refresh tokens exist yet.)
+// Logout clears a single session and revokes the refresh tokens bound to it.
 func (s *Service) Logout(ctx context.Context, sessionID string) error {
+	if s.revoker != nil {
+		if err := s.revoker.RevokeRefreshBySession(ctx, sessionID); err != nil {
+			return err
+		}
+	}
 	return s.store.DeleteSession(ctx, sessionID)
 }
 
@@ -49,7 +53,12 @@ func (s *Service) ListSessions(ctx context.Context, identityID string) ([]model.
 	return s.store.ListSessionsByIdentity(ctx, identityID)
 }
 
-// LogoutAll clears all of an identity's sessions ("log out everywhere").
+// LogoutAll clears all of an identity's sessions and revokes all its refresh tokens.
 func (s *Service) LogoutAll(ctx context.Context, identityID string) error {
+	if s.revoker != nil {
+		if err := s.revoker.RevokeRefreshByIdentity(ctx, identityID); err != nil {
+			return err
+		}
+	}
 	return s.store.DeleteSessionsByIdentity(ctx, identityID)
 }
