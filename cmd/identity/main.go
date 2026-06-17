@@ -1,8 +1,11 @@
-// Command identity is the user-center IdP backend (milestone 2: identities,
-// credentials, email/password login, self-hosted Redis session).
+// Command identity is the user-center IdP backend (milestone 3: OIDC /
+// OAuth2 authorization server layered on top of the milestone 2 identity core).
 package main
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/gogf/gf/v2/os/gctx"
@@ -15,27 +18,64 @@ import (
 	"platform/services/identity/internal/controller"
 	"platform/services/identity/internal/dao"
 	"platform/services/identity/internal/logic"
+	"platform/services/identity/internal/oidc"
 	"platform/services/identity/internal/repo"
 )
 
 func main() {
 	ctx := gctx.New()
 
-	db := g.DB()     // configured via manifest/config + GF_DATABASE_DEFAULT_LINK env
-	rdb := g.Redis() // configured via manifest/config + GF_REDIS_DEFAULT_ADDRESS env
-
-	store := repo.NewComposite(dao.NewPG(db), cache.NewRedis(rdb), cache.NewRedis(rdb))
-	svc := logic.New(store, logic.DefaultConfig())
-
+	// ── Config ──────────────────────────────────────────────────────────────
+	issuer := g.Cfg().MustGet(ctx, "oidc.issuer").String()
+	loginURL := g.Cfg().MustGet(ctx, "account.loginUrl").String()
+	globalSecret := g.Cfg().MustGet(ctx, "oidc.globalSecret").String()
+	if len(globalSecret) < 32 {
+		panic(fmt.Sprintf("oidc.globalSecret must be >= 32 bytes (got %d); set GF_OIDC_GLOBALSECRET", len(globalSecret)))
+	}
 	secureCookie := g.Cfg().MustGet(ctx, "cookie.secure", true).Bool()
-	ctl := controller.New(svc, secureCookie)
 
+	// ── Data layer ──────────────────────────────────────────────────────────
+	daoPG := dao.NewPG(g.DB())
+	rdb := cache.NewRedis(g.Redis())
+
+	// ── Business auth (milestone ②) ─────────────────────────────────────────
+	store := repo.NewComposite(daoPG, rdb, rdb)
+	svc := logic.New(store, logic.DefaultConfig())
+	authCtl := controller.New(svc, secureCookie)
+
+	// ── OIDC / OAuth2 (milestone ③) ─────────────────────────────────────────
+	mgr, err := oidc.NewManager(ctx, daoPG)
+	if err != nil {
+		panic(fmt.Sprintf("oidc.NewManager: %v", err))
+	}
+	oidcStore := oidc.NewStore(daoPG)
+	provider := oidc.NewProvider(oidcStore, oidc.Config{
+		Issuer:       issuer,
+		GlobalSecret: []byte(globalSecret),
+		AccessTTL:    10 * time.Minute,
+		IDTTL:        10 * time.Minute,
+	}, mgr.KeyGetter)
+	oidcCtl := controller.NewOIDC(provider, mgr, svc, issuer, loginURL)
+
+	// ── Routing ─────────────────────────────────────────────────────────────
 	s := g.Server()
-	s.Use(ghttpx.Middleware)
+
+	// Business API: JSON envelope middleware applied to this group only.
 	s.Group("/", func(grp *ghttp.RouterGroup) {
+		grp.Middleware(ghttpx.Middleware)
 		grp.GET("/healthz", controller.Healthz)
-		grp.Bind(ctl)
+		grp.Bind(authCtl)
 	})
+
+	// OIDC standard endpoints: raw RFC responses — NO envelope middleware.
+	s.Group("/", func(grp *ghttp.RouterGroup) {
+		grp.GET("/.well-known/openid-configuration", oidcCtl.Discovery)
+		grp.GET("/oauth2/jwks.json", oidcCtl.JWKS)
+		grp.GET("/oauth2/authorize", oidcCtl.Authorize)
+		grp.POST("/oauth2/token", oidcCtl.Token)
+		grp.ALL("/oauth2/userinfo", oidcCtl.Userinfo)
+	})
+
 	g.Log().Info(ctx, "identity-service starting")
 	s.Run()
 }

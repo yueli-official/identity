@@ -23,10 +23,10 @@ const (
 
 // SigningKey is an RS256 key pair (PEM) used to sign tokens.
 type SigningKey struct {
-	KID        string
-	Alg        string
-	PrivatePEM string
-	PublicPEM  string
-	Status     KeyStatus
-	CreatedAt  time.Time
+	KID        string    `orm:"kid"`
+	Alg        string    `orm:"alg"`
+	PrivatePEM string    `orm:"private_pem"`
+	PublicPEM  string    `orm:"public_pem"`
+	Status     KeyStatus `orm:"status"`
+	CreatedAt  time.Time `orm:"created_at"`
 }

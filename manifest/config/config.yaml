@@ -21,3 +21,8 @@ redis:
   default:
     address: ""  # override via GF_REDIS_DEFAULT_ADDRESS env var at runtime
     db: 0
+oidc:
+  issuer: "http://localhost:8081"
+  globalSecret: ""        # set via env GF_OIDC_GLOBALSECRET (>=32 bytes), never commit a real value
+account:
+  loginUrl: "http://localhost:3000/login"
