@@ -1,0 +1,8 @@
+server:
+  address: ":8081"
+  openapiPath: "/api.json"
+  swaggerPath: "/swagger"
+logger:
+  level: "info"
+  stdout: true
+# database / redis filled in a later task; values come from env in real runs.
