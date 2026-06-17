@@ -99,14 +99,20 @@ func TestAuthFlow(t *testing.T) {
 			j := gjson.New(body)
 			t.Assert(j.Get("code").String(), "ok")
 
-			// Extract id_session from Set-Cookie header
+			// Extract id_session from Set-Cookie header and assert security flags.
 			for _, raw := range resp.Header["Set-Cookie"] {
-				// raw is like: id_session=<value>; Path=/; HttpOnly
+				// raw is like: id_session=<value>; Path=/; HttpOnly; SameSite=Lax
 				parts := strings.Split(raw, ";")
 				if len(parts) > 0 {
 					kv := strings.SplitN(strings.TrimSpace(parts[0]), "=", 2)
 					if len(kv) == 2 && kv[0] == "id_session" {
 						sessionCookieValue = kv[1]
+
+						// Assert required cookie security attributes are present
+						// (guards against regression stripping HttpOnly or SameSite).
+						rawLower := strings.ToLower(raw)
+						t.Assert(strings.Contains(rawLower, "httponly"), true)
+						t.Assert(strings.Contains(rawLower, "samesite"), true)
 					}
 				}
 			}

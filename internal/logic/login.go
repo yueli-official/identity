@@ -44,7 +44,8 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (LoginOutput, error)
 
 	id, err := s.store.GetByEmail(ctx, email)
 	if errors.Is(err, repo.ErrIdentityMissing) {
-		return fail() // generic — no account enumeration
+		VerifyDummy(in.Password) // equalize timing vs the wrong-password path
+		return fail()
 	}
 	if err != nil {
 		return LoginOutput{}, err
