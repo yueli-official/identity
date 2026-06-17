@@ -86,7 +86,7 @@ func TestOIDCFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewManager: %v", err)
 	}
-	store := oidc.NewStore(r)
+	store := oidc.NewStore(oidc.NewMemBackend(), r)
 	provider := oidc.NewProvider(store, oidc.Config{
 		Issuer:       base,
 		GlobalSecret: []byte("0123456789abcdef0123456789abcdef"),

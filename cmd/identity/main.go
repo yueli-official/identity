@@ -48,7 +48,9 @@ func main() {
 	if err != nil {
 		panic(fmt.Sprintf("oidc.NewManager: %v", err))
 	}
-	oidcStore := oidc.NewStore(daoPG)
+	// TODO(task9): swap NewMemBackend for the PG-backed Backend (durable
+	// sessions/refresh tokens + real transactions). Memory backend is interim.
+	oidcStore := oidc.NewStore(oidc.NewMemBackend(), daoPG)
 	provider := oidc.NewProvider(oidcStore, oidc.Config{
 		Issuer:       issuer,
 		GlobalSecret: []byte(globalSecret),

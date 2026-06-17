@@ -15,6 +15,11 @@ func newMemBackend() *memBackend {
 	return &memBackend{generic: map[string]Record{}, refresh: map[string]RefreshRecord{}}
 }
 
+// NewMemBackend is the exported constructor for the in-memory Backend. It lets
+// external packages (cmd wiring, oidc_test black-box tests) build a Store before
+// the PG backend lands (Task 9). Sessions/refresh tokens are NOT durable.
+func NewMemBackend() Backend { return newMemBackend() }
+
 func gkey(kind, sig string) string { return kind + "\x00" + sig }
 
 func (b *memBackend) PutGeneric(_ context.Context, kind, sig string, r Record) error {

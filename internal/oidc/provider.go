@@ -48,6 +48,10 @@ func NewProvider(store fosite.Storage, cfg Config, keyGetter func(context.Contex
 		compose.OAuth2AuthorizeExplicitFactory,
 		compose.OpenIDConnectExplicitFactory,
 		compose.OAuth2PKCEFactory,
-		compose.OAuth2TokenIntrospectionFactory,
+		// Stateless JWT introspection: access tokens are self-contained JWTs and
+		// are NOT persisted (Store.GetAccessTokenSession no-ops), so the stateful
+		// CoreValidator (OAuth2TokenIntrospectionFactory) would fail every lookup.
+		// Validate from the JWT itself instead (userinfo path).
+		compose.OAuth2StatelessJWTIntrospectionFactory,
 	)
 }
