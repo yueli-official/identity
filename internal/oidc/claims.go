@@ -1,0 +1,60 @@
+package oidc
+
+import (
+	"time"
+
+	"platform/services/identity/internal/model"
+)
+
+// scopeSet builds a membership set for quick scope checks.
+func scopeSet(scopes []string) map[string]bool {
+	m := make(map[string]bool, len(scopes))
+	for _, s := range scopes {
+		m[s] = true
+	}
+	return m
+}
+
+// BuildSession assembles the fosite session (ID-token + access-token claims) for
+// an authenticated identity and the granted scopes. now is injected for tests.
+// roles is an empty placeholder until RBAC (milestone ⑥).
+func BuildSession(issuer, clientID, kid string, id model.Identity, p model.Profile, scopes []string, now time.Time) *Session {
+	has := scopeSet(scopes)
+	idExtra := map[string]interface{}{}
+	accessExtra := map[string]interface{}{}
+	if has["roles"] {
+		idExtra["roles"] = []string{}
+		accessExtra["roles"] = []string{}
+	}
+	if has["profile"] {
+		idExtra["name"] = p.DisplayName
+		idExtra["preferred_username"] = p.Username
+		idExtra["picture"] = p.AvatarURL
+		idExtra["locale"] = p.Locale
+	}
+	if has["email"] {
+		idExtra["email"] = id.Email
+		idExtra["email_verified"] = id.EmailVerified
+	}
+	return NewSession(issuer, id.ID, clientID, kid, idExtra, accessExtra, now)
+}
+
+// Userinfo returns the /userinfo response body for the granted scopes.
+func Userinfo(id model.Identity, p model.Profile, scopes []string) map[string]interface{} {
+	has := scopeSet(scopes)
+	out := map[string]interface{}{"sub": id.ID}
+	if has["profile"] {
+		out["name"] = p.DisplayName
+		out["preferred_username"] = p.Username
+		out["picture"] = p.AvatarURL
+		out["locale"] = p.Locale
+	}
+	if has["email"] {
+		out["email"] = id.Email
+		out["email_verified"] = id.EmailVerified
+	}
+	if has["roles"] {
+		out["roles"] = []string{}
+	}
+	return out
+}
