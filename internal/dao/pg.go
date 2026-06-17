@@ -102,6 +102,19 @@ func (p *PG) GetPasswordHash(ctx context.Context, identityID string) (string, er
 	return val.String(), nil
 }
 
+// GetProfile returns the user_profiles row for an identity.
+// Returns repo.ErrIdentityMissing when absent.
+func (p *PG) GetProfile(ctx context.Context, identityID string) (model.Profile, error) {
+	var out model.Profile
+	if err := p.db.Model("user_profiles").Ctx(ctx).Where("identity_id", identityID).Scan(&out); err != nil {
+		return model.Profile{}, err
+	}
+	if out.IdentityID == "" {
+		return model.Profile{}, repo.ErrIdentityMissing
+	}
+	return out, nil
+}
+
 // orDefault returns v if non-blank, otherwise d.
 func orDefault(v, d string) string {
 	if strings.TrimSpace(v) == "" {

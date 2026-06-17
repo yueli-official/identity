@@ -21,6 +21,8 @@ type Memory struct {
 	failCount map[string]int
 	lockUntil map[string]time.Time
 	now       func() time.Time
+	clients   map[string]model.OIDCClient
+	keys      []model.SigningKey
 }
 
 func NewMemory() *Memory {
@@ -29,6 +31,7 @@ func NewMemory() *Memory {
 		pwHash: map[string]string{}, profiles: map[string]model.Profile{},
 		sessions: map[string]model.Session{}, failCount: map[string]int{},
 		lockUntil: map[string]time.Time{}, now: time.Now,
+		clients: map[string]model.OIDCClient{}, keys: nil,
 	}
 }
 
@@ -151,5 +154,68 @@ func (m *Memory) Reset(_ context.Context, key string) error {
 	return nil
 }
 
-// Compile-time guarantee Memory satisfies the full Store surface.
+// GetProfile returns the stored profile for an identity.
+// Returns ErrIdentityMissing when not found.
+func (m *Memory) GetProfile(_ context.Context, identityID string) (model.Profile, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	p, ok := m.profiles[identityID]
+	if !ok {
+		return model.Profile{}, ErrIdentityMissing
+	}
+	return p, nil
+}
+
+// SetClient is a test helper that registers an OIDCClient by its ID.
+func (m *Memory) SetClient(c model.OIDCClient) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.clients[c.ID] = c
+}
+
+// GetClient returns the OIDCClient with the given id.
+// Returns ErrClientNotFound when absent.
+func (m *Memory) GetClient(_ context.Context, id string) (model.OIDCClient, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	c, ok := m.clients[id]
+	if !ok {
+		return model.OIDCClient{}, ErrClientNotFound
+	}
+	return c, nil
+}
+
+// GetActiveKey returns the first key with Status == model.KeyActive.
+// Returns ErrNoActiveKey when none exists.
+func (m *Memory) GetActiveKey(_ context.Context) (model.SigningKey, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, k := range m.keys {
+		if k.Status == model.KeyActive {
+			return k, nil
+		}
+	}
+	return model.SigningKey{}, ErrNoActiveKey
+}
+
+// InsertKey appends a signing key to the in-memory store.
+func (m *Memory) InsertKey(_ context.Context, k model.SigningKey) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.keys = append(m.keys, k)
+	return nil
+}
+
+// ListPublicKeys returns all keys (active + retired) for JWKS exposure.
+func (m *Memory) ListPublicKeys(_ context.Context) ([]model.SigningKey, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := make([]model.SigningKey, len(m.keys))
+	copy(out, m.keys)
+	return out, nil
+}
+
+// Compile-time guarantees.
 var _ Store = (*Memory)(nil)
+var _ ClientRepo = (*Memory)(nil)
+var _ SigningKeyRepo = (*Memory)(nil)
