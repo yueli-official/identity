@@ -3,11 +3,12 @@ module platform/services/identity
 go 1.22
 
 require (
+	github.com/go-jose/go-jose/v3 v3.0.3
 	github.com/gogf/gf/contrib/drivers/pgsql/v2 v2.10.2
 	github.com/gogf/gf/contrib/nosql/redis/v2 v2.10.2
 	github.com/gogf/gf/v2 v2.10.2
 	github.com/google/uuid v1.6.0
-	golang.org/x/crypto v0.38.0
+	golang.org/x/crypto v0.51.0
 )
 
 require (
