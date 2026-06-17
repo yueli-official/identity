@@ -90,7 +90,7 @@ Migration `0002` seeds a `demo-web` public client (PKCE, no client secret):
 |-----------------|-------------------------------|
 | `client_id`     | `demo-web`                    |
 | `public`        | `true`                        |
-| `redirect_uris` | `http://localhost:3000/cb`    |
+| `redirect_uris` | `http://127.0.0.1:3000/callback`, `http://localhost:3000/callback` |
 | `grant_types`   | `authorization_code`          |
 | `scopes`        | `openid profile email roles`  |
 
@@ -107,6 +107,9 @@ Migration `0002` seeds a `demo-web` public client (PKCE, no client secret):
 Config keys `oidc.issuer` (default `http://localhost:8081`) and
 `account.loginUrl` (default `http://localhost:3000/login`) can be overridden
 via `manifest/config/config.yaml` or `GF_OIDC_ISSUER` / `GF_ACCOUNT_LOGINURL`.
+`oidc.issuer` MUST equal the externally-reachable origin of this service — it is
+stamped as the JWT `iss` claim and used to build every discovery URL, so a
+mismatch silently breaks relying-party discovery and token validation.
 
 ### Auth code + PKCE walkthrough
 
@@ -117,7 +120,7 @@ via `manifest/config/config.yaml` or `GF_OIDC_ISSUER` / `GF_ACCOUNT_LOGINURL`.
    GET /oauth2/authorize
      ?response_type=code
      &client_id=demo-web
-     &redirect_uri=http://localhost:3000/cb
+     &redirect_uri=http://localhost:3000/callback
      &scope=openid%20profile%20email
      &state=<random>
      &code_challenge=<challenge>
