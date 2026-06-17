@@ -14,6 +14,8 @@ var (
 	ErrEmailTaken      = errors.New("email taken")
 	ErrIdentityMissing = errors.New("identity not found")
 	ErrSessionNotFound = errors.New("session not found")
+	ErrClientNotFound  = errors.New("oidc client not found")
+	ErrNoActiveKey     = errors.New("no active signing key")
 )
 
 // NewIdentityInput is an atomic identity+profile+password-credential creation.
@@ -26,9 +28,10 @@ type NewIdentityInput struct {
 
 type IdentityRepo interface {
 	CreateIdentityWithProfile(ctx context.Context, in NewIdentityInput) (model.Identity, error)
-	GetByEmail(ctx context.Context, email string) (model.Identity, error) // ErrIdentityMissing
-	GetByID(ctx context.Context, id string) (model.Identity, error)       // ErrIdentityMissing
+	GetByEmail(ctx context.Context, email string) (model.Identity, error)            // ErrIdentityMissing
+	GetByID(ctx context.Context, id string) (model.Identity, error)                  // ErrIdentityMissing
 	GetPasswordHash(ctx context.Context, identityID string) (string, error)
+	GetProfile(ctx context.Context, identityID string) (model.Profile, error)        // ErrIdentityMissing
 }
 
 type SessionStore interface {
@@ -51,4 +54,16 @@ type Store interface {
 	IdentityRepo
 	SessionStore
 	LoginThrottle
+}
+
+// ClientRepo provides read access to registered OIDC relying parties.
+type ClientRepo interface {
+	GetClient(ctx context.Context, id string) (model.OIDCClient, error) // ErrClientNotFound
+}
+
+// SigningKeyRepo manages RS256 key pairs used to sign OIDC tokens.
+type SigningKeyRepo interface {
+	GetActiveKey(ctx context.Context) (model.SigningKey, error) // ErrNoActiveKey
+	InsertKey(ctx context.Context, k model.SigningKey) error
+	ListPublicKeys(ctx context.Context) ([]model.SigningKey, error) // active + retired (for JWKS)
 }

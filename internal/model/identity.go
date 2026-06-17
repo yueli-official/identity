@@ -21,11 +21,11 @@ type Identity struct {
 }
 
 type Profile struct {
-	IdentityID  string
-	Username    string
-	DisplayName string
-	AvatarURL   string
-	Locale      string
+	IdentityID  string `orm:"identity_id"`
+	Username    string `orm:"username"`
+	DisplayName string `orm:"display_name"`
+	AvatarURL   string `orm:"avatar_url"`
+	Locale      string `orm:"locale"`
 }
 
 // Session is an IdP self-hosted login session (Redis-backed).

@@ -29,6 +29,89 @@ func TestMemoryIdentityCreateAndGet(t *testing.T) {
 	}
 }
 
+func TestMemoryGetProfile(t *testing.T) {
+	ctx := context.Background()
+	m := repo.NewMemory()
+	id, err := m.CreateIdentityWithProfile(ctx, repo.NewIdentityInput{
+		Email: "profile@test.com", DisplayName: "Profile User", PasswordHash: "h",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	prof, err := m.GetProfile(ctx, id.ID)
+	if err != nil {
+		t.Fatalf("GetProfile: %v", err)
+	}
+	if prof.DisplayName != "Profile User" {
+		t.Fatalf("want DisplayName 'Profile User', got %q", prof.DisplayName)
+	}
+	if _, err := m.GetProfile(ctx, "nonexistent-id"); err != repo.ErrIdentityMissing {
+		t.Fatalf("want ErrIdentityMissing for unknown id, got %v", err)
+	}
+}
+
+func TestMemoryClientRepo(t *testing.T) {
+	ctx := context.Background()
+	m := repo.NewMemory()
+	c := model.OIDCClient{
+		ID:            "client-1",
+		Public:        false,
+		SecretHash:    "hash",
+		RedirectURIs:  []string{"https://example.com/callback"},
+		GrantTypes:    []string{"authorization_code"},
+		ResponseTypes: []string{"code"},
+		Scopes:        []string{"openid", "profile"},
+	}
+	m.SetClient(c)
+	got, err := m.GetClient(ctx, "client-1")
+	if err != nil {
+		t.Fatalf("GetClient: %v", err)
+	}
+	if got.ID != "client-1" {
+		t.Fatalf("want client ID 'client-1', got %q", got.ID)
+	}
+	if got.SecretHash != "hash" {
+		t.Fatalf("want SecretHash 'hash', got %q", got.SecretHash)
+	}
+	if _, err := m.GetClient(ctx, "nonexistent-client"); err != repo.ErrClientNotFound {
+		t.Fatalf("want ErrClientNotFound, got %v", err)
+	}
+}
+
+func TestMemorySigningKeyRepo(t *testing.T) {
+	ctx := context.Background()
+	m := repo.NewMemory()
+	k := model.SigningKey{
+		KID:        "key-1",
+		Alg:        "RS256",
+		PrivatePEM: "private-pem-data",
+		PublicPEM:  "public-pem-data",
+		Status:     model.KeyActive,
+	}
+	if err := m.InsertKey(ctx, k); err != nil {
+		t.Fatalf("InsertKey: %v", err)
+	}
+	active, err := m.GetActiveKey(ctx)
+	if err != nil {
+		t.Fatalf("GetActiveKey: %v", err)
+	}
+	if active.KID != "key-1" {
+		t.Fatalf("want KID 'key-1', got %q", active.KID)
+	}
+	keys, err := m.ListPublicKeys(ctx)
+	if err != nil {
+		t.Fatalf("ListPublicKeys: %v", err)
+	}
+	if len(keys) != 1 {
+		t.Fatalf("want 1 key, got %d", len(keys))
+	}
+	// No active key scenario
+	m2 := repo.NewMemory()
+	if _, err := m2.GetActiveKey(ctx); err != repo.ErrNoActiveKey {
+		t.Fatalf("want ErrNoActiveKey, got %v", err)
+	}
+}
+
 func TestMemorySessionLifecycle(t *testing.T) {
 	ctx := context.Background()
 	m := repo.NewMemory()

@@ -26,3 +26,23 @@ func TestInitMigrationHasCoreTables(t *testing.T) {
 		t.Errorf("down migration missing: %v", err)
 	}
 }
+
+func TestOIDCMigrationHasCoreTables(t *testing.T) {
+	up, err := os.ReadFile("0002_oidc.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(up)
+	for _, want := range []string{
+		"CREATE TABLE oidc_clients",
+		"CREATE TABLE oidc_signing_keys",
+		"INSERT INTO oidc_clients",
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("0002 up missing %q", want)
+		}
+	}
+	if _, err := os.Stat("0002_oidc.down.sql"); err != nil {
+		t.Errorf("0002 down missing: %v", err)
+	}
+}
