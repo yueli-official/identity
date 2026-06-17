@@ -1,0 +1,39 @@
+package logic_test
+
+import (
+	"context"
+	"testing"
+
+	"platform/services/identity/internal/iderr"
+	"platform/services/identity/internal/logic"
+)
+
+func TestMeReturnsIdentityForValidSession(t *testing.T) {
+	svc := newSvc()
+	seedUser(t, svc, "a@b.com", "longenough123")
+	out, _ := svc.Login(context.Background(), logic.LoginInput{Email: "a@b.com", Password: "longenough123"})
+	id, err := svc.Me(context.Background(), out.SessionID)
+	if err != nil || id.Email != "a@b.com" {
+		t.Fatalf("me failed: %v %#v", err, id)
+	}
+}
+
+func TestMeRejectsUnknownSession(t *testing.T) {
+	svc := newSvc()
+	_, err := svc.Me(context.Background(), "nope")
+	if codeOfErr(err) != iderr.CodeNotAuthenticated {
+		t.Fatalf("want not_authenticated, got %v", err)
+	}
+}
+
+func TestLogoutClearsSession(t *testing.T) {
+	svc := newSvc()
+	seedUser(t, svc, "a@b.com", "longenough123")
+	out, _ := svc.Login(context.Background(), logic.LoginInput{Email: "a@b.com", Password: "longenough123"})
+	if err := svc.Logout(context.Background(), out.SessionID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Me(context.Background(), out.SessionID); codeOfErr(err) != iderr.CodeNotAuthenticated {
+		t.Fatalf("session not cleared: %v", err)
+	}
+}
