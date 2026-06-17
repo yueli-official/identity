@@ -5,4 +5,19 @@ server:
 logger:
   level: "info"
   stdout: true
-# database / redis filled in a later task; values come from env in real runs.
+cookie:
+  secure: true
+# Database and Redis connection strings must be supplied at runtime via environment variables.
+# GoFrame v2 resolves config keys through env overrides using the GF_* prefix convention:
+#   GF_DATABASE_DEFAULT_LINK=pgsql:user:pass@tcp(host:5432)/identity
+#   GF_REDIS_DEFAULT_ADDRESS=host:6379
+# (See: IDENTITY_PG_LINK / IDENTITY_REDIS_ADDR env vars — set these and export as GF_* above,
+#  or configure the fields below directly for non-production environments.)
+database:
+  default:
+    type: "pgsql"
+    link: ""  # override via GF_DATABASE_DEFAULT_LINK env var at runtime
+redis:
+  default:
+    address: ""  # override via GF_REDIS_DEFAULT_ADDRESS env var at runtime
+    db: 0
