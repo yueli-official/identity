@@ -26,6 +26,271 @@ import (
 	"platform/services/identity/internal/repo"
 )
 
+// callbackURI is the redirect_uri shared by the in-memory demo clients seeded by
+// the hermetic e2e tests below.
+const callbackURI = "http://127.0.0.1/callback"
+
+// noRedirectClient returns an HTTP client that does NOT follow redirects, so the
+// /authorize 302 Location (carrying the authorization code) can be read.
+func noRedirectClient() *http.Client {
+	return &http.Client{
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+}
+
+// e2eEnv holds the wired-up hermetic OIDC stack: the in-memory repo, the logic
+// service (with the OIDC store wired as refresh revoker), the live g.Server base
+// URL, and the login session identifiers for the seeded user.
+type e2eEnv struct {
+	ctx     context.Context
+	repo    *repo.Memory
+	svc     *logic.Service
+	store   *oidc.Store
+	base    string
+	sid     string // id_session cookie value
+	subject string // identity ID == JWT sub
+}
+
+// setupE2E builds the full hermetic OIDC stack used by milestone-③ and ④ tests:
+//   - in-memory repo + a demo client (authorization_code + refresh_token grants,
+//     offline_access scope so refresh can be exercised),
+//   - a registered+logged-in user (yielding the id_session cookie value),
+//   - manager → store → provider → controller, with svc.SetRefreshRevoker(store)
+//     wired (mirrors main.go) so /end_session performs passive logout,
+//   - a g.Server mounting ALL OIDC routes (incl. /revoke + /end_session).
+//
+// The server is registered for automatic shutdown via t.Cleanup.
+func setupE2E(t *testing.T, clientID string) *e2eEnv {
+	t.Helper()
+	ctx := context.Background()
+
+	// 1. In-memory repo + demo client. Unlike ③'s minimal client, this one also
+	//    advertises the refresh_token grant and offline_access scope.
+	r := repo.NewMemory()
+	r.SetClient(model.OIDCClient{
+		ID:            clientID,
+		Public:        true,
+		RedirectURIs:  []string{callbackURI},
+		GrantTypes:    []string{"authorization_code", "refresh_token"},
+		ResponseTypes: []string{"code"},
+		Scopes:        []string{"openid", "profile", "email", "roles", "offline_access"},
+	})
+
+	// 2. User: register + login → session id + subject.
+	svc := logic.New(r, logic.DefaultConfig())
+	if _, err := svc.Register(ctx, logic.RegisterInput{
+		Email: "u@e.com", Password: "longenough123", DisplayName: "U",
+	}); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	loginOut, err := svc.Login(ctx, logic.LoginInput{
+		Email: "u@e.com", Password: "longenough123", IP: "127.0.0.1",
+	})
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+	sid := loginOut.SessionID
+	subject := loginOut.Identity.ID
+
+	// 3. Pick a free port so the issuer URL exists before the server starts.
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("find free port: %v", err)
+	}
+	port := ln.Addr().(*net.TCPAddr).Port
+	if err := ln.Close(); err != nil {
+		t.Fatalf("close temp listener: %v", err)
+	}
+	base := fmt.Sprintf("http://127.0.0.1:%d", port)
+
+	// 4. Build OIDC stack (manager → store → provider → controller). A non-zero
+	//    RefreshTTL is required so issued refresh tokens have a valid lifespan.
+	mgr, err := oidc.NewManager(ctx, r)
+	if err != nil {
+		t.Fatalf("NewManager: %v", err)
+	}
+	store := oidc.NewStore(oidc.NewMemBackend(), r)
+	// CRITICAL wiring: without this, svc.Logout (called by EndSession) cannot
+	// revoke session-bound refresh tokens and the passive-logout test would not
+	// actually verify anything. Mirrors main.go.
+	svc.SetRefreshRevoker(store)
+	provider := oidc.NewProvider(store, oidc.Config{
+		Issuer:       base,
+		GlobalSecret: []byte("0123456789abcdef0123456789abcdef"),
+		AccessTTL:    10 * time.Minute,
+		IDTTL:        10 * time.Minute,
+		RefreshTTL:   720 * time.Hour,
+	}, mgr.KeyGetter)
+	ctl := controller.NewOIDC(provider, mgr, svc, base, base+"/login")
+
+	// 5. Start GoFrame server on the pre-chosen port (NO ghttpx.Middleware), with
+	//    the full milestone-④ route set.
+	s := g.Server(t.Name())
+	s.SetPort(port)
+	s.SetDumpRouterMap(false)
+	s.BindHandler("GET:/.well-known/openid-configuration", ctl.Discovery)
+	s.BindHandler("GET:/oauth2/jwks.json", ctl.JWKS)
+	s.BindHandler("GET:/oauth2/authorize", ctl.Authorize)
+	s.BindHandler("POST:/oauth2/token", ctl.Token)
+	s.BindHandler("ALL:/oauth2/userinfo", ctl.Userinfo)
+	s.BindHandler("POST:/oauth2/revoke", ctl.Revoke)
+	s.BindHandler("ALL:/oauth2/end_session", ctl.EndSession)
+	s.Start()
+	t.Cleanup(func() { _ = s.Shutdown() })
+
+	return &e2eEnv{
+		ctx:     ctx,
+		repo:    r,
+		svc:     svc,
+		store:   store,
+		base:    base,
+		sid:     sid,
+		subject: subject,
+	}
+}
+
+// tokenSet is the parsed /oauth2/token JSON response.
+type tokenSet struct {
+	AccessToken  string `json:"access_token"`
+	IDToken      string `json:"id_token"`
+	RefreshToken string `json:"refresh_token"`
+	TokenType    string `json:"token_type"`
+}
+
+// pkcePair is a PKCE code_verifier + its S256 challenge.
+type pkcePair struct {
+	verifier  string
+	challenge string
+}
+
+// newPKCE generates a PKCE verifier + S256 challenge (mirrors the PoC).
+func newPKCE(t *testing.T) pkcePair {
+	t.Helper()
+	verifier := randPKCEVerifier(t)
+	sum := sha256.Sum256([]byte(verifier))
+	return pkcePair{
+		verifier:  verifier,
+		challenge: base64.RawURLEncoding.EncodeToString(sum[:]),
+	}
+}
+
+// authorizeForCode drives GET /oauth2/authorize with the given cookie and PKCE
+// challenge and returns the authorization code from the 302 Location. It fails
+// the test if the authorize step does not produce a code at the callback URI.
+func authorizeForCode(t *testing.T, env *e2eEnv, clientID, scope string, p pkcePair) string {
+	t.Helper()
+	authURL := env.base + "/oauth2/authorize?" + url.Values{
+		"response_type":         {"code"},
+		"client_id":             {clientID},
+		"redirect_uri":          {callbackURI},
+		"scope":                 {scope},
+		"state":                 {"xyz-test-state-123"},
+		"code_challenge":        {p.challenge},
+		"code_challenge_method": {"S256"},
+	}.Encode()
+
+	req, err := http.NewRequestWithContext(env.ctx, http.MethodGet, authURL, nil)
+	if err != nil {
+		t.Fatalf("build authorize request: %v", err)
+	}
+	req.Header.Set("Cookie", "id_session="+env.sid)
+
+	resp, err := noRedirectClient().Do(req)
+	if err != nil {
+		t.Fatalf("authorize request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusFound && resp.StatusCode != http.StatusSeeOther {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("authorize: expected 302/303, got %d: %s", resp.StatusCode, body)
+	}
+	loc, err := url.Parse(resp.Header.Get("Location"))
+	if err != nil {
+		t.Fatalf("parse authorize redirect Location: %v", err)
+	}
+	if !strings.HasPrefix(loc.String(), callbackURI) {
+		t.Fatalf("authorize: location does not start with callback URI, got %q", loc.String())
+	}
+	code := loc.Query().Get("code")
+	if code == "" {
+		t.Fatalf("authorize: no authorization code in redirect: %s", loc.String())
+	}
+	return code
+}
+
+// exchangeCode POSTs /oauth2/token with the authorization_code grant and returns
+// the raw HTTP status, the response body, and the parsed token set.
+func exchangeCode(t *testing.T, env *e2eEnv, clientID, code, verifier string) (int, []byte, tokenSet) {
+	t.Helper()
+	form := url.Values{
+		"grant_type":    {"authorization_code"},
+		"code":          {code},
+		"redirect_uri":  {callbackURI},
+		"client_id":     {clientID},
+		"code_verifier": {verifier},
+	}
+	return postToken(t, env, form)
+}
+
+// refreshToken POSTs /oauth2/token with the refresh_token grant (public client;
+// no PKCE on refresh) and returns the raw HTTP status, body, and parsed set.
+func refreshToken(t *testing.T, env *e2eEnv, clientID, rt string) (int, []byte, tokenSet) {
+	t.Helper()
+	form := url.Values{
+		"grant_type":    {"refresh_token"},
+		"refresh_token": {rt},
+		"client_id":     {clientID},
+	}
+	return postToken(t, env, form)
+}
+
+// postToken POSTs a form to /oauth2/token and parses the JSON body.
+func postToken(t *testing.T, env *e2eEnv, form url.Values) (int, []byte, tokenSet) {
+	t.Helper()
+	req, err := http.NewRequestWithContext(env.ctx, http.MethodPost,
+		env.base+"/oauth2/token", strings.NewReader(form.Encode()))
+	if err != nil {
+		t.Fatalf("build token request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("token request: %v", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	var ts tokenSet
+	_ = json.Unmarshal(body, &ts) // non-200 bodies are error JSON; tolerated
+	return resp.StatusCode, body, ts
+}
+
+// assertValidTokenResponse asserts a 200 token response with a JWT access token
+// and bearer type. id_token presence is asserted only when requireIDToken is set
+// (true for the authorization_code exchange; the refresh_token grant does not
+// re-mint an id_token in this configuration). It does NOT assert refresh
+// presence (callers that requested offline_access check that separately).
+func assertValidTokenResponse(t *testing.T, status int, body []byte, ts tokenSet, requireIDToken bool) {
+	t.Helper()
+	if status != http.StatusOK {
+		t.Fatalf("token: expected 200, got %d: %s", status, body)
+	}
+	if ts.AccessToken == "" {
+		t.Fatalf("token: empty access_token in: %s", body)
+	}
+	if requireIDToken && ts.IDToken == "" {
+		t.Fatalf("token: empty id_token in: %s", body)
+	}
+	if !strings.EqualFold(ts.TokenType, "bearer") {
+		t.Fatalf("token: token_type = %q, want bearer", ts.TokenType)
+	}
+	if n := strings.Count(ts.AccessToken, "."); n != 2 {
+		t.Fatalf("token: access_token not a JWT (want 2 dots, got %d)", n)
+	}
+}
+
 // TestOIDCFlow is the milestone-③ acceptance test: hermetic end-to-end
 // authorization_code + PKCE flow, with local JWKS verification of the JWT
 // access token (mirrors the PoC's verifyAccessTokenLocally).
@@ -279,6 +544,229 @@ func TestOIDCFlow(t *testing.T) {
 		t.Fatalf("no-session: expected redirect to %s/login..., got %q", base, noSessLoc)
 	}
 	t.Logf("no-session OK: correctly redirected to %s", noSessLoc)
+}
+
+// TestOIDCRefreshFlow is the milestone-④ refresh happy path: an authorize with
+// offline_access yields a refresh token; the refresh_token grant then mints a
+// NEW access token (JWKS-verified) and a NEW, distinct refresh token (rotation).
+func TestOIDCRefreshFlow(t *testing.T) {
+	const clientID = "demo-web"
+	env := setupE2E(t, clientID)
+	const scope = "openid profile email roles offline_access"
+
+	// Authorize → token (with offline_access → refresh token expected).
+	p := newPKCE(t)
+	code := authorizeForCode(t, env, clientID, scope, p)
+	status, body, ts := exchangeCode(t, env, clientID, code, p.verifier)
+	assertValidTokenResponse(t, status, body, ts, true)
+	if ts.RefreshToken == "" {
+		t.Fatalf("offline_access requested but no refresh_token in response: %s", body)
+	}
+	verifyAccessTokenLocally(t, env.base, ts.AccessToken, env.base, env.subject)
+	t.Logf("initial token OK: refresh_token len=%d", len(ts.RefreshToken))
+
+	// Refresh grant → NEW access token + NEW refresh token (rotation). The refresh
+	// grant does not re-mint an id_token, so do not require one here.
+	rStatus, rBody, rts := refreshToken(t, env, clientID, ts.RefreshToken)
+	assertValidTokenResponse(t, rStatus, rBody, rts, false)
+	if rts.RefreshToken == "" {
+		t.Fatalf("refresh response missing rotated refresh_token: %s", rBody)
+	}
+	if rts.RefreshToken == ts.RefreshToken {
+		t.Fatalf("rotation failed: refresh_token unchanged after refresh grant")
+	}
+	if rts.AccessToken == ts.AccessToken {
+		t.Fatalf("refresh did not mint a new access_token")
+	}
+	verifyAccessTokenLocally(t, env.base, rts.AccessToken, env.base, env.subject)
+	t.Logf("refresh OK: new access_token + rotated refresh_token (rt→rt2)")
+}
+
+// TestOIDCRotationReplayKillsFamily is the milestone-④ rotation/replay defense:
+// after rt→rt2 rotation, replaying the OLD rt is rejected AND poisons the whole
+// family, so rt2 is then dead too. fosite revokes by request_id, which is reused
+// across the refresh chain.
+func TestOIDCRotationReplayKillsFamily(t *testing.T) {
+	const clientID = "demo-web"
+	env := setupE2E(t, clientID)
+	const scope = "openid profile email roles offline_access"
+
+	// Initial authorize → token to get rt.
+	p := newPKCE(t)
+	code := authorizeForCode(t, env, clientID, scope, p)
+	status, body, ts := exchangeCode(t, env, clientID, code, p.verifier)
+	assertValidTokenResponse(t, status, body, ts, true)
+	rt := ts.RefreshToken
+	if rt == "" {
+		t.Fatalf("no refresh_token issued: %s", body)
+	}
+
+	// Rotate rt → rt2 (refresh grant does not re-mint id_token).
+	rStatus, rBody, rts := refreshToken(t, env, clientID, rt)
+	assertValidTokenResponse(t, rStatus, rBody, rts, false)
+	rt2 := rts.RefreshToken
+	if rt2 == "" || rt2 == rt {
+		t.Fatalf("rotation failed: rt2=%q rt=%q", rt2, rt)
+	}
+
+	// Replay the OLD rt → must be rejected (invalid_grant). This replay triggers
+	// family revocation.
+	replayStatus, replayBody, _ := refreshToken(t, env, clientID, rt)
+	if replayStatus == http.StatusOK {
+		t.Fatalf("replay of old refresh token unexpectedly succeeded: %s", replayBody)
+	}
+	if !strings.Contains(string(replayBody), "invalid_grant") {
+		t.Fatalf("replay of old rt: expected invalid_grant, got %d: %s", replayStatus, replayBody)
+	}
+	t.Logf("replay of old rt rejected (status=%d invalid_grant) — family poisoned", replayStatus)
+
+	// rt2 must now ALSO be dead (whole family revoked by the replay).
+	rt2Status, rt2Body, _ := refreshToken(t, env, clientID, rt2)
+	if rt2Status == http.StatusOK {
+		t.Fatalf("rt2 still usable after family revocation: %s", rt2Body)
+	}
+	t.Logf("rt2 also dead after replay (status=%d) — family revocation confirmed", rt2Status)
+}
+
+// TestOIDCRevoke is the milestone-④ RFC 7009 path: a freshly minted refresh
+// token rt3 is revoked via /oauth2/revoke (HTTP 200), after which it is unusable
+// at the token endpoint.
+func TestOIDCRevoke(t *testing.T) {
+	const clientID = "demo-web"
+	env := setupE2E(t, clientID)
+	const scope = "openid profile email roles offline_access"
+
+	// Fresh authorize → token to get rt3.
+	p := newPKCE(t)
+	code := authorizeForCode(t, env, clientID, scope, p)
+	status, body, ts := exchangeCode(t, env, clientID, code, p.verifier)
+	assertValidTokenResponse(t, status, body, ts, true)
+	rt3 := ts.RefreshToken
+	if rt3 == "" {
+		t.Fatalf("no refresh_token issued: %s", body)
+	}
+
+	// POST /oauth2/revoke (token=rt3&client_id=demo-web) → 200.
+	revForm := url.Values{
+		"token":     {rt3},
+		"client_id": {clientID},
+	}
+	revReq, err := http.NewRequestWithContext(env.ctx, http.MethodPost,
+		env.base+"/oauth2/revoke", strings.NewReader(revForm.Encode()))
+	if err != nil {
+		t.Fatalf("build revoke request: %v", err)
+	}
+	revReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	revResp, err := http.DefaultClient.Do(revReq)
+	if err != nil {
+		t.Fatalf("revoke request: %v", err)
+	}
+	defer revResp.Body.Close()
+	revBody, _ := io.ReadAll(revResp.Body)
+	if revResp.StatusCode != http.StatusOK {
+		t.Fatalf("revoke: expected 200, got %d: %s", revResp.StatusCode, revBody)
+	}
+	t.Logf("revoke OK: HTTP 200 for rt3")
+
+	// rt3 must now be unusable.
+	rStatus, rBody, _ := refreshToken(t, env, clientID, rt3)
+	if rStatus == http.StatusOK {
+		t.Fatalf("refresh with revoked rt3 unexpectedly succeeded: %s", rBody)
+	}
+	t.Logf("revoked rt3 rejected at token endpoint (status=%d)", rStatus)
+}
+
+// TestOIDCEndSessionPassiveLogout is the milestone-④ RP-initiated logout +
+// passive-logout path: a refresh token rt4 bound to the login session is revoked
+// when /oauth2/end_session clears that session, AND the IdP session itself is
+// gone afterwards. Requires svc.SetRefreshRevoker(store) in setup.
+func TestOIDCEndSessionPassiveLogout(t *testing.T) {
+	const clientID = "demo-web"
+	env := setupE2E(t, clientID)
+	const scope = "openid profile email roles offline_access"
+
+	// Authorize → token to get rt4 (bound to env.sid via Session.IdPSessionID).
+	p := newPKCE(t)
+	code := authorizeForCode(t, env, clientID, scope, p)
+	status, body, ts := exchangeCode(t, env, clientID, code, p.verifier)
+	assertValidTokenResponse(t, status, body, ts, true)
+	rt4 := ts.RefreshToken
+	if rt4 == "" {
+		t.Fatalf("no refresh_token issued: %s", body)
+	}
+
+	// Sanity: the session is currently valid (Me resolves).
+	if _, err := env.svc.Me(env.ctx, env.sid); err != nil {
+		t.Fatalf("precondition: session should be valid before logout: %v", err)
+	}
+
+	// GET /oauth2/end_session with the id_session cookie → 200 {"logged_out":true}.
+	esReq, err := http.NewRequestWithContext(env.ctx, http.MethodGet,
+		env.base+"/oauth2/end_session", nil)
+	if err != nil {
+		t.Fatalf("build end_session request: %v", err)
+	}
+	esReq.Header.Set("Cookie", "id_session="+env.sid)
+	esResp, err := http.DefaultClient.Do(esReq)
+	if err != nil {
+		t.Fatalf("end_session request: %v", err)
+	}
+	defer esResp.Body.Close()
+	esBody, _ := io.ReadAll(esResp.Body)
+	if esResp.StatusCode != http.StatusOK {
+		t.Fatalf("end_session: expected 200, got %d: %s", esResp.StatusCode, esBody)
+	}
+	var es struct {
+		LoggedOut bool `json:"logged_out"`
+	}
+	if err := json.Unmarshal(esBody, &es); err != nil {
+		t.Fatalf("decode end_session response: %v (%s)", err, esBody)
+	}
+	if !es.LoggedOut {
+		t.Fatalf("end_session: logged_out != true: %s", esBody)
+	}
+	t.Logf("end_session OK: 200 logged_out=true")
+
+	// Passive logout: rt4 (session-bound) must now be revoked → unusable.
+	rStatus, rBody, _ := refreshToken(t, env, clientID, rt4)
+	if rStatus == http.StatusOK {
+		t.Fatalf("refresh with rt4 after end_session unexpectedly succeeded (passive logout failed): %s", rBody)
+	}
+	t.Logf("passive logout OK: rt4 rejected at token endpoint (status=%d)", rStatus)
+
+	// The IdP session itself must be gone: Me returns an error, and a fresh
+	// authorize with that cookie now redirects to /login.
+	if _, err := env.svc.Me(env.ctx, env.sid); err == nil {
+		t.Fatalf("end_session: IdP session still resolves via Me after logout")
+	}
+	p2 := newPKCE(t)
+	authURL := env.base + "/oauth2/authorize?" + url.Values{
+		"response_type":         {"code"},
+		"client_id":             {clientID},
+		"redirect_uri":          {callbackURI},
+		"scope":                 {scope},
+		"state":                 {"xyz-test-state-123"},
+		"code_challenge":        {p2.challenge},
+		"code_challenge_method": {"S256"},
+	}.Encode()
+	authReq, err := http.NewRequestWithContext(env.ctx, http.MethodGet, authURL, nil)
+	if err != nil {
+		t.Fatalf("build post-logout authorize request: %v", err)
+	}
+	authReq.Header.Set("Cookie", "id_session="+env.sid)
+	authResp, err := noRedirectClient().Do(authReq)
+	if err != nil {
+		t.Fatalf("post-logout authorize request: %v", err)
+	}
+	defer authResp.Body.Close()
+	if authResp.StatusCode != http.StatusFound && authResp.StatusCode != http.StatusSeeOther {
+		ab, _ := io.ReadAll(authResp.Body)
+		t.Fatalf("post-logout authorize: expected redirect to login, got %d: %s", authResp.StatusCode, ab)
+	}
+	if loc := authResp.Header.Get("Location"); !strings.HasPrefix(loc, env.base+"/login") {
+		t.Fatalf("post-logout authorize: expected redirect to %s/login..., got %q", env.base, loc)
+	}
+	t.Logf("post-logout authorize correctly redirects to /login — IdP session cleared")
 }
 
 // verifyAccessTokenLocally simulates a resource server: fetches JWKS, verifies
