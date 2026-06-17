@@ -27,11 +27,16 @@ func DefaultConfig() Config {
 
 // Service is the identity-service application layer.
 type Service struct {
-	store repo.Store
-	cfg   Config
-	now   func() time.Time
+	store   repo.Store
+	cfg     Config
+	now     func() time.Time
+	revoker RefreshRevoker // optional; nil before OIDC wiring
 }
 
 func New(store repo.Store, cfg Config) *Service {
 	return &Service{store: store, cfg: cfg, now: time.Now}
 }
+
+// SetRefreshRevoker wires OIDC refresh revocation into passive logout. Called in
+// main after the OIDC store is built.
+func (s *Service) SetRefreshRevoker(r RefreshRevoker) { s.revoker = r }
