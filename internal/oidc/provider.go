@@ -15,6 +15,7 @@ type Config struct {
 	GlobalSecret []byte // >= 32 bytes; backs the HMAC auth-code signatures
 	AccessTTL    time.Duration
 	IDTTL        time.Duration
+	RefreshTTL   time.Duration // milestone ④: refresh token lifespan (e.g. 30d)
 }
 
 // NewProvider builds the fosite OAuth2 provider with a JWT access-token
@@ -25,6 +26,7 @@ type Config struct {
 func NewProvider(store fosite.Storage, cfg Config, keyGetter func(context.Context) (interface{}, error)) fosite.OAuth2Provider {
 	fcfg := &fosite.Config{
 		AccessTokenLifespan:            cfg.AccessTTL,
+		RefreshTokenLifespan:           cfg.RefreshTTL,
 		IDTokenLifespan:                cfg.IDTTL,
 		IDTokenIssuer:                  cfg.Issuer,
 		AccessTokenIssuer:              cfg.Issuer,
@@ -53,5 +55,7 @@ func NewProvider(store fosite.Storage, cfg Config, keyGetter func(context.Contex
 		// CoreValidator (OAuth2TokenIntrospectionFactory) would fail every lookup.
 		// Validate from the JWT itself instead (userinfo path).
 		compose.OAuth2StatelessJWTIntrospectionFactory,
+		compose.OAuth2RefreshTokenGrantFactory, // milestone ④: refresh_token grant + rotation
+		compose.OAuth2TokenRevocationFactory,   // milestone ④: RFC 7009 /revoke
 	)
 }
