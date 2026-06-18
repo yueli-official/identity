@@ -112,6 +112,33 @@ async function onLogout() {
   await navigateTo('/login')
 }
 
+// ── Credentials (login methods) ─────────────────────────────────────────────
+interface CredRes { hasPassword: boolean; oauth: { provider: string; email: string }[] }
+const { data: credData, refresh: refreshCreds } = await useAsyncData('credentials',
+  () => call<CredRes>('/api/v1/session/credentials'))
+const hasGoogle = computed(() => (credData.value?.oauth ?? []).some(o => o.provider === 'google'))
+const bindGoogleUrl = '/api/v1/auth/oauth/google/start?intent=bind&return_to=' + encodeURIComponent('/')
+const unbinding = ref(false)
+async function onUnbindGoogle() {
+  unbinding.value = true
+  try {
+    await call('/api/v1/session/credentials/google', { method: 'DELETE' })
+    await refreshCreds()
+    toast.add({ title: '已解绑 Google', color: 'success' })
+  } catch (err: any) {
+    toast.add({ title: '解绑失败', description: err?.data?.message || '请重试', color: 'error' })
+  } finally {
+    unbinding.value = false
+  }
+}
+// Surface a failed Google bind handed back via ?error on the callback redirect.
+const route = useRoute()
+onMounted(() => {
+  if (route.query.error === 'oauth_bind') {
+    toast.add({ title: 'Google 绑定失败', description: '该 Google 账号可能已绑定到其它账户。', color: 'error' })
+  }
+})
+
 function fmt(ts: string) {
   if (!ts) return '—'
   const d = new Date(ts)
@@ -191,6 +218,49 @@ function deviceIcon(ua: string) {
           <UButton type="submit" color="neutral" label="修改密码" :loading="savingPw" />
         </div>
       </UForm>
+    </UCard>
+
+    <!-- Credentials / login methods -->
+    <UCard class="shadow-soft">
+      <template #header>
+        <div class="flex items-center gap-2">
+          <UIcon name="i-tabler-key" class="size-5 text-muted" />
+          <h2 class="font-medium text-highlighted">登录方式</h2>
+        </div>
+      </template>
+      <ul class="divide-y divide-default">
+        <li class="flex items-center justify-between gap-4 py-3">
+          <div class="flex items-center gap-3">
+            <UIcon name="i-tabler-lock" class="size-5 text-dimmed" />
+            <div>
+              <p class="text-sm text-highlighted">密码</p>
+              <p class="text-xs text-muted">邮箱 + 密码登录</p>
+            </div>
+          </div>
+          <UBadge :color="credData?.hasPassword ? 'success' : 'neutral'" variant="soft" size="sm">
+            {{ credData?.hasPassword ? '已设置' : '未设置' }}
+          </UBadge>
+        </li>
+        <li class="flex items-center justify-between gap-4 py-3">
+          <div class="flex items-center gap-3">
+            <UIcon name="i-tabler-brand-google" class="size-5 text-dimmed" />
+            <div>
+              <p class="text-sm text-highlighted">Google</p>
+              <p class="text-xs text-muted">{{ hasGoogle ? '已绑定' : '未绑定' }}</p>
+            </div>
+          </div>
+          <UButton
+            v-if="hasGoogle"
+            color="neutral" variant="ghost" size="xs" label="解绑"
+            :loading="unbinding" @click="onUnbindGoogle"
+          />
+          <UButton
+            v-else
+            color="neutral" variant="outline" size="xs" icon="i-tabler-brand-google"
+            label="绑定" :to="bindGoogleUrl" external
+          />
+        </li>
+      </ul>
     </UCard>
 
     <!-- Sessions -->
