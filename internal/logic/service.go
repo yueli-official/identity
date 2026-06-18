@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"platform/services/identity/internal/mailer"
+	"platform/services/identity/internal/pat"
 	"platform/services/identity/internal/repo"
 )
 
@@ -23,6 +24,10 @@ type Config struct {
 	ResetMaxReq        int           // max password-reset requests per window
 	VerifyResetWindow  time.Duration // throttle counting window (verify + reset)
 	VerifyResetLockFor time.Duration // throttle lockout duration (verify + reset)
+
+	// Personal Access Tokens (PAT).
+	PATHMACSecret string // HKDF secret; empty → dev fallback (codec handles it)
+	PATMaxPerUser int    // max PATs per identity (≤0 → clamped to 20 in New)
 }
 
 func DefaultConfig() Config {
@@ -40,6 +45,8 @@ func DefaultConfig() Config {
 		ResetMaxReq:        5,
 		VerifyResetWindow:  time.Hour,
 		VerifyResetLockFor: time.Hour,
+
+		PATMaxPerUser: 20,
 	}
 }
 
@@ -50,10 +57,21 @@ type Service struct {
 	now     func() time.Time
 	revoker RefreshRevoker // optional; nil before OIDC wiring
 	mailer  mailer.Mailer  // optional; nil sends no mail (links still issued)
+	patKey  []byte         // derived HMAC key for PAT hashing
 }
 
 func New(store repo.Store, cfg Config) *Service {
-	return &Service{store: store, cfg: cfg, now: time.Now}
+	// Defensive default: a zero/unset cap would make CreatePAT reject every token
+	// (count >= 0 is always true). DefaultConfig sets 20; clamp bare configs too.
+	if cfg.PATMaxPerUser <= 0 {
+		cfg.PATMaxPerUser = 20
+	}
+	return &Service{
+		store:  store,
+		cfg:    cfg,
+		now:    time.Now,
+		patKey: pat.DeriveKey(cfg.PATHMACSecret),
+	}
 }
 
 // SetRefreshRevoker wires OIDC refresh revocation into passive logout. Called in

@@ -46,6 +46,16 @@ func main() {
 	store := repo.NewComposite(daoPG, rdb, rdb)
 	cfg := logic.DefaultConfig()
 	cfg.AccountBaseURL = accountBaseURL // base for verify-email / reset links (milestone ⑤)
+
+	// PAT HMAC secret: warn at startup when falling back to the insecure dev key.
+	cfg.PATHMACSecret = g.Cfg().MustGet(ctx, "pat.hmacSecret").String()
+	if cfg.PATHMACSecret == "" {
+		g.Log().Warning(ctx, "pat.hmacSecret not set; using insecure dev fallback key")
+	}
+	if maxPerUser := g.Cfg().MustGet(ctx, "pat.maxPerUser", 0).Int(); maxPerUser > 0 {
+		cfg.PATMaxPerUser = maxPerUser
+	}
+
 	svc := logic.New(store, cfg)
 	authCtl := controller.New(svc, secureCookie)
 
