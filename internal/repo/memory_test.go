@@ -345,6 +345,39 @@ func TestMemory_Audit(t *testing.T) {
 	if roleRowResult[0].Detail["role"] != "admin" {
 		t.Fatalf("Detail round-trip failed: got %v", roleRowResult[0].Detail)
 	}
+
+	// Negative offset must not panic and behaves as offset=0 (returns all u1 rows).
+	negOffset, err := m.QueryAudit(ctx, repo.AuditFilter{IdentityID: "u1", Offset: -1})
+	if err != nil {
+		t.Fatalf("QueryAudit with negative offset: %v", err)
+	}
+	asZero, err := m.QueryAudit(ctx, repo.AuditFilter{IdentityID: "u1", Offset: 0})
+	if err != nil {
+		t.Fatalf("QueryAudit with zero offset: %v", err)
+	}
+	if len(negOffset) != len(asZero) {
+		t.Fatalf("negative offset should behave as offset=0: got %d rows, want %d", len(negOffset), len(asZero))
+	}
+
+	// Detail-aliasing: mutating the caller's map after insert must not alter the
+	// stored row (InsertAudit shallow-copies Detail).
+	aliasDetail := map[string]any{"k": "original"}
+	if err := m.InsertAudit(ctx, repo.AuditRow{
+		Event: "alias.check", ActorID: "alias-actor", Result: "success", Detail: aliasDetail,
+	}); err != nil {
+		t.Fatalf("InsertAudit alias.check: %v", err)
+	}
+	aliasDetail["k"] = "mutated" // mutate the caller's map after insert
+	aliasResult, err := m.QueryAudit(ctx, repo.AuditFilter{Event: "alias.check"})
+	if err != nil {
+		t.Fatalf("QueryAudit alias.check: %v", err)
+	}
+	if len(aliasResult) != 1 {
+		t.Fatalf("want 1 alias.check row, got %d", len(aliasResult))
+	}
+	if aliasResult[0].Detail["k"] != "original" {
+		t.Fatalf("Detail aliasing: stored row mutated by caller, got %v", aliasResult[0].Detail["k"])
+	}
 }
 
 func TestMemorySessionLifecycle(t *testing.T) {

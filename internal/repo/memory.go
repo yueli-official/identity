@@ -396,6 +396,16 @@ func (m *Memory) InsertAudit(_ context.Context, row AuditRow) error {
 	if row.OccurredAt.IsZero() {
 		row.OccurredAt = m.now()
 	}
+	// Defensively shallow-copy Detail: the value-copy of row still shares the
+	// underlying map with the caller, so without this a caller mutating its map
+	// after InsertAudit would alter the stored row (and vice-versa).
+	if row.Detail != nil {
+		detail := make(map[string]any, len(row.Detail))
+		for k, v := range row.Detail {
+			detail[k] = v
+		}
+		row.Detail = detail
+	}
 	m.audit = append(m.audit, row)
 	return nil
 }
@@ -430,6 +440,9 @@ func (m *Memory) QueryAudit(_ context.Context, f AuditFilter) ([]AuditRow, error
 		limit = 200
 	}
 	offset := f.Offset
+	if offset < 0 {
+		offset = 0
+	}
 	if offset >= len(matches) {
 		return []AuditRow{}, nil
 	}
