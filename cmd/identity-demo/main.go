@@ -13,6 +13,9 @@
 package main
 
 import (
+	"bufio"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/gogf/gf/v2/frame/g"
@@ -24,6 +27,7 @@ import (
 	"platform/services/identity/internal/logic"
 	"platform/services/identity/internal/mailer"
 	"platform/services/identity/internal/model"
+	"platform/services/identity/internal/oauthlogin"
 	"platform/services/identity/internal/oidc"
 	"platform/services/identity/internal/repo"
 )
@@ -43,6 +47,7 @@ const (
 
 func main() {
 	ctx := gctx.New()
+	loadDotEnv() // pick up gitignored creds (Google client id/secret) from .env.local
 
 	// ── In-memory data layer (resets on restart) ─────────────────────────────
 	store := repo.NewMemory()
@@ -89,9 +94,23 @@ func main() {
 	}, mgr.KeyGetter)
 	oidcCtl := controller.NewOIDC(provider, mgr, svc, demoIssuer, demoLoginURL)
 
-	// Google OAuth stays unconfigured in the demo (nil provider → the start/
-	// callback endpoints redirect to login with ?error=oauth_unavailable).
-	oauthCtl := controller.NewOAuth(svc, nil, false, []byte(demoSecret), demoLoginURL)
+	// Google OAuth: enabled when GF_OIDC_GOOGLE_CLIENTID/SECRET are present
+	// (read from .env.local via loadDotEnv). Otherwise nil → the start/callback
+	// endpoints redirect to login with ?error=oauth_unavailable.
+	var googleProvider oauthlogin.Provider
+	googleID := os.Getenv("GF_OIDC_GOOGLE_CLIENTID")
+	googleSecret := os.Getenv("GF_OIDC_GOOGLE_CLIENTSECRET")
+	googleRedirect := os.Getenv("GF_OIDC_GOOGLE_REDIRECTURL")
+	if googleRedirect == "" {
+		googleRedirect = "http://localhost:3000/api/v1/auth/oauth/google/callback"
+	}
+	if googleID != "" && googleSecret != "" {
+		googleProvider = oauthlogin.NewGoogle(googleID, googleSecret, googleRedirect)
+		g.Log().Infof(ctx, "google oauth: ENABLED (redirect %s)", googleRedirect)
+	} else {
+		g.Log().Info(ctx, "google oauth: disabled (set GF_OIDC_GOOGLE_CLIENTID/SECRET in .env.local)")
+	}
+	oauthCtl := controller.NewOAuth(svc, googleProvider, false, []byte(demoSecret), demoLoginURL)
 
 	// ── Routing (mirrors cmd/identity) ───────────────────────────────────────
 	s := g.Server()
@@ -123,4 +142,32 @@ func main() {
 	g.Log().Infof(ctx, "UI:       http://localhost:3000")
 	g.Log().Infof(ctx, "seeded login:  %s / %s", demoEmail, demoPassword)
 	s.Run()
+}
+
+// loadDotEnv loads KEY=VALUE lines from .env.local in the working directory into
+// the process environment (existing env wins). Dev-only convenience so `go run`
+// picks up the gitignored credentials file the same way the real service expects
+// those values to be present in the environment. Missing file → no-op.
+func loadDotEnv() {
+	f, err := os.Open(".env.local")
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		k, v, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		k = strings.TrimSpace(k)
+		v = strings.Trim(strings.TrimSpace(v), `"'`)
+		if k != "" && os.Getenv(k) == "" {
+			_ = os.Setenv(k, v)
+		}
+	}
 }
