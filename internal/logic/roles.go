@@ -21,8 +21,8 @@ func (s *Service) GetRoles(ctx context.Context, identityID string) ([]string, er
 }
 
 // GrantRole / RevokeRole are thin pass-throughs (catalog validation lives in the
-// repo). A structured audit log would be emitted here; ⑥-audit will replace it
-// with a persisted audit_logs row.
+// repo). Each emits a persisted audit_logs row (role.granted / role.revoked) after
+// the store mutation succeeds.
 func (s *Service) GrantRole(ctx context.Context, identityID, slug string) error {
 	if err := s.store.GrantRole(ctx, identityID, slug); err != nil {
 		return err

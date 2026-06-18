@@ -163,11 +163,17 @@ func (s *Service) ResetPassword(ctx context.Context, token, newPassword string) 
 	if err := s.store.UpdatePasswordHash(ctx, rec.IdentityID, hash); err != nil {
 		return err
 	}
+	// Force-logout all sessions before auditing success: if the purge fails the
+	// caller must see the error, and we must not claim a clean reset (matches the
+	// "audit only after the final store op succeeds" pattern in VerifyEmail/Logout).
+	if err := s.store.DeleteSessionsByIdentity(ctx, rec.IdentityID); err != nil {
+		return err
+	}
 	s.audit(ctx, AuditEvent{
 		Event:    EvPwReset,
 		ActorID:  rec.IdentityID,
 		TargetID: rec.IdentityID,
 		Email:    rec.Email,
 	})
-	return s.store.DeleteSessionsByIdentity(ctx, rec.IdentityID)
+	return nil
 }

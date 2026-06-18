@@ -7,6 +7,7 @@ import (
 
 	"platform/services/identity/internal/actor"
 	"platform/services/identity/internal/logic"
+	"platform/services/identity/internal/model"
 	"platform/services/identity/internal/repo"
 )
 
@@ -22,16 +23,6 @@ func newSvcWithStore(st repo.Store) *logic.Service {
 // actorCtx injects actor metadata (IP only here; extend as needed).
 func actorCtx(ip string) context.Context {
 	return actor.With(context.Background(), actor.Actor{IP: ip})
-}
-
-// hasEvent returns true if any audit row in rows has the given event name.
-func hasEvent(rows []repo.AuditRow, event string) bool {
-	for _, r := range rows {
-		if r.Event == event {
-			return true
-		}
-	}
-	return false
 }
 
 // findEvent returns the first audit row with the given event name, or zero value + false.
@@ -65,6 +56,26 @@ type failingAuditStore struct {
 
 func (f *failingAuditStore) InsertAudit(_ context.Context, _ repo.AuditRow) error {
 	return errors.New("forced audit failure")
+}
+
+// ---------------------------------------------------------------------------
+// deletedIdentityStore wraps a Store and forces GetByEmail to report the
+// identity as soft-deleted (status=deleted). The IdentityRepo seam exposes no
+// status mutator, so this overlay is how a test exercises the deleted path.
+// All other ops (incl. audit) pass through to the embedded store.
+// ---------------------------------------------------------------------------
+
+type deletedIdentityStore struct {
+	repo.Store
+}
+
+func (d *deletedIdentityStore) GetByEmail(ctx context.Context, email string) (model.Identity, error) {
+	id, err := d.Store.GetByEmail(ctx, email)
+	if err != nil {
+		return id, err
+	}
+	id.Status = model.StatusDeleted
+	return id, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -131,6 +142,39 @@ func TestAudit_LoginFailure_BadPassword(t *testing.T) {
 	}
 	if row.Detail["reason"] != "bad_password" {
 		t.Errorf("Detail[reason]: want bad_password, got %v", row.Detail["reason"])
+	}
+}
+
+// TestAudit_LoginFailure_Deleted checks that logging in to a soft-deleted identity
+// (correct password, status=deleted) records login.failure with
+// Detail["reason"]=="deleted". The identity is registered against the base store,
+// then a deletedIdentityStore overlay forces GetByEmail to report status=deleted.
+func TestAudit_LoginFailure_Deleted(t *testing.T) {
+	base := repo.NewMemory()
+	if _, err := newSvcWithStore(base).Register(
+		context.Background(), logic.RegisterInput{Email: "gone@example.com", Password: "longenough123"},
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	svc := newSvcWithStore(&deletedIdentityStore{Store: base})
+	ctx := actorCtx("6.6.6.6")
+
+	_, err := svc.Login(ctx, logic.LoginInput{Email: "gone@example.com", Password: "longenough123", IP: "6.6.6.6"})
+	if err == nil {
+		t.Fatal("expected login error")
+	}
+
+	rows := allAudit(t, base)
+	row, ok := findEvent(rows, logic.EvLoginFailure)
+	if !ok {
+		t.Fatalf("expected %q audit event, got events: %v", logic.EvLoginFailure, eventNames(rows))
+	}
+	if row.Result != "failure" {
+		t.Errorf("Result: want failure, got %q", row.Result)
+	}
+	if row.Detail["reason"] != "deleted" {
+		t.Errorf("Detail[reason]: want deleted, got %v", row.Detail["reason"])
 	}
 }
 
@@ -207,19 +251,16 @@ func TestAudit_RoleGranted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// clear audit rows from register so we start clean
-	preCount := len(allAudit(t, m))
-
 	if err := svc.GrantRole(ctx, id.ID, "admin"); err != nil {
 		t.Fatal(err)
 	}
 
+	// Locate the role.granted event by event name (linear scan) rather than by
+	// slice position, so the assertion does not depend on row ordering.
 	rows := allAudit(t, m)
-	// Only look at rows added after pre-count
-	newRows := rows[:len(rows)-preCount] // QueryAudit returns newest-first
-	row, ok := findEvent(newRows, logic.EvRoleGranted)
+	row, ok := findEvent(rows, logic.EvRoleGranted)
 	if !ok {
-		t.Fatalf("expected %q audit event in new rows, got: %v", logic.EvRoleGranted, eventNames(newRows))
+		t.Fatalf("expected %q audit event, got events: %v", logic.EvRoleGranted, eventNames(rows))
 	}
 	if row.TargetID != id.ID {
 		t.Errorf("TargetID: want %q, got %q", id.ID, row.TargetID)
