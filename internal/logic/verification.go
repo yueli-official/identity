@@ -54,6 +54,12 @@ func (s *Service) RequestEmailVerification(ctx context.Context, identityID, ip s
 	}
 	_ = s.store.RecordFailure(ctx, acctKey, s.cfg.VerifyResetWindow, s.cfg.VerifyResetLockFor, s.cfg.VerifyMaxReq)
 	_ = s.store.RecordFailure(ctx, ipKey, s.cfg.VerifyResetWindow, s.cfg.VerifyResetLockFor, s.cfg.VerifyMaxReq)
+	s.audit(ctx, AuditEvent{
+		Event:    EvEmailVerifyRequested,
+		ActorID:  identityID,
+		TargetID: identityID,
+		Email:    id.Email,
+	})
 	link := s.cfg.AccountBaseURL + "/verify-email?token=" + token
 	if s.mailer != nil {
 		return s.mailer.SendVerifyEmail(ctx, id.Email, link)
@@ -73,7 +79,16 @@ func (s *Service) VerifyEmail(ctx context.Context, token string) error {
 	if err != nil {
 		return err
 	}
-	return s.store.SetEmailVerified(ctx, rec.IdentityID, true)
+	if err := s.store.SetEmailVerified(ctx, rec.IdentityID, true); err != nil {
+		return err
+	}
+	s.audit(ctx, AuditEvent{
+		Event:    EvEmailVerified,
+		ActorID:  rec.IdentityID,
+		TargetID: rec.IdentityID,
+		Email:    rec.Email,
+	})
+	return nil
 }
 
 // RequestPasswordReset emails a reset link IF the account exists; it always
@@ -91,6 +106,11 @@ func (s *Service) RequestPasswordReset(ctx context.Context, email, ip string) er
 	_ = s.store.RecordFailure(ctx, ipKey, s.cfg.VerifyResetWindow, s.cfg.VerifyResetLockFor, s.cfg.ResetMaxReq)
 	id, err := s.store.GetByEmail(ctx, email)
 	if errors.Is(err, repo.ErrIdentityMissing) {
+		s.audit(ctx, AuditEvent{
+			Event:  EvPwResetRequested,
+			Email:  email,
+			Detail: map[string]any{"identity_found": false},
+		})
 		return nil // no leak
 	}
 	if err != nil {
@@ -106,6 +126,13 @@ func (s *Service) RequestPasswordReset(ctx context.Context, email, ip string) er
 	}); err != nil {
 		return err
 	}
+	s.audit(ctx, AuditEvent{
+		Event:    EvPwResetRequested,
+		ActorID:  id.ID,
+		TargetID: id.ID,
+		Email:    id.Email,
+		Detail:   map[string]any{"identity_found": true},
+	})
 	link := s.cfg.AccountBaseURL + "/reset?token=" + token
 	if s.mailer != nil {
 		return s.mailer.SendPasswordReset(ctx, id.Email, link)
@@ -136,5 +163,17 @@ func (s *Service) ResetPassword(ctx context.Context, token, newPassword string) 
 	if err := s.store.UpdatePasswordHash(ctx, rec.IdentityID, hash); err != nil {
 		return err
 	}
-	return s.store.DeleteSessionsByIdentity(ctx, rec.IdentityID)
+	// Force-logout all sessions before auditing success: if the purge fails the
+	// caller must see the error, and we must not claim a clean reset (matches the
+	// "audit only after the final store op succeeds" pattern in VerifyEmail/Logout).
+	if err := s.store.DeleteSessionsByIdentity(ctx, rec.IdentityID); err != nil {
+		return err
+	}
+	s.audit(ctx, AuditEvent{
+		Event:    EvPwReset,
+		ActorID:  rec.IdentityID,
+		TargetID: rec.IdentityID,
+		Email:    rec.Email,
+	})
+	return nil
 }

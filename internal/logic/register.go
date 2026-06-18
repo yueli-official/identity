@@ -38,5 +38,19 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (model.Identit
 		return model.Identity{}, err
 	}
 	_ = s.store.GrantRole(ctx, id.ID, DefaultRole) // best-effort default role
+	// Audit order mirrors the causal order: the identity must exist before a role
+	// can be granted, so identity.register is emitted first, then role.default_granted.
+	s.audit(ctx, AuditEvent{
+		Event:    EvRegister,
+		ActorID:  id.ID,
+		TargetID: id.ID,
+		Email:    id.Email,
+	})
+	s.audit(ctx, AuditEvent{
+		Event:    EvRoleDefaultGranted,
+		ActorID:  id.ID,
+		TargetID: id.ID,
+		Detail:   map[string]any{"role": DefaultRole, "best_effort": true},
+	})
 	return id, nil
 }

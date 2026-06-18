@@ -247,6 +247,148 @@ func TestMemory_Roles_GrantGetRevoke(t *testing.T) {
 	}
 }
 
+func TestMemory_Audit(t *testing.T) {
+	ctx := context.Background()
+	m := repo.NewMemory()
+
+	// Insert two audit rows.
+	loginRow := repo.AuditRow{
+		Event:      "login.success",
+		ActorID:    "u1",
+		TargetID:   "u1",
+		ActorEmail: "u1@example.com",
+		IP:         "1.2.3.4",
+		Result:     "success",
+	}
+	if err := m.InsertAudit(ctx, loginRow); err != nil {
+		t.Fatalf("InsertAudit login.success: %v", err)
+	}
+
+	roleRow := repo.AuditRow{
+		Event:    "role.granted",
+		ActorID:  "admin1",
+		TargetID: "u1",
+		Result:   "success",
+		Detail:   map[string]any{"role": "admin"},
+	}
+	if err := m.InsertAudit(ctx, roleRow); err != nil {
+		t.Fatalf("InsertAudit role.granted: %v", err)
+	}
+
+	// QueryAudit by IdentityID="u1" → both rows (actor OR target), newest-first.
+	rows, err := m.QueryAudit(ctx, repo.AuditFilter{IdentityID: "u1"})
+	if err != nil {
+		t.Fatalf("QueryAudit by identity: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("want 2 rows for u1, got %d", len(rows))
+	}
+	// Newest-first: role.granted (inserted second) must come first.
+	if rows[0].Event != "role.granted" {
+		t.Fatalf("want rows[0].Event=role.granted (newest), got %q", rows[0].Event)
+	}
+	if rows[1].Event != "login.success" {
+		t.Fatalf("want rows[1].Event=login.success (oldest), got %q", rows[1].Event)
+	}
+
+	// QueryAudit by Event="login.success" → only login row; IP preserved.
+	loginRows, err := m.QueryAudit(ctx, repo.AuditFilter{Event: "login.success"})
+	if err != nil {
+		t.Fatalf("QueryAudit by event: %v", err)
+	}
+	if len(loginRows) != 1 {
+		t.Fatalf("want 1 login row, got %d", len(loginRows))
+	}
+	if loginRows[0].IP != "1.2.3.4" {
+		t.Fatalf("want IP 1.2.3.4, got %q", loginRows[0].IP)
+	}
+
+	// Limit/offset: insert a third row, then verify limit=1 returns only 1 row.
+	_ = m.InsertAudit(ctx, repo.AuditRow{Event: "password.changed", ActorID: "u1", TargetID: "u1", Result: "success"})
+	limited, err := m.QueryAudit(ctx, repo.AuditFilter{IdentityID: "u1", Limit: 1})
+	if err != nil {
+		t.Fatalf("QueryAudit with limit: %v", err)
+	}
+	if len(limited) != 1 {
+		t.Fatalf("want 1 row with limit=1, got %d", len(limited))
+	}
+	// With limit=1, newest row should be password.changed (id=3).
+	if limited[0].Event != "password.changed" {
+		t.Fatalf("want newest row with limit=1, got %q", limited[0].Event)
+	}
+
+	// Offset: skip newest, get the next one.
+	offset, err := m.QueryAudit(ctx, repo.AuditFilter{IdentityID: "u1", Limit: 1, Offset: 1})
+	if err != nil {
+		t.Fatalf("QueryAudit with offset: %v", err)
+	}
+	if len(offset) != 1 {
+		t.Fatalf("want 1 row with offset=1, got %d", len(offset))
+	}
+	if offset[0].Event != "role.granted" {
+		t.Fatalf("want second-newest row with offset=1, got %q", offset[0].Event)
+	}
+
+	// Row IDs must be assigned and monotonically increasing.
+	allRows, _ := m.QueryAudit(ctx, repo.AuditFilter{IdentityID: "u1"})
+	for i := 1; i < len(allRows); i++ {
+		if allRows[i].ID >= allRows[i-1].ID {
+			t.Fatalf("rows not ordered newest-first by ID: %d >= %d", allRows[i].ID, allRows[i-1].ID)
+		}
+	}
+
+	// Detail map round-trips.
+	roleRowResult, _ := m.QueryAudit(ctx, repo.AuditFilter{Event: "role.granted"})
+	if len(roleRowResult) != 1 {
+		t.Fatalf("want 1 role.granted row, got %d", len(roleRowResult))
+	}
+	if roleRowResult[0].Detail["role"] != "admin" {
+		t.Fatalf("Detail round-trip failed: got %v", roleRowResult[0].Detail)
+	}
+
+	// Nil-Detail contract: loginRow was inserted with Detail: nil, but QueryAudit
+	// must normalize it to a non-nil, len-0 map (matching dao.PG.QueryAudit).
+	if loginRows[0].Detail == nil {
+		t.Fatalf("nil Detail must be normalized to non-nil map, got nil")
+	}
+	if len(loginRows[0].Detail) != 0 {
+		t.Fatalf("want empty Detail for nil-Detail row, got %v", loginRows[0].Detail)
+	}
+
+	// Negative offset must not panic and behaves as offset=0 (returns all u1 rows).
+	negOffset, err := m.QueryAudit(ctx, repo.AuditFilter{IdentityID: "u1", Offset: -1})
+	if err != nil {
+		t.Fatalf("QueryAudit with negative offset: %v", err)
+	}
+	asZero, err := m.QueryAudit(ctx, repo.AuditFilter{IdentityID: "u1", Offset: 0})
+	if err != nil {
+		t.Fatalf("QueryAudit with zero offset: %v", err)
+	}
+	if len(negOffset) != len(asZero) {
+		t.Fatalf("negative offset should behave as offset=0: got %d rows, want %d", len(negOffset), len(asZero))
+	}
+
+	// Detail-aliasing: mutating the caller's map after insert must not alter the
+	// stored row (InsertAudit shallow-copies Detail).
+	aliasDetail := map[string]any{"k": "original"}
+	if err := m.InsertAudit(ctx, repo.AuditRow{
+		Event: "alias.check", ActorID: "alias-actor", Result: "success", Detail: aliasDetail,
+	}); err != nil {
+		t.Fatalf("InsertAudit alias.check: %v", err)
+	}
+	aliasDetail["k"] = "mutated" // mutate the caller's map after insert
+	aliasResult, err := m.QueryAudit(ctx, repo.AuditFilter{Event: "alias.check"})
+	if err != nil {
+		t.Fatalf("QueryAudit alias.check: %v", err)
+	}
+	if len(aliasResult) != 1 {
+		t.Fatalf("want 1 alias.check row, got %d", len(aliasResult))
+	}
+	if aliasResult[0].Detail["k"] != "original" {
+		t.Fatalf("Detail aliasing: stored row mutated by caller, got %v", aliasResult[0].Detail["k"])
+	}
+}
+
 func TestMemorySessionLifecycle(t *testing.T) {
 	ctx := context.Background()
 	m := repo.NewMemory()

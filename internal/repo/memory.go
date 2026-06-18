@@ -31,6 +31,8 @@ type Memory struct {
 	oauthLinks map[string]string // provider+"\x00"+providerUID -> identity id
 	verifs     map[string]memVerification // token_hash -> verification record
 	roles      map[string]map[string]bool // identity id -> set of granted role slugs
+	audit      []AuditRow                 // append-only audit log (newest is highest index)
+	auditSeq   int64                      // monotonically incrementing ID counter
 }
 
 // memVerification mirrors a single email_verifications row in memory.
@@ -381,6 +383,84 @@ func (m *Memory) ListPublicKeys(_ context.Context) ([]model.SigningKey, error) {
 	defer m.mu.Unlock()
 	out := make([]model.SigningKey, len(m.keys))
 	copy(out, m.keys)
+	return out, nil
+}
+
+// InsertAudit appends an audit row to the in-memory log. It assigns a
+// monotonically incrementing ID and sets OccurredAt to now() when zero.
+func (m *Memory) InsertAudit(_ context.Context, row AuditRow) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.auditSeq++
+	row.ID = m.auditSeq
+	if row.OccurredAt.IsZero() {
+		row.OccurredAt = m.now()
+	}
+	// Defensively shallow-copy Detail: the value-copy of row still shares the
+	// underlying map with the caller, so without this a caller mutating its map
+	// after InsertAudit would alter the stored row (and vice-versa).
+	if row.Detail != nil {
+		detail := make(map[string]any, len(row.Detail))
+		for k, v := range row.Detail {
+			detail[k] = v
+		}
+		row.Detail = detail
+	}
+	m.audit = append(m.audit, row)
+	return nil
+}
+
+// QueryAudit returns audit rows matching f, ordered newest-first (by ID desc).
+// IdentityID matches actor OR target; Event matches exactly; Limit 0 → 50,
+// capped at 200; Offset skips the first N matching rows. Returns a copy slice
+// so callers cannot mutate internal state.
+func (m *Memory) QueryAudit(_ context.Context, f AuditFilter) ([]AuditRow, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Collect matching rows in reverse insertion order (newest-first).
+	var matches []AuditRow
+	for i := len(m.audit) - 1; i >= 0; i-- {
+		r := m.audit[i]
+		if f.IdentityID != "" && r.ActorID != f.IdentityID && r.TargetID != f.IdentityID {
+			continue
+		}
+		if f.Event != "" && r.Event != f.Event {
+			continue
+		}
+		matches = append(matches, r)
+	}
+
+	// Apply limit/offset.
+	limit := f.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	offset := f.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	if offset >= len(matches) {
+		return []AuditRow{}, nil
+	}
+	matches = matches[offset:]
+	if len(matches) > limit {
+		matches = matches[:limit]
+	}
+
+	// Return a copy to avoid leaking internal slice storage. Normalize Detail to a
+	// non-nil empty map so this impl matches the dao.PG.QueryAudit contract
+	// (QueryAudit always returns a non-nil Detail).
+	out := make([]AuditRow, len(matches))
+	copy(out, matches)
+	for i := range out {
+		if out[i].Detail == nil {
+			out[i].Detail = map[string]any{}
+		}
+	}
 	return out, nil
 }
 

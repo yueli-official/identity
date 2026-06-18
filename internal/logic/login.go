@@ -36,29 +36,35 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (LoginOutput, error)
 		return LoginOutput{}, iderr.AccountLocked()
 	}
 
-	fail := func() (LoginOutput, error) {
+	fail := func(reason string) (LoginOutput, error) {
 		_ = s.store.RecordFailure(ctx, acctKey, s.cfg.LoginFailWindow, s.cfg.LoginLockFor, s.cfg.LoginMaxFails)
 		_ = s.store.RecordFailure(ctx, ipKey, s.cfg.LoginFailWindow, s.cfg.LoginLockFor, s.cfg.IPMaxFails)
+		s.audit(ctx, AuditEvent{
+			Event:  EvLoginFailure,
+			Email:  email,
+			Result: "failure",
+			Detail: map[string]any{"reason": reason},
+		})
 		return LoginOutput{}, iderr.InvalidCredentials()
 	}
 
 	id, err := s.store.GetByEmail(ctx, email)
 	if errors.Is(err, repo.ErrIdentityMissing) {
 		VerifyDummy(in.Password) // equalize timing vs the wrong-password path
-		return fail()
+		return fail("unknown_email")
 	}
 	if err != nil {
 		return LoginOutput{}, err
 	}
 	hash, err := s.store.GetPasswordHash(ctx, id.ID)
 	if err != nil || !VerifyPassword(hash, in.Password) {
-		return fail()
+		return fail("bad_password")
 	}
 	if id.Status == model.StatusDisabled {
 		return LoginOutput{}, iderr.AccountDisabled()
 	}
 	if id.Status == model.StatusDeleted {
-		return fail()
+		return fail("deleted")
 	}
 
 	// Success: clear counters, mint a fresh (rotated) session id.
@@ -71,5 +77,11 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (LoginOutput, error)
 	if err := s.store.CreateSession(ctx, sess, s.cfg.SessionIdleTTL); err != nil {
 		return LoginOutput{}, err
 	}
+	s.audit(ctx, AuditEvent{
+		Event:    EvLoginSuccess,
+		ActorID:  id.ID,
+		TargetID: id.ID,
+		Email:    id.Email,
+	})
 	return LoginOutput{SessionID: sess.ID, Identity: id}, nil
 }

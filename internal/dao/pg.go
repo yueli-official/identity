@@ -123,6 +123,17 @@ func orDefault(v, d string) string {
 	return v
 }
 
+// nilIfEmpty returns nil when s is blank (empty or whitespace-only), otherwise
+// the ORIGINAL string s. Used to map empty-string sentinel values to SQL NULL
+// for UUID columns and to keep nullable TEXT columns NULL rather than storing
+// whitespace-only junk.
+func nilIfEmpty(s string) any {
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
+	return s
+}
+
 // isUniqueViolation reports whether err is a PostgreSQL unique_violation (SQLSTATE 23505).
 func isUniqueViolation(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "23505")

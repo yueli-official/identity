@@ -118,6 +118,39 @@ type LoginThrottle interface {
 	Reset(ctx context.Context, key string) error
 }
 
+// AuditRow is a single audit-log entry (maps 1-to-1 with the audit_logs table).
+// Empty string fields correspond to NULL in Postgres.
+type AuditRow struct {
+	ID         int64
+	Event      string
+	ActorID    string         // "" → NULL in PG
+	TargetID   string         // "" → NULL in PG
+	ActorEmail string
+	IP         string
+	UserAgent  string
+	ClientID   string
+	RequestID  string
+	Result     string         // "success" | "failure"
+	Detail     map[string]any
+	OccurredAt time.Time
+}
+
+// AuditFilter constrains a QueryAudit call. IdentityID matches actor OR target;
+// all fields are optional (zero value = no constraint).
+type AuditFilter struct {
+	IdentityID string
+	Event      string
+	Limit      int // 0 → default 50; capped at 200
+	Offset     int
+}
+
+// AuditRepo persists and queries structured audit events.
+type AuditRepo interface {
+	InsertAudit(ctx context.Context, row AuditRow) error
+	// QueryAudit returns rows newest-first (by id desc).
+	QueryAudit(ctx context.Context, f AuditFilter) ([]AuditRow, error)
+}
+
 // Store is the full repository surface (a single impl satisfies all three).
 type Store interface {
 	IdentityRepo
@@ -126,6 +159,7 @@ type Store interface {
 	OAuthRepo
 	VerificationRepo
 	RoleRepo
+	AuditRepo
 }
 
 // ClientRepo provides read access to registered OIDC relying parties.
