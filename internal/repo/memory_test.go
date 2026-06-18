@@ -2,6 +2,7 @@ package repo_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"platform/services/identity/internal/model"
@@ -109,6 +110,46 @@ func TestMemorySigningKeyRepo(t *testing.T) {
 	m2 := repo.NewMemory()
 	if _, err := m2.GetActiveKey(ctx); err != repo.ErrNoActiveKey {
 		t.Fatalf("want ErrNoActiveKey, got %v", err)
+	}
+}
+
+func TestMemory_OAuth_CreateThenGetByProviderUID(t *testing.T) {
+	m := repo.NewMemory()
+	ctx := context.Background()
+	id, err := m.CreateOAuthIdentity(ctx, repo.NewOAuthIdentityInput{
+		Email: "g@example.com", EmailVerified: true, DisplayName: "G",
+		Provider: "google", ProviderUID: "uid-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := m.GetByProviderUID(ctx, "google", "uid-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != id.ID || got.Email != "g@example.com" || !got.EmailVerified {
+		t.Fatalf("round-trip mismatch: %+v", got)
+	}
+}
+
+func TestMemory_OAuth_GetByProviderUID_Missing(t *testing.T) {
+	m := repo.NewMemory()
+	_, err := m.GetByProviderUID(context.Background(), "google", "nope")
+	if !errors.Is(err, repo.ErrIdentityMissing) {
+		t.Fatalf("want ErrIdentityMissing, got %v", err)
+	}
+}
+
+func TestMemory_OAuth_LinkExistingIdentity(t *testing.T) {
+	m := repo.NewMemory()
+	ctx := context.Background()
+	base, _ := m.CreateIdentityWithProfile(ctx, repo.NewIdentityInput{Email: "a@example.com", DisplayName: "A", PasswordHash: "h"})
+	if err := m.LinkOAuthCredential(ctx, base.ID, "google", "uid-2", "a@example.com", true); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := m.GetByProviderUID(ctx, "google", "uid-2")
+	if got.ID != base.ID {
+		t.Fatalf("link should resolve to base identity, got %s", got.ID)
 	}
 }
 

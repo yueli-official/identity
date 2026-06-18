@@ -18,6 +18,7 @@ import (
 	"platform/services/identity/internal/controller"
 	"platform/services/identity/internal/dao"
 	"platform/services/identity/internal/logic"
+	"platform/services/identity/internal/oauthlogin"
 	"platform/services/identity/internal/oidc"
 	"platform/services/identity/internal/repo"
 )
@@ -64,6 +65,18 @@ func main() {
 	}, mgr.KeyGetter)
 	oidcCtl := controller.NewOIDC(provider, mgr, svc, issuer, loginURL)
 
+	// ── Google OAuth login (milestone ⑤) ────────────────────────────────────
+	// Provider stays nil when credentials are unconfigured; the controller then
+	// redirects the start/callback endpoints to login with ?error=oauth_unavailable.
+	googleClientID := g.Cfg().MustGet(ctx, "oidc.google.clientId").String()
+	googleClientSecret := g.Cfg().MustGet(ctx, "oidc.google.clientSecret").String()
+	googleRedirectURL := g.Cfg().MustGet(ctx, "oidc.google.redirectUrl").String()
+	var googleProvider oauthlogin.Provider
+	if googleClientID != "" && googleClientSecret != "" {
+		googleProvider = oauthlogin.NewGoogle(googleClientID, googleClientSecret, googleRedirectURL)
+	}
+	oauthCtl := controller.NewOAuth(svc, googleProvider, secureCookie, []byte(globalSecret), loginURL)
+
 	// ── Routing ─────────────────────────────────────────────────────────────
 	s := g.Server()
 
@@ -83,6 +96,12 @@ func main() {
 		grp.ALL("/oauth2/userinfo", oidcCtl.Userinfo)
 		grp.POST("/oauth2/revoke", oidcCtl.Revoke)         // RFC 7009 token revocation
 		grp.ALL("/oauth2/end_session", oidcCtl.EndSession)  // OIDC RP-initiated logout (MVP)
+	})
+
+	// Google OAuth login: raw redirect handlers — NO envelope middleware.
+	s.Group("/", func(grp *ghttp.RouterGroup) {
+		grp.GET("/api/v1/auth/oauth/google/start", oauthCtl.GoogleStart)
+		grp.GET("/api/v1/auth/oauth/google/callback", oauthCtl.GoogleCallback)
 	})
 
 	g.Log().Info(ctx, "identity-service starting")

@@ -17,6 +17,10 @@ var (
 	CodeWeakPassword       = errs.Register("identity.weak_password", http.StatusBadRequest)
 	CodeInvalidEmail       = errs.Register("identity.invalid_email", http.StatusBadRequest)
 	CodeNotAuthenticated   = errs.Register("identity.not_authenticated", http.StatusUnauthorized)
+
+	CodeOAuthEmailConflict = errs.Register("identity.oauth_email_conflict", http.StatusConflict)
+	CodeOAuthNoEmail       = errs.Register("identity.oauth_no_email", http.StatusBadRequest)
+	CodeOAuthFailed        = errs.Register("identity.oauth_failed", http.StatusUnauthorized)
 )
 
 func EmailTaken(email string) *errs.Coded {
@@ -46,4 +50,21 @@ func InvalidEmail(email string) *errs.Coded {
 
 func NotAuthenticated() *errs.Coded {
 	return errs.New(CodeNotAuthenticated, "not authenticated", nil)
+}
+
+// OAuthEmailConflict: the provider's (unverified) email collides with an
+// existing local account, so we refuse to auto-link (spec §10).
+func OAuthEmailConflict(email string) *errs.Coded {
+	return errs.New(CodeOAuthEmailConflict, "email already registered to another account", map[string]any{"email": email})
+}
+
+// OAuthNoEmail: the provider returned no email, so we can neither link nor register.
+func OAuthNoEmail() *errs.Coded {
+	return errs.New(CodeOAuthNoEmail, "oauth provider returned no email", nil)
+}
+
+// OAuthFailed is a generic provider/exchange failure for any non-redirect caller
+// that needs a coded error (the redirect endpoints surface errors via query string).
+func OAuthFailed() *errs.Coded {
+	return errs.New(CodeOAuthFailed, "oauth login failed", nil)
 }
