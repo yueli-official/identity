@@ -4,6 +4,14 @@
 export default defineNuxtConfig({
   modules: ['@nuxt/ui'],
   css: ['~/assets/css/main.css'],
+  runtimeConfig: {
+    // Server-side base for backend calls during SSR. The dev proxy below only
+    // covers real browser requests; Nitro's internal SSR $fetch bypasses it, so
+    // a relative /api on the server falls through to the SPA catch-all. Hitting
+    // the backend by absolute URL fixes SSR auth (hard loads / deep links).
+    // Override in prod with NUXT_API_BASE.
+    apiBase: 'http://127.0.0.1:8081'
+  },
   // Dev-only proxy to the Go backend so the app is same-origin in `nuxt dev`.
   // In Nuxt 4 this lives under `nitro.devProxy` (the top-level `devProxy`
   // key is not honored by the installed nitro version).

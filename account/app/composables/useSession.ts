@@ -1,8 +1,17 @@
+export interface Me {
+  id: string
+  email: string
+  emailVerified: boolean
+  displayName: string
+  username: string
+  avatarUrl: string
+}
+
 export function useSession() {
-  const me = useState<{ id: string; email: string; emailVerified: boolean } | null>('me', () => null)
+  const me = useState<Me | null>('me', () => null)
   const { call } = useApi()
   async function refresh() {
-    try { me.value = await call('/api/v1/session/me') }
+    try { me.value = await call<Me>('/api/v1/session/me') }
     catch { me.value = null }
     return me.value
   }

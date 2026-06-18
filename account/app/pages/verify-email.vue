@@ -1,4 +1,6 @@
 <script setup lang="ts">
+definePageMeta({ layout: 'auth' })
+
 const route = useRoute()
 const { call } = useApi()
 const status = ref<'pending' | 'success' | 'failure'>('pending')

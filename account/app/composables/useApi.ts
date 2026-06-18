@@ -9,7 +9,11 @@ export function useApi() {
     // (e.g. the auth middleware on a hard navigation) would look unauthenticated.
     // Forward the request cookie header explicitly on the server.
     const cookieHeaders = import.meta.server ? useRequestHeaders(['cookie']) : {}
-    const res = await $fetch<Envelope<T>>(url, {
+    // On the server the dev proxy doesn't apply (internal SSR $fetch bypasses
+    // it), so call the backend by absolute URL; on the client use a relative URL
+    // so the request is same-origin and goes through the proxy.
+    const base = import.meta.server ? useRuntimeConfig().apiBase : ''
+    const res = await $fetch<Envelope<T>>(base + url, {
       credentials: 'include',
       ...opts,
       headers: { ...cookieHeaders, ...(opts?.headers as Record<string, string> | undefined) },

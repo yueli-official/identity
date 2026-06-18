@@ -2,6 +2,8 @@
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 
+definePageMeta({ layout: 'auth' })
+
 const route = useRoute()
 const { call } = useApi()
 const token = computed(() => (route.query.token as string) || '')
