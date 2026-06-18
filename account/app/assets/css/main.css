@@ -1,0 +1,4 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+/* TODO(Task 2): append `@import "@platform/ui/theme.css";` once @platform/ui
+   exposes that export (created in Task 2). */
