@@ -29,6 +29,16 @@ type ChangePasswordReq struct {
 
 type ChangePasswordRes struct{}
 
+// SetPasswordReq sets an INITIAL password for an account that has none (e.g.
+// OAuth-only). No current password is required; an account that already has a
+// password gets identity.password_already_set and must use change-password.
+type SetPasswordReq struct {
+	g.Meta      `path:"/api/v1/auth/password/set" method:"post" tags:"account" summary:"Set an initial password"`
+	NewPassword string `json:"newPassword" v:"required#new password required"`
+}
+
+type SetPasswordRes struct{}
+
 // ── Session list / revoke (account-center device management) ────────────────
 
 type SessionListReq struct {

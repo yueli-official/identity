@@ -35,6 +35,7 @@ var (
 	CodeCredentialConflict = errs.Register("identity.credential_conflict", http.StatusConflict)
 	CodeCredentialNotFound = errs.Register("identity.credential_not_found", http.StatusNotFound)
 	CodeLastCredential     = errs.Register("identity.last_credential", http.StatusConflict)
+	CodePasswordAlreadySet = errs.Register("identity.password_already_set", http.StatusConflict)
 )
 
 func EmailTaken(email string) *errs.Coded {
@@ -137,6 +138,12 @@ func CredentialNotFound() *errs.Coded {
 // LastCredential: refusing to remove the only remaining login credential (spec §10).
 func LastCredential() *errs.Coded {
 	return errs.New(CodeLastCredential, "cannot remove the last login credential", nil)
+}
+
+// PasswordAlreadySet: SetPassword is for accounts WITHOUT a password (e.g.
+// OAuth-only). An account that already has one must use ChangePassword.
+func PasswordAlreadySet() *errs.Coded {
+	return errs.New(CodePasswordAlreadySet, "password already set; use change password", nil)
 }
 
 // ── Personal Access Token (PAT) codes ───────────────────────────────────────

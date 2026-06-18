@@ -60,5 +60,19 @@ func (p *PG) UpdatePasswordHash(ctx context.Context, identityID, passwordHash st
 	return err
 }
 
+// SetPasswordHash inserts-or-replaces an identity's password hash (no existing
+// credential required) — used when an OAuth-only account sets an initial password.
+func (p *PG) SetPasswordHash(ctx context.Context, identityID, passwordHash string) error {
+	_, err := p.db.Model("credentials_password").Ctx(ctx).
+		Data(g.Map{
+			"identity_id":   identityID,
+			"password_hash": passwordHash,
+			"updated_at":    gtime.Now(),
+		}).
+		OnConflict("identity_id").
+		Save()
+	return err
+}
+
 // Compile-time interface assertion.
 var _ repo.VerificationRepo = (*PG)(nil)
