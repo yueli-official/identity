@@ -1,0 +1,117 @@
+package controller
+
+import (
+	"crypto/rand"
+	"encoding/hex"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/gogf/gf/v2/net/ghttp"
+
+	"platform/services/identity/internal/logic"
+	"platform/services/identity/internal/oauthlogin"
+)
+
+// oauthStateCookie holds the short-lived CSRF nonce that must match the nonce
+// signed into the OAuth state parameter at /callback.
+const oauthStateCookie = "g_oauth_state"
+
+// OAuthController handles the external-provider (Google) login redirect dance.
+// These are raw redirect endpoints that bypass the gokit JSON envelope, the same
+// precedent as the OIDC endpoints (spec §5).
+type OAuthController struct {
+	svc          *logic.Service
+	google       oauthlogin.Provider // nil when unconfigured
+	secureCookie bool
+	stateSecret  []byte
+	loginURL     string
+}
+
+// NewOAuth builds the OAuth controller. google may be nil when no credentials are
+// configured, in which case the endpoints redirect to the login page with an error.
+func NewOAuth(svc *logic.Service, google oauthlogin.Provider, secureCookie bool, stateSecret []byte, loginURL string) *OAuthController {
+	return &OAuthController{svc: svc, google: google, secureCookie: secureCookie, stateSecret: stateSecret, loginURL: loginURL}
+}
+
+// GoogleStart handles GET /api/v1/auth/oauth/google/start.
+// It signs the (validated) return_to + a random nonce into the OAuth state,
+// drops the nonce in a short-lived HttpOnly cookie, then redirects to Google.
+func (c *OAuthController) GoogleStart(r *ghttp.Request) {
+	if c.google == nil {
+		r.Response.RedirectTo(c.loginURL + "?error=oauth_unavailable")
+		return
+	}
+	returnTo := safeReturnTo(r.Get("return_to").String())
+	nonce := randHex(16)
+	state := oauthlogin.EncodeState(c.stateSecret, returnTo, nonce, time.Now().Add(10*time.Minute).Unix())
+	r.Cookie.SetHttpCookie(&http.Cookie{
+		Name: oauthStateCookie, Value: nonce, Path: "/",
+		HttpOnly: true, Secure: c.secureCookie, SameSite: http.SameSiteLaxMode, MaxAge: 600,
+	})
+	r.Response.RedirectTo(c.google.AuthorizeURL(state))
+}
+
+// GoogleCallback handles GET /api/v1/auth/oauth/google/callback.
+// It verifies the signed state + nonce cookie (CSRF), exchanges the code, fetches
+// the profile, performs §10 account-linking via OAuthLogin, mints an id_session
+// cookie, and redirects back to the validated return_to.
+func (c *OAuthController) GoogleCallback(r *ghttp.Request) {
+	ctx := r.Context()
+	if c.google == nil {
+		r.Response.RedirectTo(c.loginURL + "?error=oauth_unavailable")
+		return
+	}
+	returnTo, nonce, err := oauthlogin.DecodeState(c.stateSecret, r.Get("state").String())
+	cookieNonce := r.Cookie.Get(oauthStateCookie, "").String()
+	r.Cookie.Remove(oauthStateCookie)
+	if err != nil || nonce == "" || nonce != cookieNonce {
+		r.Response.RedirectTo(c.loginURL + "?error=oauth_state")
+		return
+	}
+	code := r.Get("code").String()
+	if code == "" {
+		r.Response.RedirectTo(c.loginURL + "?error=oauth_denied")
+		return
+	}
+	at, err := c.google.ExchangeCode(ctx, code)
+	if err != nil {
+		r.Response.RedirectTo(c.loginURL + "?error=oauth_exchange")
+		return
+	}
+	ui, err := c.google.FetchUserInfo(ctx, at)
+	if err != nil {
+		r.Response.RedirectTo(c.loginURL + "?error=oauth_userinfo")
+		return
+	}
+	out, err := c.svc.OAuthLogin(ctx, logic.OAuthLoginInput{
+		Provider: c.google.Name(), ProviderUID: ui.ProviderUID, Email: ui.Email,
+		EmailVerified: ui.EmailVerified, DisplayName: ui.DisplayName,
+		UserAgent: r.UserAgent(), IP: r.GetClientIp(),
+	})
+	if err != nil {
+		r.Response.RedirectTo(c.loginURL + "?error=oauth_login")
+		return
+	}
+	r.Cookie.SetHttpCookie(&http.Cookie{
+		Name: sessionCookie, Value: out.SessionID, Path: "/",
+		HttpOnly: true, Secure: c.secureCookie, SameSite: http.SameSiteLaxMode,
+	})
+	r.Response.RedirectTo(returnTo)
+}
+
+// safeReturnTo permits only same-origin relative paths; everything else → "/".
+// This guards against open redirects (a "//evil.com" path is treated as absolute).
+func safeReturnTo(v string) string {
+	if v == "" || !strings.HasPrefix(v, "/") || strings.HasPrefix(v, "//") {
+		return "/"
+	}
+	return v
+}
+
+// randHex returns a random hex string of n bytes (2n hex chars).
+func randHex(n int) string {
+	b := make([]byte, n)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
+}

@@ -25,5 +25,9 @@ oidc:
   issuer: "http://localhost:8081"
   refreshTtl: "720h"      # 30 days; access/id tokens stay 10m (set in code)
   globalSecret: ""        # set via env GF_OIDC_GLOBALSECRET (>=32 bytes), never commit a real value
+  google:
+    clientId: ""        # set via env GF_OIDC_GOOGLE_CLIENTID
+    clientSecret: ""    # set via env GF_OIDC_GOOGLE_CLIENTSECRET
+    redirectUrl: "http://localhost:3000/api/v1/auth/oauth/google/callback"  # env GF_OIDC_GOOGLE_REDIRECTURL
 account:
   loginUrl: "http://localhost:3000/login"
