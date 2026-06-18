@@ -9,4 +9,7 @@ type MeRes struct {
 	ID            string `json:"id"`
 	Email         string `json:"email"`
 	EmailVerified bool   `json:"emailVerified"`
+	DisplayName   string `json:"displayName"`
+	Username      string `json:"username"`
+	AvatarURL     string `json:"avatarUrl"`
 }

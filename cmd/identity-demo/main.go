@@ -57,6 +57,10 @@ func main() {
 		Email: demoEmail, Password: demoPassword, DisplayName: "Demo User",
 	}); err != nil {
 		g.Log().Warningf(ctx, "seed demo user: %v", err)
+	} else if id, err := svc.GetByEmail(ctx, demoEmail); err == nil {
+		// Demo convenience: pre-verify the seeded account so the UI isn't gated
+		// behind an email link that the dev mailer only prints to this log.
+		_ = store.SetEmailVerified(ctx, id.ID, true)
 	}
 	store.SetClient(model.OIDCClient{
 		ID:            demoClientID,

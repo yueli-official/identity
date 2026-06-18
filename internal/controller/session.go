@@ -15,5 +15,13 @@ func (c *Controller) Me(ctx context.Context, _ *v1.MeReq) (*v1.MeRes, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &v1.MeRes{ID: id.ID, Email: id.Email, EmailVerified: id.EmailVerified}, nil
+	p, _ := c.svc.GetProfile(ctx, id.ID) // empty profile is acceptable
+	return &v1.MeRes{
+		ID:            id.ID,
+		Email:         id.Email,
+		EmailVerified: id.EmailVerified,
+		DisplayName:   p.DisplayName,
+		Username:      p.Username,
+		AvatarURL:     p.AvatarURL,
+	}, nil
 }
