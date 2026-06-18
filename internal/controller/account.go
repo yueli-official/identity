@@ -82,6 +82,37 @@ func (c *Controller) RevokeSession(ctx context.Context, req *v1.RevokeSessionReq
 	return &v1.RevokeSessionRes{}, nil
 }
 
+// Credentials lists the caller's login methods (password + bound oauth).
+func (c *Controller) Credentials(ctx context.Context, _ *v1.CredentialsReq) (*v1.CredentialsRes, error) {
+	r := ghttp.RequestFromCtx(ctx)
+	id, err := c.svc.Me(ctx, r.Cookie.Get(sessionCookie, "").String())
+	if err != nil {
+		return nil, err
+	}
+	cs, err := c.svc.ListCredentials(ctx, id.ID)
+	if err != nil {
+		return nil, err
+	}
+	oauth := make([]v1.OAuthCredentialDTO, 0, len(cs.OAuth))
+	for _, o := range cs.OAuth {
+		oauth = append(oauth, v1.OAuthCredentialDTO{Provider: o.Provider, Email: o.Email})
+	}
+	return &v1.CredentialsRes{HasPassword: cs.HasPassword, OAuth: oauth}, nil
+}
+
+// UnbindCredential removes one of the caller's oauth credentials (last-credential guarded).
+func (c *Controller) UnbindCredential(ctx context.Context, req *v1.UnbindCredentialReq) (*v1.UnbindCredentialRes, error) {
+	r := ghttp.RequestFromCtx(ctx)
+	id, err := c.svc.Me(ctx, r.Cookie.Get(sessionCookie, "").String())
+	if err != nil {
+		return nil, err
+	}
+	if err := c.svc.UnbindCredential(ctx, id.ID, req.Provider); err != nil {
+		return nil, err
+	}
+	return &v1.UnbindCredentialRes{}, nil
+}
+
 // LogoutAll clears every session of the caller and revokes all refresh tokens.
 func (c *Controller) LogoutAll(ctx context.Context, _ *v1.LogoutAllReq) (*v1.LogoutAllRes, error) {
 	r := ghttp.RequestFromCtx(ctx)

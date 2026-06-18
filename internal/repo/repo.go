@@ -94,6 +94,12 @@ type NewOAuthIdentityInput struct {
 	ProviderUID   string // provider's stable user id (Google "sub")
 }
 
+// OAuthCredential is one external-provider credential bound to an identity.
+type OAuthCredential struct {
+	Provider string
+	Email    string // may be "" (the in-memory store does not retain it)
+}
+
 // OAuthRepo resolves and persists external-provider identity links.
 type OAuthRepo interface {
 	// GetByProviderUID returns the linked identity, or ErrIdentityMissing if none.
@@ -102,6 +108,10 @@ type OAuthRepo interface {
 	CreateOAuthIdentity(ctx context.Context, in NewOAuthIdentityInput) (model.Identity, error)
 	// LinkOAuthCredential attaches an oauth credential to an existing identity.
 	LinkOAuthCredential(ctx context.Context, identityID, provider, providerUID, email string, emailVerified bool) error
+	// ListOAuthCredentials returns the identity's bound oauth credentials (sorted by provider).
+	ListOAuthCredentials(ctx context.Context, identityID string) ([]OAuthCredential, error)
+	// DeleteOAuthCredential removes the (identityID, provider) credential; bool = a row was deleted.
+	DeleteOAuthCredential(ctx context.Context, identityID, provider string) (bool, error)
 }
 
 // RoleRepo manages the coarse-grained RBAC role grants for an identity. The

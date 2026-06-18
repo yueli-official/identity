@@ -31,6 +31,10 @@ var (
 
 	CodeInvalidProfile  = errs.Register("identity.invalid_profile", http.StatusBadRequest)
 	CodeSessionNotFound = errs.Register("identity.session_not_found", http.StatusNotFound)
+
+	CodeCredentialConflict = errs.Register("identity.credential_conflict", http.StatusConflict)
+	CodeCredentialNotFound = errs.Register("identity.credential_not_found", http.StatusNotFound)
+	CodeLastCredential     = errs.Register("identity.last_credential", http.StatusConflict)
 )
 
 func EmailTaken(email string) *errs.Coded {
@@ -118,6 +122,21 @@ func InvalidProfile(reason string) *errs.Coded {
 // caller (intentionally merged — don't reveal another account's sessions).
 func SessionNotFound() *errs.Coded {
 	return errs.New(CodeSessionNotFound, "session not found", nil)
+}
+
+// CredentialConflict: the external account is already linked to a different identity.
+func CredentialConflict(provider string) *errs.Coded {
+	return errs.New(CodeCredentialConflict, "this account is already linked to another identity", map[string]any{"provider": provider})
+}
+
+// CredentialNotFound: the caller has no such credential to unbind.
+func CredentialNotFound() *errs.Coded {
+	return errs.New(CodeCredentialNotFound, "credential not found", nil)
+}
+
+// LastCredential: refusing to remove the only remaining login credential (spec §10).
+func LastCredential() *errs.Coded {
+	return errs.New(CodeLastCredential, "cannot remove the last login credential", nil)
 }
 
 // ── Personal Access Token (PAT) codes ───────────────────────────────────────

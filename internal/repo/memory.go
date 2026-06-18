@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -162,6 +163,39 @@ func (m *Memory) LinkOAuthCredential(_ context.Context, identityID, provider, pr
 	}
 	m.oauthLinks[key] = identityID
 	return nil
+}
+
+// ListOAuthCredentials returns the identity's bound oauth providers (the memory
+// store does not retain per-link email, so Email is left blank).
+func (m *Memory) ListOAuthCredentials(_ context.Context, identityID string) ([]OAuthCredential, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := []OAuthCredential{}
+	for key, id := range m.oauthLinks {
+		if id != identityID {
+			continue
+		}
+		provider, _, _ := strings.Cut(key, "\x00")
+		out = append(out, OAuthCredential{Provider: provider})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Provider < out[j].Provider })
+	return out, nil
+}
+
+// DeleteOAuthCredential removes the (identityID, provider) link; bool = deleted.
+func (m *Memory) DeleteOAuthCredential(_ context.Context, identityID, provider string) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for key, id := range m.oauthLinks {
+		if id != identityID {
+			continue
+		}
+		if p, _, _ := strings.Cut(key, "\x00"); p == provider {
+			delete(m.oauthLinks, key)
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // SetEmailVerified flips the stored identity's email_verified flag.

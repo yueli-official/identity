@@ -28,9 +28,10 @@ const (
 	EvPATCreated = "pat.created"
 	EvPATRevoked = "pat.revoked"
 
-	EvProfileUpdated  = "profile.updated"
-	EvPasswordChanged = "password.changed"
-	EvSessionRevoked  = "session.revoked"
+	EvProfileUpdated   = "profile.updated"
+	EvPasswordChanged  = "password.changed"
+	EvSessionRevoked   = "session.revoked"
+	EvCredentialUnlinked = "credential.oauth_unlinked"
 )
 
 // AuditEvent is the logic-layer description of one auditable event. IP/UA/request-id

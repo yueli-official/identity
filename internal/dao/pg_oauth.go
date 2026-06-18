@@ -95,5 +95,34 @@ func (p *PG) LinkOAuthCredential(ctx context.Context, identityID, provider, prov
 	return nil
 }
 
+// ListOAuthCredentials returns the identity's bound oauth credentials.
+func (p *PG) ListOAuthCredentials(ctx context.Context, identityID string) ([]repo.OAuthCredential, error) {
+	var rows []struct {
+		Provider string `orm:"provider"`
+		Email    string `orm:"email"`
+	}
+	if err := p.db.Model("credentials_oauth").Ctx(ctx).
+		Fields("provider", "email").Where("identity_id", identityID).
+		OrderAsc("provider").Scan(&rows); err != nil {
+		return nil, err
+	}
+	out := make([]repo.OAuthCredential, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, repo.OAuthCredential{Provider: r.Provider, Email: r.Email})
+	}
+	return out, nil
+}
+
+// DeleteOAuthCredential removes the (identityID, provider) credential row.
+func (p *PG) DeleteOAuthCredential(ctx context.Context, identityID, provider string) (bool, error) {
+	res, err := p.db.Model("credentials_oauth").Ctx(ctx).
+		Where("identity_id", identityID).Where("provider", provider).Delete()
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
 // Compile-time interface assertion.
 var _ repo.OAuthRepo = (*PG)(nil)

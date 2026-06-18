@@ -60,3 +60,26 @@ type LogoutAllReq struct {
 }
 
 type LogoutAllRes struct{}
+
+// ── Credentials (login methods: password + bound oauth) ─────────────────────
+
+type CredentialsReq struct {
+	g.Meta `path:"/api/v1/session/credentials" method:"get" tags:"account" summary:"List own login credentials"`
+}
+
+type OAuthCredentialDTO struct {
+	Provider string `json:"provider"`
+	Email    string `json:"email"`
+}
+
+type CredentialsRes struct {
+	HasPassword bool                 `json:"hasPassword"`
+	OAuth       []OAuthCredentialDTO `json:"oauth"`
+}
+
+type UnbindCredentialReq struct {
+	g.Meta   `path:"/api/v1/session/credentials/{provider}" method:"delete" tags:"account" summary:"Unbind an oauth credential"`
+	Provider string `json:"provider" in:"path"`
+}
+
+type UnbindCredentialRes struct{}

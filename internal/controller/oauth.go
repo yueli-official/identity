@@ -43,8 +43,17 @@ func (c *OAuthController) GoogleStart(r *ghttp.Request) {
 		return
 	}
 	returnTo := safeReturnTo(r.Get("return_to").String())
+	// intent=bind + a live session → LINK the provider to the current identity
+	// (account binding) instead of logging in. The identity id is signed into the
+	// state so the callback can trust it.
+	bind := ""
+	if r.Get("intent").String() == "bind" {
+		if id, err := c.svc.Me(r.Context(), r.Cookie.Get(sessionCookie, "").String()); err == nil {
+			bind = id.ID
+		}
+	}
 	nonce := randHex(16)
-	state := oauthlogin.EncodeState(c.stateSecret, returnTo, nonce, time.Now().Add(10*time.Minute).Unix())
+	state := oauthlogin.EncodeState(c.stateSecret, returnTo, nonce, bind, time.Now().Add(10*time.Minute).Unix())
 	r.Cookie.SetHttpCookie(&http.Cookie{
 		Name: oauthStateCookie, Value: nonce, Path: "/",
 		HttpOnly: true, Secure: c.secureCookie, SameSite: http.SameSiteLaxMode, MaxAge: 600,
@@ -62,7 +71,7 @@ func (c *OAuthController) GoogleCallback(r *ghttp.Request) {
 		r.Response.RedirectTo(c.loginURL + "?error=oauth_unavailable")
 		return
 	}
-	returnTo, nonce, err := oauthlogin.DecodeState(c.stateSecret, r.Get("state").String())
+	returnTo, nonce, bind, err := oauthlogin.DecodeState(c.stateSecret, r.Get("state").String())
 	cookieNonce := r.Cookie.Get(oauthStateCookie, "").String()
 	r.Cookie.Remove(oauthStateCookie)
 	if err != nil || nonce == "" || nonce != cookieNonce {
@@ -84,6 +93,19 @@ func (c *OAuthController) GoogleCallback(r *ghttp.Request) {
 		r.Response.RedirectTo(c.loginURL + "?error=oauth_userinfo")
 		return
 	}
+
+	// Bind flow: link the provider to the already-logged-in identity (no new
+	// session) and return to the account page. returnTo is the same-origin page
+	// the account UI started the bind from.
+	if bind != "" {
+		if berr := c.svc.BindOAuth(ctx, bind, c.google.Name(), ui.ProviderUID, ui.Email, ui.EmailVerified); berr != nil {
+			r.Response.RedirectTo(withError(returnTo, "oauth_bind"))
+			return
+		}
+		r.Response.RedirectTo(returnTo)
+		return
+	}
+
 	out, err := c.svc.OAuthLogin(ctx, logic.OAuthLoginInput{
 		Provider: c.google.Name(), ProviderUID: ui.ProviderUID, Email: ui.Email,
 		EmailVerified: ui.EmailVerified, DisplayName: ui.DisplayName,
@@ -116,6 +138,15 @@ func safeReturnTo(v string) string {
 		return "/"
 	}
 	return v
+}
+
+// withError appends ?error=<code> (or &error=) to a same-origin path.
+func withError(path, code string) string {
+	sep := "?"
+	if strings.Contains(path, "?") {
+		sep = "&"
+	}
+	return path + sep + "error=" + code
 }
 
 // randHex returns a random hex string of n bytes (2n hex chars).
