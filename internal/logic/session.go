@@ -33,6 +33,13 @@ func (s *Service) GetByID(ctx context.Context, id string) (model.Identity, error
 	return s.store.GetByID(ctx, id)
 }
 
+// GetByEmail fetches a single identity by email (canonicalized first, matching
+// the login/register path). Returns repo.ErrIdentityMissing if none exists. Used
+// by the startup bootstrap-admin grant.
+func (s *Service) GetByEmail(ctx context.Context, email string) (model.Identity, error) {
+	return s.store.GetByEmail(ctx, CanonicalizeEmail(email))
+}
+
 // GetProfile fetches the profile for an identity by its primary-key ID.
 func (s *Service) GetProfile(ctx context.Context, id string) (model.Profile, error) {
 	return s.store.GetProfile(ctx, id)

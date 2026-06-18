@@ -7,6 +7,11 @@ import "context"
 // roles claim, so the grant is best-effort.
 const DefaultRole = "user"
 
+// AdminRole is the elevated role gating the admin-only endpoints. Single-sourced
+// here so the controller's admin guard and the catalog/migration 0006 stay in
+// lockstep on the literal "admin" slug.
+const AdminRole = "admin"
+
 func (s *Service) GetRoles(ctx context.Context, identityID string) ([]string, error) {
 	return s.store.GetRoles(ctx, identityID)
 }

@@ -3,6 +3,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -47,6 +48,26 @@ func main() {
 	cfg.AccountBaseURL = accountBaseURL // base for verify-email / reset links (milestone ⑤)
 	svc := logic.New(store, cfg)
 	authCtl := controller.New(svc, secureCookie)
+
+	// ── Bootstrap admin (RBAC) ───────────────────────────────────────────────
+	// If rbac.bootstrapAdminEmail is set and that identity already exists, grant
+	// it the admin role. Best-effort + idempotent (GrantRole is a no-op on a
+	// repeat grant); silent if the identity hasn't registered yet.
+	if bootstrapEmail := g.Cfg().MustGet(ctx, "rbac.bootstrapAdminEmail").String(); bootstrapEmail != "" {
+		id, err := svc.GetByEmail(ctx, bootstrapEmail)
+		switch {
+		case errors.Is(err, repo.ErrIdentityMissing):
+			g.Log().Infof(ctx, "bootstrap admin: identity %q not found yet, skipping", bootstrapEmail)
+		case err != nil:
+			g.Log().Warningf(ctx, "bootstrap admin: lookup of %q failed: %v", bootstrapEmail, err)
+		default:
+			if err := svc.GrantRole(ctx, id.ID, logic.AdminRole); err != nil {
+				g.Log().Warningf(ctx, "bootstrap admin: grant to %q failed: %v", bootstrapEmail, err)
+			} else {
+				g.Log().Infof(ctx, "bootstrap admin: granted %q to %q", logic.AdminRole, bootstrapEmail)
+			}
+		}
+	}
 
 	// ── Mailer (milestone ⑤) ─────────────────────────────────────────────────
 	// Default to the dev-log mailer (links printed to logs); switch to real SMTP

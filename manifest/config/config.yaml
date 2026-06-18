@@ -32,6 +32,9 @@ oidc:
 account:
   loginUrl: "http://localhost:3000/login"
   baseUrl: "http://localhost:3000"   # env GF_ACCOUNT_BASEURL — used to build email links
+rbac:
+  defaultRole: "user"
+  bootstrapAdminEmail: ""   # env GF_RBAC_BOOTSTRAPADMINEMAIL — granted admin at startup if the identity exists
 mail:
   smtp:
     host: ""        # env GF_MAIL_SMTP_HOST — empty ⇒ dev-log mailer
