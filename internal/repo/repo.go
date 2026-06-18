@@ -18,6 +18,7 @@ var (
 	ErrNoActiveKey         = errors.New("no active signing key")
 	ErrProviderUIDTaken    = errors.New("provider uid already linked")
 	ErrVerificationInvalid = errors.New("verification token invalid, expired, or used")
+	ErrUnknownRole         = errors.New("unknown role slug")
 )
 
 // Verification purpose scopes (a token issued for one purpose must not work for
@@ -92,6 +93,16 @@ type OAuthRepo interface {
 	LinkOAuthCredential(ctx context.Context, identityID, provider, providerUID, email string, emailVerified bool) error
 }
 
+// RoleRepo manages the coarse-grained RBAC role grants for an identity. The
+// catalog is the small fixed set seeded by migration 0006 (user, admin).
+type RoleRepo interface {
+	// GetRoles returns the identity's role slugs (sorted, possibly empty).
+	GetRoles(ctx context.Context, identityID string) ([]string, error)
+	// GrantRole is idempotent; returns ErrUnknownRole if slug is not in the catalog.
+	GrantRole(ctx context.Context, identityID, slug string) error
+	RevokeRole(ctx context.Context, identityID, slug string) error
+}
+
 type SessionStore interface {
 	CreateSession(ctx context.Context, s model.Session, ttl time.Duration) error
 	GetSession(ctx context.Context, id string) (model.Session, error) // ErrSessionNotFound
@@ -114,6 +125,7 @@ type Store interface {
 	LoginThrottle
 	OAuthRepo
 	VerificationRepo
+	RoleRepo
 }
 
 // ClientRepo provides read access to registered OIDC relying parties.

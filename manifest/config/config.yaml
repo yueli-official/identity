@@ -32,6 +32,11 @@ oidc:
 account:
   loginUrl: "http://localhost:3000/login"
   baseUrl: "http://localhost:3000"   # env GF_ACCOUNT_BASEURL — used to build email links
+rbac:
+  # The default role granted to new identities is the DefaultRole const in
+  # internal/logic/roles.go (kept in lockstep with the migration 0006 seed),
+  # not a config value — so no defaultRole key here.
+  bootstrapAdminEmail: ""   # env GF_RBAC_BOOTSTRAPADMINEMAIL — granted admin at startup if the identity exists
 mail:
   smtp:
     host: ""        # env GF_MAIL_SMTP_HOST — empty ⇒ dev-log mailer

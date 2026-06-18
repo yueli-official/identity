@@ -25,6 +25,9 @@ var (
 	CodeVerificationInvalid = errs.Register("identity.verification_invalid", http.StatusBadRequest)
 	CodeResetThrottled      = errs.Register("identity.reset_throttled", http.StatusTooManyRequests)
 	CodeVerifyThrottled     = errs.Register("identity.verify_throttled", http.StatusTooManyRequests)
+
+	CodeForbidden   = errs.Register("identity.forbidden", http.StatusForbidden)
+	CodeUnknownRole = errs.Register("identity.unknown_role", http.StatusBadRequest)
 )
 
 func EmailTaken(email string) *errs.Coded {
@@ -87,4 +90,17 @@ func ResetThrottled() *errs.Coded {
 // VerifyThrottled: too many email-verification requests for this account/IP.
 func VerifyThrottled() *errs.Coded {
 	return errs.New(CodeVerifyThrottled, "too many verification requests, try again later", nil)
+}
+
+// Forbidden: the caller is authenticated but lacks the required privilege
+// (e.g. a non-admin hitting an admin-only endpoint).
+func Forbidden() *errs.Coded {
+	return errs.New(CodeForbidden, "insufficient privileges", nil)
+}
+
+// UnknownRole: the requested role slug is not in the fixed catalog (migration
+// 0006 seeds {user, admin}). A client error, not a server fault — so it maps to
+// 400 rather than leaking through the envelope as a generic 500.
+func UnknownRole(slug string) *errs.Coded {
+	return errs.New(CodeUnknownRole, "unknown role slug", map[string]any{"role": slug})
 }

@@ -73,11 +73,16 @@ func (s *Service) resolveOAuthIdentity(ctx context.Context, in OAuthLoginInput, 
 		}
 		return existing, nil
 	case errors.Is(gerr, repo.ErrIdentityMissing):
-		// no collision → implicit register
-		return s.store.CreateOAuthIdentity(ctx, repo.NewOAuthIdentityInput{
+		// no collision → implicit register (NEW identity, not a link)
+		id, cerr := s.store.CreateOAuthIdentity(ctx, repo.NewOAuthIdentityInput{
 			Email: email, EmailVerified: in.EmailVerified, DisplayName: in.DisplayName,
 			Locale: in.Locale, Provider: in.Provider, ProviderUID: in.ProviderUID,
 		})
+		if cerr != nil {
+			return model.Identity{}, cerr
+		}
+		_ = s.store.GrantRole(ctx, id.ID, DefaultRole) // best-effort default role (create path only)
+		return id, nil
 	default:
 		return model.Identity{}, gerr
 	}
