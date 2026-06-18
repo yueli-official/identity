@@ -81,6 +81,28 @@ async function onChangePassword(e: FormSubmitEvent<PwSchema>) {
   }
 }
 
+// ── Set initial password (accounts that have none, e.g. OAuth-only) ──────────
+const setPwSchema = z.object({
+  newPassword: z.string().min(8, '密码至少 8 位').max(128),
+  confirm: z.string().min(1, '请再次输入密码')
+}).refine(d => d.newPassword === d.confirm, { message: '两次输入不一致', path: ['confirm'] })
+type SetPwSchema = z.output<typeof setPwSchema>
+const setPwState = reactive<Partial<SetPwSchema>>({ newPassword: '', confirm: '' })
+const settingPw = ref(false)
+async function onSetPassword(e: FormSubmitEvent<SetPwSchema>) {
+  settingPw.value = true
+  try {
+    await call('/api/v1/auth/password/set', { method: 'POST', body: { newPassword: e.data.newPassword } })
+    setPwState.newPassword = setPwState.confirm = ''
+    await refreshCreds()
+    toast.add({ title: '密码已设置', description: '现在可以用邮箱 + 密码登录,也能解绑第三方账号了。', color: 'success', icon: 'i-tabler-lock-check' })
+  } catch (err: any) {
+    toast.add({ title: '设置失败', description: err?.data?.message || '请重试', color: 'error' })
+  } finally {
+    settingPw.value = false
+  }
+}
+
 // ── Sessions ────────────────────────────────────────────────────────────────
 interface SessionEntry {
   id: string; createdAt: string; lastSeen: string; ip: string; userAgent: string; current: boolean
@@ -118,13 +140,21 @@ const { data: credData, refresh: refreshCreds } = await useAsyncData('credential
   () => call<CredRes>('/api/v1/session/credentials'))
 const hasGoogle = computed(() => (credData.value?.oauth ?? []).some(o => o.provider === 'google'))
 const bindGoogleUrl = '/api/v1/auth/oauth/google/start?intent=bind&return_to=' + encodeURIComponent('/')
+// Google is the LAST login credential when there's no password and it's the only
+// oauth link. The backend refuses to unbind it (anti-lockout) — so disable the
+// button and steer the user to set a password first, instead of failing on click.
+const isGoogleLastCredential = computed(() =>
+  !credData.value?.hasPassword && (credData.value?.oauth?.length ?? 0) <= 1
+)
+const confirmUnbindOpen = ref(false)
 const unbinding = ref(false)
 async function onUnbindGoogle() {
   unbinding.value = true
   try {
     await call('/api/v1/session/credentials/google', { method: 'DELETE' })
     await refreshCreds()
-    toast.add({ title: '已解绑 Google', color: 'success' })
+    confirmUnbindOpen.value = false
+    toast.add({ title: '已解绑 Google', color: 'success', icon: 'i-tabler-check' })
   } catch (err: any) {
     toast.add({ title: '解绑失败', description: err?.data?.message || '请重试', color: 'error' })
   } finally {
@@ -195,8 +225,8 @@ function deviceIcon(ua: string) {
       </UForm>
     </UCard>
 
-    <!-- Security: change password -->
-    <UCard class="shadow-soft">
+    <!-- Security: change password (only when a password is already set) -->
+    <UCard v-if="credData?.hasPassword" class="shadow-soft">
       <template #header>
         <div class="flex items-center gap-2">
           <UIcon name="i-tabler-lock" class="size-5 text-muted" />
@@ -216,6 +246,32 @@ function deviceIcon(ua: string) {
         <div class="flex items-center justify-between gap-4">
           <p class="text-xs text-muted">改密后其他设备会被强制登出</p>
           <UButton type="submit" color="neutral" label="修改密码" :loading="savingPw" />
+        </div>
+      </UForm>
+    </UCard>
+
+    <!-- Security: set an initial password (accounts without one, e.g. OAuth-only) -->
+    <UCard v-else class="shadow-soft">
+      <template #header>
+        <div class="flex items-center gap-2">
+          <UIcon name="i-tabler-lock-plus" class="size-5 text-muted" />
+          <h2 class="font-medium text-highlighted">设置密码</h2>
+        </div>
+      </template>
+      <UForm :schema="setPwSchema" :state="setPwState" class="space-y-4" @submit="onSetPassword">
+        <UAlert
+          color="info" variant="soft" icon="i-tabler-info-circle" class="mb-1"
+          title="你还没有设置密码"
+          description="你目前只能用第三方账号登录。设置密码后即可用邮箱 + 密码登录,也才能解绑第三方账号。"
+        />
+        <UFormField name="newPassword" label="新密码" hint="至少 8 位">
+          <UInput v-model="setPwState.newPassword" type="password" autocomplete="new-password" class="w-full" />
+        </UFormField>
+        <UFormField name="confirm" label="确认密码">
+          <UInput v-model="setPwState.confirm" type="password" autocomplete="new-password" class="w-full" />
+        </UFormField>
+        <div class="flex justify-end">
+          <UButton type="submit" label="设置密码" :loading="settingPw" />
         </div>
       </UForm>
     </UCard>
@@ -246,13 +302,17 @@ function deviceIcon(ua: string) {
             <UIcon name="i-tabler-brand-google" class="size-5 text-dimmed" />
             <div>
               <p class="text-sm text-highlighted">Google</p>
-              <p class="text-xs text-muted">{{ hasGoogle ? '已绑定' : '未绑定' }}</p>
+              <p class="text-xs text-muted">
+                {{ hasGoogle ? '已绑定' : '未绑定' }}
+                <span v-if="hasGoogle && isGoogleLastCredential" class="text-warning">· 唯一登录方式,需先设置密码才能解绑</span>
+              </p>
             </div>
           </div>
           <UButton
             v-if="hasGoogle"
             color="neutral" variant="ghost" size="xs" label="解绑"
-            :loading="unbinding" @click="onUnbindGoogle"
+            :disabled="isGoogleLastCredential || unbinding"
+            @click="confirmUnbindOpen = true"
           />
           <UButton
             v-else
@@ -262,6 +322,21 @@ function deviceIcon(ua: string) {
         </li>
       </ul>
     </UCard>
+
+    <!-- Confirm unbind (destructive, so gate it behind an explicit confirmation) -->
+    <UModal v-model:open="confirmUnbindOpen" title="解绑 Google?">
+      <template #body>
+        <p class="text-sm text-muted">
+          解绑后将无法再用 Google 登录此账户,你仍可用邮箱 + 密码登录。确定要解绑吗?
+        </p>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton color="neutral" variant="ghost" label="取消" :disabled="unbinding" @click="confirmUnbindOpen = false" />
+          <UButton color="error" label="确认解绑" :loading="unbinding" @click="onUnbindGoogle" />
+        </div>
+      </template>
+    </UModal>
 
     <!-- Sessions -->
     <UCard class="shadow-soft">
@@ -285,7 +360,13 @@ function deviceIcon(ua: string) {
               <span class="truncate">{{ s.ip || '未知 IP' }}</span>
               <UBadge v-if="s.current" color="primary" variant="soft" size="sm">当前设备</UBadge>
             </p>
-            <p class="truncate text-xs text-muted">{{ s.userAgent || '未知设备' }} · 最近活跃 {{ fmt(s.lastSeen) }}</p>
+            <p class="truncate text-xs text-muted">
+              {{ s.userAgent || '未知设备' }} · 最近活跃
+              <!-- toLocaleString is timezone/locale dependent → render client-only so
+                   the SSR and client markup agree (a mismatch here was eating the
+                   page's first click after a hard load / OAuth redirect). -->
+              <ClientOnly fallback="…">{{ fmt(s.lastSeen) }}</ClientOnly>
+            </p>
           </div>
           <UButton
             v-if="!s.current"
