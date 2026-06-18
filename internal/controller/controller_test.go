@@ -32,6 +32,7 @@ func TestAuthFlow(t *testing.T) {
 
 		// --- start server ---
 		s := g.Server(t.Name())
+		s.SetAddr("127.0.0.1:0") // loopback-only: avoids the Windows Firewall prompt
 		s.Use(ghttpx.Middleware)
 		s.Group("/", func(grp *ghttp.RouterGroup) {
 			grp.Bind(ctl)

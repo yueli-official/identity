@@ -111,7 +111,7 @@ func TestE2E_RBAC(t *testing.T) {
 
 		// --- one server: business API (with envelope middleware) + raw OIDC -----
 		s := g.Server(t.Name())
-		s.SetPort(port)
+		s.SetAddr(fmt.Sprintf("127.0.0.1:%d", port)) // loopback-only: avoids the Windows Firewall prompt
 		s.SetDumpRouterMap(false)
 		s.Group("/", func(grp *ghttp.RouterGroup) {
 			grp.Middleware(ghttpx.Middleware)

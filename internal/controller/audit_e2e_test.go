@@ -50,6 +50,7 @@ func TestE2E_AuditLogging(t *testing.T) {
 		// ActorMiddleware must be global (s.Use) so it runs for every request and
 		// populates IP/UA into ctx before the business handler calls svc methods.
 		s := g.Server(t.Name())
+		s.SetAddr("127.0.0.1:0") // loopback-only: avoids the Windows Firewall prompt
 		s.SetDumpRouterMap(false)
 		s.Use(controller.ActorMiddleware) // <-- THIS is what the other e2e tests omit
 		s.Group("/", func(grp *ghttp.RouterGroup) {

@@ -128,7 +128,7 @@ func setupE2E(t *testing.T, clientID string) *e2eEnv {
 	// 5. Start GoFrame server on the pre-chosen port (NO ghttpx.Middleware), with
 	//    the full milestone-④ route set.
 	s := g.Server(t.Name())
-	s.SetPort(port)
+	s.SetAddr(fmt.Sprintf("127.0.0.1:%d", port)) // loopback-only: avoids the Windows Firewall prompt
 	s.SetDumpRouterMap(false)
 	s.BindHandler("GET:/.well-known/openid-configuration", ctl.Discovery)
 	s.BindHandler("GET:/oauth2/jwks.json", ctl.JWKS)
@@ -364,7 +364,7 @@ func TestOIDCFlow(t *testing.T) {
 	// 5. Start GoFrame server on the pre-chosen port (NO ghttpx.Middleware)
 	// -----------------------------------------------------------------------
 	s := g.Server(t.Name())
-	s.SetPort(port)
+	s.SetAddr(fmt.Sprintf("127.0.0.1:%d", port)) // loopback-only: avoids the Windows Firewall prompt
 	s.SetDumpRouterMap(false)
 	// Bind OIDC handlers directly — no middleware wrapper so fosite can write
 	// RFC-compliant headers + bodies through RawWriter without interference.

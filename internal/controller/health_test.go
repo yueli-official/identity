@@ -15,6 +15,7 @@ import (
 func TestHealthz(t *testing.T) {
 	gtest.C(t, func(t *gtest.T) {
 		s := g.Server(t.Name())
+		s.SetAddr("127.0.0.1:0") // loopback-only: avoids the Windows Firewall prompt
 		s.Group("/", func(group *ghttp.RouterGroup) {
 			group.GET("/healthz", controller.Healthz)
 		})
