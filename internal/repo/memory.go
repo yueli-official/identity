@@ -31,6 +31,8 @@ type Memory struct {
 	oauthLinks map[string]string // provider+"\x00"+providerUID -> identity id
 	verifs     map[string]memVerification // token_hash -> verification record
 	roles      map[string]map[string]bool // identity id -> set of granted role slugs
+	audit      []AuditRow                 // append-only audit log (newest is highest index)
+	auditSeq   int64                      // monotonically incrementing ID counter
 }
 
 // memVerification mirrors a single email_verifications row in memory.
@@ -381,6 +383,64 @@ func (m *Memory) ListPublicKeys(_ context.Context) ([]model.SigningKey, error) {
 	defer m.mu.Unlock()
 	out := make([]model.SigningKey, len(m.keys))
 	copy(out, m.keys)
+	return out, nil
+}
+
+// InsertAudit appends an audit row to the in-memory log. It assigns a
+// monotonically incrementing ID and sets OccurredAt to now() when zero.
+func (m *Memory) InsertAudit(_ context.Context, row AuditRow) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.auditSeq++
+	row.ID = m.auditSeq
+	if row.OccurredAt.IsZero() {
+		row.OccurredAt = m.now()
+	}
+	m.audit = append(m.audit, row)
+	return nil
+}
+
+// QueryAudit returns audit rows matching f, ordered newest-first (by ID desc).
+// IdentityID matches actor OR target; Event matches exactly; Limit 0 → 50,
+// capped at 200; Offset skips the first N matching rows. Returns a copy slice
+// so callers cannot mutate internal state.
+func (m *Memory) QueryAudit(_ context.Context, f AuditFilter) ([]AuditRow, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Collect matching rows in reverse insertion order (newest-first).
+	var matches []AuditRow
+	for i := len(m.audit) - 1; i >= 0; i-- {
+		r := m.audit[i]
+		if f.IdentityID != "" && r.ActorID != f.IdentityID && r.TargetID != f.IdentityID {
+			continue
+		}
+		if f.Event != "" && r.Event != f.Event {
+			continue
+		}
+		matches = append(matches, r)
+	}
+
+	// Apply limit/offset.
+	limit := f.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	offset := f.Offset
+	if offset >= len(matches) {
+		return []AuditRow{}, nil
+	}
+	matches = matches[offset:]
+	if len(matches) > limit {
+		matches = matches[:limit]
+	}
+
+	// Return a copy to avoid leaking internal slice storage.
+	out := make([]AuditRow, len(matches))
+	copy(out, matches)
 	return out, nil
 }
 
