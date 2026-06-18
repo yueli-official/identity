@@ -1,37 +1,29 @@
-package logic_test
+package logic
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
 
+	"platform/gokit/errs"
 	"platform/services/identity/internal/iderr"
-	"platform/services/identity/internal/logic"
 	"platform/services/identity/internal/pat"
 	"platform/services/identity/internal/repo"
 )
 
-// newPATSvc creates a Service backed by the given store, with DefaultConfig and
-// a controllable clock. It returns the service and a pointer whose value is read
-// by the fake clock; callers advance time by writing to *nowPtr.
-func newPATSvc(st repo.Store) (*logic.Service, *time.Time) {
-	svc := logic.New(st, logic.DefaultConfig())
-	t0 := time.Now()
-	svc.SetNow(func() time.Time { return t0 })
-	// Return pointer to local — caller must use advanceClock helper.
-	// NOTE: closures capture variables by reference, but t0 is a value here.
-	// We return the service separately so tests can advance via SetNow.
-	// Actually re-implement using a mutable time pointer:
-	return svc, &t0
-}
+// ---------------------------------------------------------------------------
+// Clock helpers (white-box: set unexported now field directly)
+// ---------------------------------------------------------------------------
 
-// newPATSvcClk creates a Service with a mutable clock pointer.
-func newPATSvcClk(st repo.Store) (*logic.Service, *time.Time) {
+// newPATSvcClk creates a Service backed by the given store, with DefaultConfig
+// and a mutable clock pointer. Callers advance time by writing to *nowPtr.
+func newPATSvcClk(st repo.Store) (*Service, *time.Time) {
 	now := time.Now()
 	nowPtr := &now
-	svc := logic.New(st, logic.DefaultConfig())
-	svc.SetNow(func() time.Time { return *nowPtr })
+	svc := New(st, DefaultConfig())
+	svc.now = func() time.Time { return *nowPtr }
 	return svc, nowPtr
 }
 
@@ -40,9 +32,51 @@ func advanceClock(nowPtr *time.Time, d time.Duration) {
 	*nowPtr = (*nowPtr).Add(d)
 }
 
+// ---------------------------------------------------------------------------
+// Local helpers (self-contained — do not depend on other *_test.go files)
+// ---------------------------------------------------------------------------
+
+// codeOfErr returns the *errs.Coded code string, or "" if not a Coded error.
+func patCodeOfErr(err error) string {
+	var c *errs.Coded
+	if errors.As(err, &c) {
+		return c.Code
+	}
+	return ""
+}
+
+// patAllAudit reads all audit rows from store without filter.
+func patAllAudit(t *testing.T, st repo.Store) []repo.AuditRow {
+	t.Helper()
+	rows, err := st.QueryAudit(context.Background(), repo.AuditFilter{Limit: 200})
+	if err != nil {
+		t.Fatalf("QueryAudit: %v", err)
+	}
+	return rows
+}
+
+// patFindEvent returns the first audit row with the given event name.
+func patFindEvent(rows []repo.AuditRow, event string) (repo.AuditRow, bool) {
+	for _, r := range rows {
+		if r.Event == event {
+			return r, true
+		}
+	}
+	return repo.AuditRow{}, false
+}
+
+// patEventNames extracts event names from a slice for error messages.
+func patEventNames(rows []repo.AuditRow) []string {
+	names := make([]string, len(rows))
+	for i, r := range rows {
+		names[i] = r.Event
+	}
+	return names
+}
+
 // patHash is a shortcut to derive-key then hash, using DefaultConfig.
 func patHash(plaintext string) string {
-	key := pat.DeriveKey(logic.DefaultConfig().PATHMACSecret)
+	key := pat.DeriveKey(DefaultConfig().PATHMACSecret)
 	return pat.Hash(key, plaintext)
 }
 
@@ -101,7 +135,7 @@ func TestCreatePAT_EmptyName(t *testing.T) {
 	m := repo.NewMemory()
 	svc, _ := newPATSvcClk(m)
 	_, _, err := svc.CreatePAT(context.Background(), "id-1", "", []string{"read"}, 0)
-	if codeOfErr(err) != iderr.CodePATNameRequired {
+	if patCodeOfErr(err) != iderr.CodePATNameRequired {
 		t.Errorf("empty name: want PATNameRequired, got %v", err)
 	}
 }
@@ -110,7 +144,7 @@ func TestCreatePAT_WhitespaceName(t *testing.T) {
 	m := repo.NewMemory()
 	svc, _ := newPATSvcClk(m)
 	_, _, err := svc.CreatePAT(context.Background(), "id-1", "   ", []string{"read"}, 0)
-	if codeOfErr(err) != iderr.CodePATNameRequired {
+	if patCodeOfErr(err) != iderr.CodePATNameRequired {
 		t.Errorf("whitespace name: want PATNameRequired, got %v", err)
 	}
 }
@@ -119,7 +153,7 @@ func TestCreatePAT_EmptyScopes(t *testing.T) {
 	m := repo.NewMemory()
 	svc, _ := newPATSvcClk(m)
 	_, _, err := svc.CreatePAT(context.Background(), "id-1", "tok", []string{}, 0)
-	if codeOfErr(err) != iderr.CodePATScopesRequired {
+	if patCodeOfErr(err) != iderr.CodePATScopesRequired {
 		t.Errorf("empty scopes: want PATScopesRequired, got %v", err)
 	}
 }
@@ -128,7 +162,7 @@ func TestCreatePAT_ScopeWithSpace(t *testing.T) {
 	m := repo.NewMemory()
 	svc, _ := newPATSvcClk(m)
 	_, _, err := svc.CreatePAT(context.Background(), "id-1", "tok", []string{"read write"}, 0)
-	if codeOfErr(err) != iderr.CodePATScopeInvalid {
+	if patCodeOfErr(err) != iderr.CodePATScopeInvalid {
 		t.Errorf("scope with space: want PATScopeInvalid, got %v", err)
 	}
 }
@@ -141,7 +175,7 @@ func TestCreatePAT_TooManyScopes(t *testing.T) {
 		scopes[i] = "scope"
 	}
 	_, _, err := svc.CreatePAT(context.Background(), "id-1", "tok", scopes, 0)
-	if codeOfErr(err) != iderr.CodePATScopeInvalid {
+	if patCodeOfErr(err) != iderr.CodePATScopeInvalid {
 		t.Errorf(">50 scopes: want PATScopeInvalid, got %v", err)
 	}
 }
@@ -154,7 +188,7 @@ func TestCreatePAT_LimitReached(t *testing.T) {
 	m := repo.NewMemory()
 	svc, _ := newPATSvcClk(m)
 	ctx := context.Background()
-	cfg := logic.DefaultConfig()
+	cfg := DefaultConfig()
 
 	for i := 0; i < cfg.PATMaxPerUser; i++ {
 		_, _, err := svc.CreatePAT(ctx, "id-cap", "tok", []string{"read"}, 0)
@@ -164,7 +198,7 @@ func TestCreatePAT_LimitReached(t *testing.T) {
 	}
 
 	_, _, err := svc.CreatePAT(ctx, "id-cap", "extra", []string{"read"}, 0)
-	if codeOfErr(err) != iderr.CodePATLimitReached {
+	if patCodeOfErr(err) != iderr.CodePATLimitReached {
 		t.Errorf("over limit: want PATLimitReached, got %v", err)
 	}
 }
@@ -208,7 +242,7 @@ func TestRevokePAT_WrongIdentity(t *testing.T) {
 	}
 
 	err = svc.RevokePAT(ctx, "id-other", row.ID)
-	if codeOfErr(err) != iderr.CodePATNotFound {
+	if patCodeOfErr(err) != iderr.CodePATNotFound {
 		t.Errorf("wrong identity: want PATNotFound, got %v", err)
 	}
 }
@@ -228,7 +262,7 @@ func TestRevokePAT_ThenVerify(t *testing.T) {
 	}
 
 	_, err = svc.VerifyPAT(ctx, plaintext)
-	if codeOfErr(err) != iderr.CodePATInvalid {
+	if patCodeOfErr(err) != iderr.CodePATInvalid {
 		t.Errorf("verify after revoke: want PATInvalid, got %v", err)
 	}
 }
@@ -263,7 +297,7 @@ func TestVerifyPAT_Garbage(t *testing.T) {
 	m := repo.NewMemory()
 	svc, _ := newPATSvcClk(m)
 	_, err := svc.VerifyPAT(context.Background(), "not-a-real-token")
-	if codeOfErr(err) != iderr.CodePATInvalid {
+	if patCodeOfErr(err) != iderr.CodePATInvalid {
 		t.Errorf("garbage: want PATInvalid, got %v", err)
 	}
 }
@@ -283,7 +317,7 @@ func TestVerifyPAT_Expired(t *testing.T) {
 	advanceClock(nowPtr, 25*time.Hour)
 
 	_, err = svc.VerifyPAT(ctx, plaintext)
-	if codeOfErr(err) != iderr.CodePATExpired {
+	if patCodeOfErr(err) != iderr.CodePATExpired {
 		t.Errorf("expired: want PATExpired, got %v", err)
 	}
 }
@@ -357,19 +391,19 @@ func TestPAT_Audit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rows := allAudit(t, m)
+	rows := patAllAudit(t, m)
 
-	created, ok := findEvent(rows, logic.EvPATCreated)
+	created, ok := patFindEvent(rows, EvPATCreated)
 	if !ok {
-		t.Fatalf("expected pat.created audit event, got: %v", eventNames(rows))
+		t.Fatalf("expected pat.created audit event, got: %v", patEventNames(rows))
 	}
 	if created.ActorID != "id-audit" || created.TargetID != "id-audit" {
 		t.Errorf("pat.created ActorID/TargetID: want id-audit, got actor=%q target=%q", created.ActorID, created.TargetID)
 	}
 
-	revoked, ok := findEvent(rows, logic.EvPATRevoked)
+	revoked, ok := patFindEvent(rows, EvPATRevoked)
 	if !ok {
-		t.Fatalf("expected pat.revoked audit event, got: %v", eventNames(rows))
+		t.Fatalf("expected pat.revoked audit event, got: %v", patEventNames(rows))
 	}
 	if revoked.ActorID != "id-audit" || revoked.TargetID != "id-audit" {
 		t.Errorf("pat.revoked ActorID/TargetID: want id-audit, got actor=%q target=%q", revoked.ActorID, revoked.TargetID)

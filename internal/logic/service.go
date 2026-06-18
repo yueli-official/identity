@@ -69,10 +69,6 @@ func New(store repo.Store, cfg Config) *Service {
 	}
 }
 
-// SetNow replaces the clock function used by the service. Used in tests to
-// control time-dependent behaviour (expiry, throttle windows, etc.).
-func (s *Service) SetNow(fn func() time.Time) { s.now = fn }
-
 // SetRefreshRevoker wires OIDC refresh revocation into passive logout. Called in
 // main after the OIDC store is built.
 func (s *Service) SetRefreshRevoker(r RefreshRevoker) { s.revoker = r }

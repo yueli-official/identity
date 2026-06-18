@@ -36,8 +36,7 @@ func (s *Service) CreatePAT(ctx context.Context, identityID, name string, scopes
 		return "", repo.PATRow{}, iderr.PATScopeInvalid()
 	}
 	for _, sc := range scopes {
-		trimmed := strings.TrimSpace(sc)
-		if trimmed == "" || strings.ContainsAny(sc, " \t\r\n") {
+		if sc == "" || strings.ContainsAny(sc, " \t\r\n") {
 			return "", repo.PATRow{}, iderr.PATScopeInvalid()
 		}
 	}
@@ -137,13 +136,14 @@ func (s *Service) VerifyPAT(ctx context.Context, presented string) (PATVerificat
 	}
 
 	// 3. Check expiry: !After means at-or-past expiry boundary.
-	if row.ExpiresAt != nil && !row.ExpiresAt.After(s.now()) {
+	now := s.now()
+	if row.ExpiresAt != nil && !row.ExpiresAt.After(now) {
 		return PATVerification{}, iderr.PATExpired()
 	}
 
 	// 4. Throttled touch (best-effort: at most once per minute).
-	if row.LastUsedAt == nil || s.now().Sub(*row.LastUsedAt) >= time.Minute {
-		if err := s.store.TouchPATLastUsed(ctx, row.ID, s.now()); err != nil {
+	if row.LastUsedAt == nil || now.Sub(*row.LastUsedAt) >= time.Minute {
+		if err := s.store.TouchPATLastUsed(ctx, row.ID, now); err != nil {
 			g.Log().Errorf(ctx, "pat: touch last_used %d failed: %v", row.ID, err)
 		}
 	}
