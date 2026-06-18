@@ -582,6 +582,51 @@ func TestOIDCRefreshFlow(t *testing.T) {
 	t.Logf("refresh OK: new access_token + rotated refresh_token (rt→rt2)")
 }
 
+// TestOIDCRefreshRolesUpdated proves the Task-5 fresh-roles-on-refresh seam:
+// after the initial token (roles claim == ["user"]), GRANTING "admin" to the
+// identity and then exercising the refresh_token grant yields a NEW access-token
+// JWT whose "roles" claim now contains "admin". Without the refresh-roles
+// injection in the Token handler, fosite would re-sign the frozen authorize-time
+// roles (["user"]) and this test would FAIL.
+func TestOIDCRefreshRolesUpdated(t *testing.T) {
+	const clientID = "demo-web"
+	env := setupE2E(t, clientID)
+	const scope = "openid profile email roles offline_access"
+
+	// Initial authorize → token. The default role is "user", so the access-token
+	// roles claim must be exactly ["user"] at this point.
+	p := newPKCE(t)
+	code := authorizeForCode(t, env, clientID, scope, p)
+	status, body, ts := exchangeCode(t, env, clientID, code, p.verifier)
+	assertValidTokenResponse(t, status, body, ts, true)
+	if ts.RefreshToken == "" {
+		t.Fatalf("offline_access requested but no refresh_token: %s", body)
+	}
+	roles0 := decodeAccessTokenRoles(t, env.base, ts.AccessToken)
+	if !rolesContain(roles0, "user") || rolesContain(roles0, "admin") {
+		t.Fatalf("initial access token: want roles=[user] (no admin), got %v", roles0)
+	}
+	t.Logf("initial access token roles = %v", roles0)
+
+	// Grant admin AFTER the authorize-time session was frozen into the refresh
+	// token. A pure-delegation Token handler would never see this change.
+	if err := env.svc.GrantRole(env.ctx, env.subject, "admin"); err != nil {
+		t.Fatalf("GrantRole(admin): %v", err)
+	}
+
+	// Refresh grant → the re-minted access token must carry the FRESH roles.
+	rStatus, rBody, rts := refreshToken(t, env, clientID, ts.RefreshToken)
+	assertValidTokenResponse(t, rStatus, rBody, rts, false)
+	roles1 := decodeAccessTokenRoles(t, env.base, rts.AccessToken)
+	if !rolesContain(roles1, "admin") {
+		t.Fatalf("refresh access token: want roles to include admin after grant, got %v", roles1)
+	}
+	if !rolesContain(roles1, "user") {
+		t.Fatalf("refresh access token: existing role 'user' dropped, got %v", roles1)
+	}
+	t.Logf("refresh access token roles = %v (admin propagated on refresh)", roles1)
+}
+
 // TestOIDCRotationReplayKillsFamily is the milestone-④ rotation/replay defense:
 // after rt→rt2 rotation, replaying the OLD rt is rejected AND poisons the whole
 // family, so rt2 is then dead too. fosite revokes by request_id, which is reused
@@ -834,6 +879,67 @@ func verifyAccessTokenLocally(t *testing.T, idpURL, accessToken, expectedIss, ex
 
 	t.Logf("LOCAL JWKS verify OK: alg=%s kid=%s iss=%v sub=%v scope=%q",
 		alg, kid, claims["iss"], claims["sub"], scope)
+}
+
+// decodeAccessTokenRoles fetches the IdP JWKS, RS256-verifies the access token
+// offline (resource-server style), and returns its "roles" claim as a []string.
+// It mirrors verifyAccessTokenLocally's verify path but extracts the roles claim.
+func decodeAccessTokenRoles(t *testing.T, idpURL, accessToken string) []string {
+	t.Helper()
+
+	jwksResp, err := http.Get(idpURL + "/oauth2/jwks.json") //nolint:noctx
+	if err != nil {
+		t.Fatalf("fetch jwks: %v", err)
+	}
+	defer jwksResp.Body.Close()
+	var jwks jose.JSONWebKeySet
+	if err := json.NewDecoder(jwksResp.Body).Decode(&jwks); err != nil {
+		t.Fatalf("decode jwks: %v", err)
+	}
+
+	parsed, err := josejwt.ParseSigned(accessToken)
+	if err != nil {
+		t.Fatalf("parse signed access token: %v", err)
+	}
+	if len(parsed.Headers) == 0 {
+		t.Fatalf("access token: no JOSE headers")
+	}
+	matched := jwks.Key(parsed.Headers[0].KeyID)
+	if len(matched) == 0 {
+		t.Fatalf("no JWKS key matches token kid %q", parsed.Headers[0].KeyID)
+	}
+	var claims map[string]interface{}
+	if err := parsed.Claims(matched[0].Key, &claims); err != nil {
+		t.Fatalf("LOCAL RS256 signature verification FAILED: %v", err)
+	}
+
+	raw, ok := claims["roles"]
+	if !ok {
+		t.Fatalf("access token has no 'roles' claim: %v", claims)
+	}
+	arr, ok := raw.([]interface{})
+	if !ok {
+		t.Fatalf("access token 'roles' claim is not an array: %T (%v)", raw, raw)
+	}
+	out := make([]string, 0, len(arr))
+	for _, v := range arr {
+		s, ok := v.(string)
+		if !ok {
+			t.Fatalf("access token 'roles' element not a string: %T (%v)", v, v)
+		}
+		out = append(out, s)
+	}
+	return out
+}
+
+// rolesContain reports whether roles includes target.
+func rolesContain(roles []string, target string) bool {
+	for _, r := range roles {
+		if r == target {
+			return true
+		}
+	}
+	return false
 }
 
 // randPKCEVerifier generates a random PKCE code verifier (48 bytes → 64 base64url chars).

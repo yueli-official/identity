@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"net/url"
 	"time"
 
@@ -98,20 +99,18 @@ func (c *OIDCController) Authorize(r *ghttp.Request) {
 
 // Token handles POST /oauth2/token (authorization_code + refresh_token grants).
 //
-// ROLES ON REFRESH: the refresh_token grant is fully owned by fosite's stock
-// RefreshTokenGrantHandler (compose.OAuth2RefreshTokenGrantFactory). On refresh
-// it re-hydrates the ORIGINAL request session from storage and re-signs the
-// access-token JWT from those frozen claims (handler/oauth2/flow_refresh.go:87
-// `request.SetSession(originalRequest.GetSession().Clone())`, then
-// strategy_jwt.go reads claims off that cloned session). This handler is a pure
-// delegation to NewAccessRequest/NewAccessResponse, so there is NO
-// application-level reconstruction seam where fresh roles could be injected
-// without forking the fosite handler. Consequence: the "roles" claim is frozen
-// at authorize time; role changes (grant/revoke) propagate on the next FULL
-// authorize, not on token refresh. Acceptable for the MVP — refresh TTL bounds
-// staleness. FOLLOW-UP (spec §6, deferred): to refresh roles on every grant,
-// register a custom post-refresh hook / wrap the refresh handler that re-fetches
-// c.svc.GetRoles(subject) and overwrites the access-token Extra before signing.
+// ROLES ON REFRESH: on the refresh_token grant fosite re-hydrates the ORIGINAL
+// authorize-time session from storage and deep-clones it INTO the access request
+// (handler/oauth2/flow_refresh.go:87 `request.SetSession(originalRequest.
+// GetSession().Clone())`), which runs inside NewAccessRequest. So when
+// NewAccessRequest returns, accessReq.GetSession() is the live, hydrated
+// *oidc.Session that will be signed — and strategy_jwt.go reads its JWT claims
+// LIVE at signing time (during NewAccessResponse). That gives us an
+// application-level seam: between NewAccessRequest and NewAccessResponse we
+// re-fetch the identity's CURRENT roles and overwrite the "roles" claim, so role
+// grants/revocations take effect on refresh (spec §6) instead of only on the
+// next full authorize. Without this, a revoked admin would keep "admin" in their
+// access token until the refresh token itself expired.
 func (c *OIDCController) Token(r *ghttp.Request) {
 	ctx := r.Context()
 	w := r.Response.RawWriter()
@@ -123,12 +122,49 @@ func (c *OIDCController) Token(r *ghttp.Request) {
 		c.provider.WriteAccessError(ctx, w, accessReq, err)
 		return
 	}
+	c.refreshRolesClaim(ctx, accessReq)
 	resp, err := c.provider.NewAccessResponse(ctx, accessReq)
 	if err != nil {
 		c.provider.WriteAccessError(ctx, w, accessReq, err)
 		return
 	}
 	c.provider.WriteAccessResponse(ctx, w, accessReq, resp)
+}
+
+// refreshRolesClaim re-fetches the identity's current roles and overwrites the
+// "roles" claim on the (already deep-cloned, live) refresh-grant session, so the
+// freshly-signed access-token JWT — and the id token if it is re-minted — carry
+// up-to-date roles. No-op unless this is a refresh_token grant that was granted
+// the "roles" scope. The roles claim must mirror BuildSession's authorize-time
+// shape (a non-nil slice). It is a no-op on the authorization_code grant, whose
+// session already holds fresh authorize-time roles.
+func (c *OIDCController) refreshRolesClaim(ctx context.Context, accessReq fosite.AccessRequester) {
+	if !accessReq.GetGrantTypes().ExactOne("refresh_token") || !accessReq.GetGrantedScopes().Has("roles") {
+		return
+	}
+	sess, ok := accessReq.GetSession().(*oidc.Session)
+	if !ok || sess.JWTClaims == nil {
+		return
+	}
+	roles, err := c.svc.GetRoles(ctx, sess.JWTClaims.Subject)
+	if err != nil {
+		return // keep the cloned authorize-time roles rather than dropping them
+	}
+	if roles == nil {
+		roles = []string{}
+	}
+	// Access-token JWT (primary: resource servers read this). Extra is non-nil
+	// here because BuildSession set accessExtra["roles"] when the roles scope was
+	// granted, and the clone preserves it — but guard anyway.
+	if sess.JWTClaims.Extra == nil {
+		sess.JWTClaims.Extra = map[string]interface{}{}
+	}
+	sess.JWTClaims.Extra["roles"] = roles
+	// ID token (secondary: only re-minted when openid is granted). Only touch a
+	// non-nil claims map to avoid introducing a nil-map panic.
+	if sess.DefaultSession != nil && sess.DefaultSession.Claims != nil && sess.DefaultSession.Claims.Extra != nil {
+		sess.DefaultSession.Claims.Extra["roles"] = roles
+	}
 }
 
 // Userinfo handles GET/POST /oauth2/userinfo.
