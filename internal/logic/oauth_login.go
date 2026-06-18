@@ -27,12 +27,13 @@ type OAuthLoginInput struct {
 func (s *Service) OAuthLogin(ctx context.Context, in OAuthLoginInput) (LoginOutput, error) {
 	email := CanonicalizeEmail(in.Email)
 
+	var created bool
 	id, err := s.store.GetByProviderUID(ctx, in.Provider, in.ProviderUID)
 	switch {
 	case err == nil:
 		// already linked → straight in
 	case errors.Is(err, repo.ErrIdentityMissing):
-		id, err = s.resolveOAuthIdentity(ctx, in, email)
+		id, created, err = s.resolveOAuthIdentity(ctx, in, email)
 		if err != nil {
 			return LoginOutput{}, err
 		}
@@ -54,24 +55,41 @@ func (s *Service) OAuthLogin(ctx context.Context, in OAuthLoginInput) (LoginOutp
 	if err := s.store.CreateSession(ctx, sess, s.cfg.SessionIdleTTL); err != nil {
 		return LoginOutput{}, err
 	}
+	s.audit(ctx, AuditEvent{
+		Event:    EvOAuthLogin,
+		ActorID:  id.ID,
+		TargetID: id.ID,
+		Email:    id.Email,
+		Detail:   map[string]any{"provider": in.Provider, "created": created},
+	})
 	return LoginOutput{SessionID: sess.ID, Identity: id}, nil
 }
 
-func (s *Service) resolveOAuthIdentity(ctx context.Context, in OAuthLoginInput, email string) (model.Identity, error) {
+// resolveOAuthIdentity resolves an identity for an OAuth login where no existing
+// credential link was found. Returns the resolved identity, a bool indicating
+// whether it was newly created (implicit-register), and any error.
+func (s *Service) resolveOAuthIdentity(ctx context.Context, in OAuthLoginInput, email string) (model.Identity, bool, error) {
 	if email == "" {
-		return model.Identity{}, iderr.OAuthNoEmail()
+		return model.Identity{}, false, iderr.OAuthNoEmail()
 	}
 	existing, gerr := s.store.GetByEmail(ctx, email)
 	switch {
 	case gerr == nil:
 		// §10: verified email matches an existing identity → link; unverified → refuse.
 		if !in.EmailVerified {
-			return model.Identity{}, iderr.OAuthEmailConflict(email)
+			return model.Identity{}, false, iderr.OAuthEmailConflict(email)
 		}
 		if lerr := s.store.LinkOAuthCredential(ctx, existing.ID, in.Provider, in.ProviderUID, email, true); lerr != nil {
-			return model.Identity{}, lerr
+			return model.Identity{}, false, lerr
 		}
-		return existing, nil
+		s.audit(ctx, AuditEvent{
+			Event:    EvCredentialLinked,
+			ActorID:  existing.ID,
+			TargetID: existing.ID,
+			Email:    existing.Email,
+			Detail:   map[string]any{"provider": in.Provider},
+		})
+		return existing, false, nil
 	case errors.Is(gerr, repo.ErrIdentityMissing):
 		// no collision → implicit register (NEW identity, not a link)
 		id, cerr := s.store.CreateOAuthIdentity(ctx, repo.NewOAuthIdentityInput{
@@ -79,11 +97,17 @@ func (s *Service) resolveOAuthIdentity(ctx context.Context, in OAuthLoginInput, 
 			Locale: in.Locale, Provider: in.Provider, ProviderUID: in.ProviderUID,
 		})
 		if cerr != nil {
-			return model.Identity{}, cerr
+			return model.Identity{}, false, cerr
 		}
 		_ = s.store.GrantRole(ctx, id.ID, DefaultRole) // best-effort default role (create path only)
-		return id, nil
+		s.audit(ctx, AuditEvent{
+			Event:    EvRoleDefaultGranted,
+			ActorID:  id.ID,
+			TargetID: id.ID,
+			Detail:   map[string]any{"role": DefaultRole, "best_effort": true},
+		})
+		return id, true, nil
 	default:
-		return model.Identity{}, gerr
+		return model.Identity{}, false, gerr
 	}
 }

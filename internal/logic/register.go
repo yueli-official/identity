@@ -38,5 +38,17 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (model.Identit
 		return model.Identity{}, err
 	}
 	_ = s.store.GrantRole(ctx, id.ID, DefaultRole) // best-effort default role
+	s.audit(ctx, AuditEvent{
+		Event:    EvRoleDefaultGranted,
+		ActorID:  id.ID,
+		TargetID: id.ID,
+		Detail:   map[string]any{"role": DefaultRole, "best_effort": true},
+	})
+	s.audit(ctx, AuditEvent{
+		Event:    EvRegister,
+		ActorID:  id.ID,
+		TargetID: id.ID,
+		Email:    id.Email,
+	})
 	return id, nil
 }

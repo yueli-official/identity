@@ -1,6 +1,10 @@
 package logic
 
-import "context"
+import (
+	"context"
+
+	"platform/services/identity/internal/actor"
+)
 
 // DefaultRole is granted to every identity at creation time (password register
 // and the OAuth implicit-register path). A missing grant only yields an empty
@@ -23,7 +27,12 @@ func (s *Service) GrantRole(ctx context.Context, identityID, slug string) error 
 	if err := s.store.GrantRole(ctx, identityID, slug); err != nil {
 		return err
 	}
-	// TODO(⑥-audit): persist role.granted audit event
+	s.audit(ctx, AuditEvent{
+		Event:    EvRoleGranted,
+		ActorID:  actor.From(ctx).IdentityID,
+		TargetID: identityID,
+		Detail:   map[string]any{"role": slug},
+	})
 	return nil
 }
 
@@ -31,6 +40,11 @@ func (s *Service) RevokeRole(ctx context.Context, identityID, slug string) error
 	if err := s.store.RevokeRole(ctx, identityID, slug); err != nil {
 		return err
 	}
-	// TODO(⑥-audit): persist role.revoked audit event
+	s.audit(ctx, AuditEvent{
+		Event:    EvRoleRevoked,
+		ActorID:  actor.From(ctx).IdentityID,
+		TargetID: identityID,
+		Detail:   map[string]any{"role": slug},
+	})
 	return nil
 }

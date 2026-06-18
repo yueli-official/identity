@@ -47,12 +47,28 @@ func (s *Service) GetProfile(ctx context.Context, id string) (model.Profile, err
 
 // Logout clears a single session and revokes the refresh tokens bound to it.
 func (s *Service) Logout(ctx context.Context, sessionID string) error {
+	// Resolve the identity before deleting so we can audit with the correct actor/target.
+	// If the lookup fails we still proceed (don't block logout) and record "" identity.
+	var identityID string
+	if sess, err := s.store.GetSession(ctx, sessionID); err == nil {
+		identityID = sess.IdentityID
+	}
+
 	if s.revoker != nil {
 		if err := s.revoker.RevokeRefreshBySession(ctx, sessionID); err != nil {
 			return err
 		}
 	}
-	return s.store.DeleteSession(ctx, sessionID)
+	if err := s.store.DeleteSession(ctx, sessionID); err != nil {
+		return err
+	}
+	s.audit(ctx, AuditEvent{
+		Event:    EvLogout,
+		ActorID:  identityID,
+		TargetID: identityID,
+		Detail:   map[string]any{"session_id": sessionID},
+	})
+	return nil
 }
 
 // ListSessions lists an identity's active IdP sessions (account-center).
@@ -67,5 +83,14 @@ func (s *Service) LogoutAll(ctx context.Context, identityID string) error {
 			return err
 		}
 	}
-	return s.store.DeleteSessionsByIdentity(ctx, identityID)
+	if err := s.store.DeleteSessionsByIdentity(ctx, identityID); err != nil {
+		return err
+	}
+	s.audit(ctx, AuditEvent{
+		Event:    EvLogoutAll,
+		ActorID:  identityID,
+		TargetID: identityID,
+		Detail:   map[string]any{"scope": "all"},
+	})
+	return nil
 }
