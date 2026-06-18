@@ -14,12 +14,14 @@ import (
 
 // newToken mints an opaque URL-safe token and its sha256-hex storage hash. Only
 // the hash is persisted; the raw token lives solely in the emailed link.
-func newToken() (token, hash string) {
+func newToken() (token, hash string, err error) {
 	b := make([]byte, 32)
-	_, _ = rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		return "", "", err
+	}
 	token = base64.RawURLEncoding.EncodeToString(b)
 	sum := sha256.Sum256([]byte(token))
-	return token, hex.EncodeToString(sum[:])
+	return token, hex.EncodeToString(sum[:]), nil
 }
 
 func hashToken(token string) string {
@@ -40,7 +42,10 @@ func (s *Service) RequestEmailVerification(ctx context.Context, identityID, ip s
 	if err != nil {
 		return err
 	}
-	token, hash := newToken()
+	token, hash, err := newToken()
+	if err != nil {
+		return err
+	}
 	if err := s.store.CreateVerification(ctx, repo.NewVerificationInput{
 		IdentityID: id.ID, Email: id.Email, Purpose: repo.PurposeVerifyEmail,
 		TokenHash: hash, ExpiresAt: s.now().Add(s.cfg.VerifyTokenTTL),
@@ -91,7 +96,10 @@ func (s *Service) RequestPasswordReset(ctx context.Context, email, ip string) er
 	if err != nil {
 		return err
 	}
-	token, hash := newToken()
+	token, hash, err := newToken()
+	if err != nil {
+		return err
+	}
 	if err := s.store.CreateVerification(ctx, repo.NewVerificationInput{
 		IdentityID: id.ID, Email: id.Email, Purpose: repo.PurposePasswordReset,
 		TokenHash: hash, ExpiresAt: s.now().Add(s.cfg.ResetTokenTTL),
