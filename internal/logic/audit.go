@@ -30,6 +30,7 @@ const (
 
 	EvProfileUpdated   = "profile.updated"
 	EvPasswordChanged  = "password.changed"
+	EvPasswordSet      = "password.set"
 	EvSessionRevoked   = "session.revoked"
 	EvCredentialUnlinked = "credential.oauth_unlinked"
 )

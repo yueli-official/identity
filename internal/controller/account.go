@@ -43,6 +43,20 @@ func (c *Controller) ChangePassword(ctx context.Context, req *v1.ChangePasswordR
 	return &v1.ChangePasswordRes{}, nil
 }
 
+// SetPassword sets an initial password for the caller's account when it has none
+// (e.g. an OAuth-only account adding a password before unbinding its OAuth login).
+func (c *Controller) SetPassword(ctx context.Context, req *v1.SetPasswordReq) (*v1.SetPasswordRes, error) {
+	r := ghttp.RequestFromCtx(ctx)
+	id, err := c.svc.Me(ctx, r.Cookie.Get(sessionCookie, "").String())
+	if err != nil {
+		return nil, err
+	}
+	if err := c.svc.SetPassword(ctx, id.ID, req.NewPassword); err != nil {
+		return nil, err
+	}
+	return &v1.SetPasswordRes{}, nil
+}
+
 // SessionList returns the caller's active login sessions, flagging the current.
 func (c *Controller) SessionList(ctx context.Context, _ *v1.SessionListReq) (*v1.SessionListRes, error) {
 	r := ghttp.RequestFromCtx(ctx)

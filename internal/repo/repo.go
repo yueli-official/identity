@@ -56,7 +56,12 @@ type IdentityRepo interface {
 	// SetEmailVerified flips the identity's email_verified flag.
 	SetEmailVerified(ctx context.Context, identityID string, verified bool) error
 	// UpdatePasswordHash replaces the identity's stored bcrypt password hash.
+	// Returns ErrIdentityMissing if the identity has no password credential yet.
 	UpdatePasswordHash(ctx context.Context, identityID, passwordHash string) error
+	// SetPasswordHash inserts-or-replaces the identity's password hash. Unlike
+	// UpdatePasswordHash it does NOT require an existing credential — it's how an
+	// OAuth-only account adds an initial password.
+	SetPasswordHash(ctx context.Context, identityID, passwordHash string) error
 }
 
 // NewVerificationInput records an issued email token (stored hashed, with TTL).

@@ -225,6 +225,15 @@ func (m *Memory) UpdatePasswordHash(_ context.Context, identityID, passwordHash 
 	return nil
 }
 
+// SetPasswordHash inserts-or-replaces the identity's password hash (no existing
+// credential required) — used when an OAuth-only account sets an initial password.
+func (m *Memory) SetPasswordHash(_ context.Context, identityID, passwordHash string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.pwHash[identityID] = passwordHash
+	return nil
+}
+
 // CreateVerification records an issued email token keyed by its hash.
 func (m *Memory) CreateVerification(_ context.Context, in NewVerificationInput) error {
 	m.mu.Lock()

@@ -6,6 +6,7 @@ import (
 
 	"platform/services/identity/internal/iderr"
 	"platform/services/identity/internal/logic"
+	"platform/services/identity/internal/repo"
 )
 
 func TestListCredentials_PasswordOnly(t *testing.T) {
@@ -89,6 +90,67 @@ func TestUnbindCredential_LastRejected(t *testing.T) {
 	err = svc.UnbindCredential(ctx, out.Identity.ID, "google")
 	if codeOf(t, err) != iderr.CodeLastCredential {
 		t.Fatalf("want CodeLastCredential, got %v", err)
+	}
+}
+
+// TestSetPassword_OAuthOnlyThenUnbind is the closed-loop: an OAuth-only account
+// cannot unbind its sole google credential (last-credential guard), but after
+// SETTING an initial password it has a second credential and unbind succeeds.
+func TestSetPassword_OAuthOnlyThenUnbind(t *testing.T) {
+	ctx := context.Background()
+	store := repo.NewMemory()
+	svc := logic.New(store, logic.DefaultConfig())
+	out, err := svc.OAuthLogin(ctx, logic.OAuthLoginInput{
+		Provider: "google", ProviderUID: "solo", Email: "solo@e.com", EmailVerified: true, DisplayName: "Solo",
+	})
+	if err != nil {
+		t.Fatalf("oauth-only register: %v", err)
+	}
+	id := out.Identity.ID
+
+	// Precondition: google is the only credential → unbind refused.
+	if err := svc.UnbindCredential(ctx, id, "google"); codeOf(t, err) != iderr.CodeLastCredential {
+		t.Fatalf("precondition: want CodeLastCredential, got %v", err)
+	}
+
+	// Set an initial password — no current password required for a no-password account.
+	if err := svc.SetPassword(ctx, id, "longenough123"); err != nil {
+		t.Fatalf("SetPassword: %v", err)
+	}
+	cs, _ := svc.ListCredentials(ctx, id)
+	if !cs.HasPassword {
+		t.Fatalf("HasPassword = false after SetPassword")
+	}
+
+	// Now google is no longer the last credential → unbind succeeds.
+	if err := svc.UnbindCredential(ctx, id, "google"); err != nil {
+		t.Fatalf("UnbindCredential after SetPassword: %v", err)
+	}
+}
+
+// TestSetPassword_RejectsWhenAlreadySet: SetPassword is initial-only; an account
+// that already has a password must use ChangePassword (which verifies the current one).
+func TestSetPassword_RejectsWhenAlreadySet(t *testing.T) {
+	ctx := context.Background()
+	_, svc, id, _ := setupAccount(t) // password account
+	if err := svc.SetPassword(ctx, id, "anotherpass123"); codeOf(t, err) != iderr.CodePasswordAlreadySet {
+		t.Fatalf("want CodePasswordAlreadySet, got %v", err)
+	}
+}
+
+// TestSetPassword_Weak: an initial password still has to pass the strength check.
+func TestSetPassword_Weak(t *testing.T) {
+	ctx := context.Background()
+	store := repo.NewMemory()
+	svc := logic.New(store, logic.DefaultConfig())
+	out, err := svc.OAuthLogin(ctx, logic.OAuthLoginInput{
+		Provider: "google", ProviderUID: "weak", Email: "weak@e.com", EmailVerified: true, DisplayName: "W",
+	})
+	if err != nil {
+		t.Fatalf("oauth-only register: %v", err)
+	}
+	if err := svc.SetPassword(ctx, out.Identity.ID, "short"); codeOf(t, err) != iderr.CodeWeakPassword {
+		t.Fatalf("want CodeWeakPassword, got %v", err)
 	}
 }
 
