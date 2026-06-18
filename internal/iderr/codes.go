@@ -28,6 +28,9 @@ var (
 
 	CodeForbidden   = errs.Register("identity.forbidden", http.StatusForbidden)
 	CodeUnknownRole = errs.Register("identity.unknown_role", http.StatusBadRequest)
+
+	CodeInvalidProfile  = errs.Register("identity.invalid_profile", http.StatusBadRequest)
+	CodeSessionNotFound = errs.Register("identity.session_not_found", http.StatusNotFound)
 )
 
 func EmailTaken(email string) *errs.Coded {
@@ -103,6 +106,18 @@ func Forbidden() *errs.Coded {
 // 400 rather than leaking through the envelope as a generic 500.
 func UnknownRole(slug string) *errs.Coded {
 	return errs.New(CodeUnknownRole, "unknown role slug", map[string]any{"role": slug})
+}
+
+// InvalidProfile: a submitted profile field failed validation (e.g. empty
+// display name).
+func InvalidProfile(reason string) *errs.Coded {
+	return errs.New(CodeInvalidProfile, "invalid profile", map[string]any{"reason": reason})
+}
+
+// SessionNotFound: the target session does not exist OR is not owned by the
+// caller (intentionally merged — don't reveal another account's sessions).
+func SessionNotFound() *errs.Coded {
+	return errs.New(CodeSessionNotFound, "session not found", nil)
 }
 
 // ── Personal Access Token (PAT) codes ───────────────────────────────────────

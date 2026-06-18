@@ -76,6 +76,35 @@ func (s *Service) ListSessions(ctx context.Context, identityID string) ([]model.
 	return s.store.ListSessionsByIdentity(ctx, identityID)
 }
 
+// RevokeSession clears one session and revokes its bound refresh tokens, but
+// only if it belongs to identityID. A not-found session and a session owned by
+// someone else are merged into the same error so a caller cannot probe another
+// account's session ids.
+func (s *Service) RevokeSession(ctx context.Context, identityID, sessionID string) error {
+	sess, err := s.store.GetSession(ctx, sessionID)
+	if errors.Is(err, repo.ErrSessionNotFound) || (err == nil && sess.IdentityID != identityID) {
+		return iderr.SessionNotFound()
+	}
+	if err != nil {
+		return err
+	}
+	if s.revoker != nil {
+		if err := s.revoker.RevokeRefreshBySession(ctx, sessionID); err != nil {
+			return err
+		}
+	}
+	if err := s.store.DeleteSession(ctx, sessionID); err != nil {
+		return err
+	}
+	s.audit(ctx, AuditEvent{
+		Event:    EvSessionRevoked,
+		ActorID:  identityID,
+		TargetID: identityID,
+		Detail:   map[string]any{"session_id": sessionID},
+	})
+	return nil
+}
+
 // LogoutAll clears all of an identity's sessions and revokes all its refresh tokens.
 func (s *Service) LogoutAll(ctx context.Context, identityID string) error {
 	if s.revoker != nil {

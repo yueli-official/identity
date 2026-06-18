@@ -115,6 +115,23 @@ func (p *PG) GetProfile(ctx context.Context, identityID string) (model.Profile, 
 	return out, nil
 }
 
+// UpdateProfile replaces the editable display fields of an identity's profile.
+func (p *PG) UpdateProfile(ctx context.Context, identityID string, in repo.ProfileUpdate) error {
+	res, err := p.db.Model("user_profiles").Ctx(ctx).Where("identity_id", identityID).Data(g.Map{
+		"username":     in.Username,
+		"display_name": in.DisplayName,
+		"avatar_url":   in.AvatarURL,
+		"locale":       in.Locale,
+	}).Update()
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return repo.ErrIdentityMissing
+	}
+	return nil
+}
+
 // orDefault returns v if non-blank, otherwise d.
 func orDefault(v, d string) string {
 	if strings.TrimSpace(v) == "" {

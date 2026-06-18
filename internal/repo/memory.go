@@ -340,6 +340,22 @@ func (m *Memory) GetProfile(_ context.Context, identityID string) (model.Profile
 	return p, nil
 }
 
+// UpdateProfile replaces the editable display fields of an identity's profile.
+func (m *Memory) UpdateProfile(_ context.Context, identityID string, in ProfileUpdate) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	p, ok := m.profiles[identityID]
+	if !ok {
+		return ErrIdentityMissing
+	}
+	p.DisplayName = in.DisplayName
+	p.Username = in.Username
+	p.AvatarURL = in.AvatarURL
+	p.Locale = in.Locale
+	m.profiles[identityID] = p
+	return nil
+}
+
 // SetClient is a test helper that registers an OIDCClient by its ID.
 func (m *Memory) SetClient(c model.OIDCClient) {
 	m.mu.Lock()

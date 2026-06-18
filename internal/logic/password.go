@@ -1,9 +1,12 @@
 package logic
 
 import (
+	"context"
 	"errors"
 
 	"golang.org/x/crypto/bcrypt"
+
+	"platform/services/identity/internal/iderr"
 )
 
 const bcryptCost = 12
@@ -33,4 +36,50 @@ func ValidatePasswordStrength(plain string) error {
 		return errors.New("password must be at least 8 characters")
 	}
 	return nil
+}
+
+// ChangePassword verifies the caller's current password, sets a new one, and
+// revokes all OTHER sessions (keeping currentSessionID so the caller stays
+// logged in here). Mirrors the reset flow's "force logout other sessions"
+// (spec §11) but for the authenticated change-password path.
+func (s *Service) ChangePassword(ctx context.Context, identityID, currentSessionID, current, newPassword string) error {
+	hash, err := s.store.GetPasswordHash(ctx, identityID)
+	if err != nil {
+		return err
+	}
+	if !VerifyPassword(hash, current) {
+		return iderr.InvalidCredentials()
+	}
+	if err := ValidatePasswordStrength(newPassword); err != nil {
+		return iderr.WeakPassword(err.Error())
+	}
+	newHash, err := HashPassword(newPassword)
+	if err != nil {
+		return err
+	}
+	if err := s.store.UpdatePasswordHash(ctx, identityID, newHash); err != nil {
+		return err
+	}
+	s.revokeOtherSessions(ctx, identityID, currentSessionID)
+	s.audit(ctx, AuditEvent{Event: EvPasswordChanged, ActorID: identityID, TargetID: identityID})
+	return nil
+}
+
+// revokeOtherSessions clears every session of identityID except keepID and
+// revokes their bound refresh tokens. Best-effort: a per-session failure does
+// not abort the rest (the password is already changed).
+func (s *Service) revokeOtherSessions(ctx context.Context, identityID, keepID string) {
+	sessions, err := s.store.ListSessionsByIdentity(ctx, identityID)
+	if err != nil {
+		return
+	}
+	for _, sess := range sessions {
+		if sess.ID == keepID {
+			continue
+		}
+		if s.revoker != nil {
+			_ = s.revoker.RevokeRefreshBySession(ctx, sess.ID)
+		}
+		_ = s.store.DeleteSession(ctx, sess.ID)
+	}
 }

@@ -36,12 +36,23 @@ type NewIdentityInput struct {
 	PasswordHash string
 }
 
+// ProfileUpdate carries the user-editable display fields for a profile.
+type ProfileUpdate struct {
+	DisplayName string
+	Username    string
+	AvatarURL   string
+	Locale      string
+}
+
 type IdentityRepo interface {
 	CreateIdentityWithProfile(ctx context.Context, in NewIdentityInput) (model.Identity, error)
 	GetByEmail(ctx context.Context, email string) (model.Identity, error)            // ErrIdentityMissing
 	GetByID(ctx context.Context, id string) (model.Identity, error)                  // ErrIdentityMissing
 	GetPasswordHash(ctx context.Context, identityID string) (string, error)
 	GetProfile(ctx context.Context, identityID string) (model.Profile, error)        // ErrIdentityMissing
+	// UpdateProfile replaces the user-editable display fields of an identity's
+	// profile. Returns ErrIdentityMissing if the profile row does not exist.
+	UpdateProfile(ctx context.Context, identityID string, in ProfileUpdate) error
 	// SetEmailVerified flips the identity's email_verified flag.
 	SetEmailVerified(ctx context.Context, identityID string, verified bool) error
 	// UpdatePasswordHash replaces the identity's stored bcrypt password hash.
