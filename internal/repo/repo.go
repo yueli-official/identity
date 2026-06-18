@@ -151,6 +151,36 @@ type AuditRepo interface {
 	QueryAudit(ctx context.Context, f AuditFilter) ([]AuditRow, error)
 }
 
+// PATRow is a single personal-access-token record (maps 1-to-1 with pat_tokens).
+type PATRow struct {
+	ID          int64
+	IdentityID  string
+	Name        string
+	TokenHash   string
+	TokenPrefix string
+	Scopes      []string
+	ExpiresAt   *time.Time // nil = never expires
+	LastUsedAt  *time.Time
+	CreatedAt   time.Time
+}
+
+// PATRepo persists and queries personal access tokens.
+type PATRepo interface {
+	// InsertPAT creates a new PAT and returns its assigned id.
+	InsertPAT(ctx context.Context, row PATRow) (int64, error)
+	// ListPATByIdentity returns all PATs for an identity, newest-first (id DESC).
+	ListPATByIdentity(ctx context.Context, identityID string) ([]PATRow, error)
+	// GetPATByHash looks up a PAT by its token hash for verification; bool=found.
+	GetPATByHash(ctx context.Context, hash string) (PATRow, bool, error)
+	// DeletePAT deletes the token only if it exists AND belongs to identityID.
+	// Returns whether a row was actually deleted.
+	DeletePAT(ctx context.Context, id int64, identityID string) (bool, error)
+	// TouchPATLastUsed sets the LastUsedAt timestamp on the token.
+	TouchPATLastUsed(ctx context.Context, id int64, t time.Time) error
+	// CountPATByIdentity returns the number of PATs for an identity.
+	CountPATByIdentity(ctx context.Context, identityID string) (int, error)
+}
+
 // Store is the full repository surface (a single impl satisfies all three).
 type Store interface {
 	IdentityRepo
@@ -160,6 +190,7 @@ type Store interface {
 	VerificationRepo
 	RoleRepo
 	AuditRepo
+	PATRepo
 }
 
 // ClientRepo provides read access to registered OIDC relying parties.

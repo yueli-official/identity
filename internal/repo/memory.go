@@ -33,6 +33,8 @@ type Memory struct {
 	roles      map[string]map[string]bool // identity id -> set of granted role slugs
 	audit      []AuditRow                 // append-only audit log (newest is highest index)
 	auditSeq   int64                      // monotonically incrementing ID counter
+	pats       map[int64]PATRow           // id -> PAT row
+	patSeq     int64                      // monotonically incrementing PAT ID counter
 }
 
 // memVerification mirrors a single email_verifications row in memory.
@@ -54,6 +56,7 @@ func NewMemory() *Memory {
 		oauthLinks: map[string]string{},
 		verifs:     map[string]memVerification{},
 		roles:      map[string]map[string]bool{},
+		pats:       map[int64]PATRow{},
 	}
 }
 
@@ -462,6 +465,100 @@ func (m *Memory) QueryAudit(_ context.Context, f AuditFilter) ([]AuditRow, error
 		}
 	}
 	return out, nil
+}
+
+// copyScopes returns a fresh copy of a Scopes slice so that callers cannot
+// alias internal state. A nil input produces a non-nil empty slice.
+func copyScopes(s []string) []string {
+	out := make([]string, len(s))
+	copy(out, s)
+	return out
+}
+
+// InsertPAT creates a new PAT row, assigns a monotonically incrementing ID,
+// auto-fills CreatedAt when zero, and defensively copies the Scopes slice.
+func (m *Memory) InsertPAT(_ context.Context, row PATRow) (int64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.patSeq++
+	row.ID = m.patSeq
+	if row.CreatedAt.IsZero() {
+		row.CreatedAt = m.now()
+	}
+	row.Scopes = copyScopes(row.Scopes)
+	m.pats[row.ID] = row
+	return row.ID, nil
+}
+
+// ListPATByIdentity returns all PATs owned by identityID, ordered newest-first
+// (by ID DESC). Each returned row's Scopes slice is a copy.
+func (m *Memory) ListPATByIdentity(_ context.Context, identityID string) ([]PATRow, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var out []PATRow
+	for _, r := range m.pats {
+		if r.IdentityID == identityID {
+			r.Scopes = copyScopes(r.Scopes)
+			out = append(out, r)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID > out[j].ID })
+	return out, nil
+}
+
+// GetPATByHash looks up a PAT by its token hash. Returns (copy, true) when
+// found or (zero, false) when not found. The returned Scopes slice is a copy.
+func (m *Memory) GetPATByHash(_ context.Context, hash string) (PATRow, bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, r := range m.pats {
+		if r.TokenHash == hash {
+			r.Scopes = copyScopes(r.Scopes)
+			return r, true, nil
+		}
+	}
+	return PATRow{}, false, nil
+}
+
+// DeletePAT deletes the PAT only when it exists AND belongs to identityID.
+// Returns (true, nil) when deleted, (false, nil) otherwise.
+func (m *Memory) DeletePAT(_ context.Context, id int64, identityID string) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	r, ok := m.pats[id]
+	if !ok || r.IdentityID != identityID {
+		return false, nil
+	}
+	delete(m.pats, id)
+	return true, nil
+}
+
+// TouchPATLastUsed sets LastUsedAt on the PAT. It is a no-op (returns nil)
+// when the id does not exist.
+func (m *Memory) TouchPATLastUsed(_ context.Context, id int64, t time.Time) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	r, ok := m.pats[id]
+	if !ok {
+		return nil
+	}
+	ts := t // copy so the stored pointer is not aliased to the caller's variable
+	r.LastUsedAt = &ts
+	m.pats[id] = r
+	return nil
+}
+
+// CountPATByIdentity returns the number of PATs owned by identityID.
+func (m *Memory) CountPATByIdentity(_ context.Context, identityID string) (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	n := 0
+	for _, r := range m.pats {
+		if r.IdentityID == identityID {
+			n++
+		}
+	}
+	return n, nil
 }
 
 // Compile-time guarantees.
