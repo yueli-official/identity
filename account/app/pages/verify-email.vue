@@ -29,7 +29,7 @@ onMounted(async () => {
 
       <template v-if="status === 'pending'">
         <div class="flex flex-col items-center gap-2 py-4 text-muted">
-          <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin" />
+          <UIcon name="i-tabler-loader-2" class="size-6 animate-spin" />
           <p class="text-sm">正在验证…</p>
         </div>
       </template>

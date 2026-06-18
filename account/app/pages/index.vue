@@ -18,7 +18,7 @@ async function onResendVerification() {
       title: '验证邮件已发送',
       description: '请检查邮箱完成验证。(demo 环境无真实邮件:链接打印在后端日志)',
       color: 'success',
-      icon: 'i-lucide-mail-check'
+      icon: 'i-tabler-mail-check'
     })
   } catch (err: any) {
     toast.add({ title: '发送失败', description: err?.data?.message || '请稍后重试。', color: 'error' })
@@ -50,7 +50,7 @@ async function onResendVerification() {
       v-if="me && !me.emailVerified"
       color="warning"
       variant="soft"
-      icon="i-lucide-mail-warning"
+      icon="i-tabler-mail-x"
       title="邮箱尚未验证"
       description="验证邮箱以保护账户安全。"
     >
@@ -69,7 +69,7 @@ async function onResendVerification() {
     <UCard class="shadow-soft">
       <template #header>
         <div class="flex items-center gap-2">
-          <UIcon name="i-lucide-id-card" class="size-5 text-muted" />
+          <UIcon name="i-tabler-id-badge-2" class="size-5 text-muted" />
           <h2 class="font-medium text-highlighted">账户信息</h2>
         </div>
       </template>
@@ -102,7 +102,7 @@ async function onResendVerification() {
     <UCard class="shadow-soft">
       <template #header>
         <div class="flex items-center gap-2">
-          <UIcon name="i-lucide-shield" class="size-5 text-muted" />
+          <UIcon name="i-tabler-shield" class="size-5 text-muted" />
           <h2 class="font-medium text-highlighted">安全</h2>
         </div>
       </template>

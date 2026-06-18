@@ -8,10 +8,14 @@
     "typecheck": "nuxt typecheck"
   },
   "dependencies": {
-    "nuxt": "^4.0.0",
     "@nuxt/ui": "^4.0.0",
+    "@platform/ui": "workspace:*",
+    "nuxt": "^4.0.0",
     "tailwindcss": "^4.0.0",
-    "zod": "^4.0.0",
-    "@platform/ui": "workspace:*"
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@iconify-json/lucide": "^1.2.113",
+    "@iconify-json/tabler": "^1.2.35"
   }
 }

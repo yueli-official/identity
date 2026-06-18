@@ -10,10 +10,10 @@ const initial = computed(() =>
 const userItems = computed<DropdownMenuItem[][]>(() => [
   [{ label: me.value?.displayName || me.value?.email || '', type: 'label' }],
   [
-    { label: '账户中心', icon: 'i-lucide-circle-user', to: '/' },
+    { label: '账户中心', icon: 'i-tabler-user-circle', to: '/' },
     {
       label: '退出登录',
-      icon: 'i-lucide-log-out',
+      icon: 'i-tabler-logout',
       onSelect: async () => {
         await logout()
         await navigateTo('/login')
@@ -32,7 +32,7 @@ const userItems = computed<DropdownMenuItem[][]>(() => [
           class="font-display flex items-center gap-2 text-base font-semibold text-highlighted"
         >
           <span class="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary">
-            <UIcon name="i-lucide-shield-check" class="size-5" />
+            <UIcon name="i-tabler-shield-check" class="size-5" />
           </span>
           账户中心
         </NuxtLink>

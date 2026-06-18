@@ -49,7 +49,7 @@ async function onSubmit(e: FormSubmitEvent<Schema>) {
     <div class="w-full max-w-sm space-y-6">
       <div class="text-center">
         <span class="mx-auto grid size-12 place-items-center rounded-2xl bg-primary/10 text-primary">
-          <UIcon name="i-lucide-shield-check" class="size-6" />
+          <UIcon name="i-tabler-shield-check" class="size-6" />
         </span>
         <h1 class="font-display mt-3 text-xl font-semibold text-highlighted">欢迎回来</h1>
         <p class="mt-1 text-sm text-muted">登录账户中心</p>
@@ -60,7 +60,7 @@ async function onSubmit(e: FormSubmitEvent<Schema>) {
           v-if="oauthError"
           color="warning"
           variant="soft"
-          icon="i-lucide-info"
+          icon="i-tabler-info-circle"
           :description="oauthError"
           class="mb-4"
         />
@@ -84,7 +84,7 @@ async function onSubmit(e: FormSubmitEvent<Schema>) {
           block
           color="neutral"
           variant="outline"
-          icon="i-simple-icons-google"
+          icon="i-tabler-brand-google"
           label="使用 Google 登录"
           :to="`/api/v1/auth/oauth/google/start?return_to=${encodeURIComponent(returnTo)}`"
           external
