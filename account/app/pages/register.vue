@@ -53,6 +53,17 @@ async function onSubmit(e: FormSubmitEvent<Schema>) {
         <UAlert v-if="error" color="error" variant="soft" :title="error" />
         <UButton type="submit" label="注册" block :loading="loading" />
       </UForm>
+
+      <USeparator label="或" class="my-4" />
+      <UButton
+        block
+        color="neutral"
+        variant="outline"
+        icon="i-simple-icons-google"
+        label="使用 Google 登录"
+        :to="`/api/v1/auth/oauth/google/start?return_to=${encodeURIComponent(String(route.query.return_to ?? '/'))}`"
+        external
+      />
       <template #footer>
         <p class="text-center text-sm text-muted">
           已有账户?<ULink to="/login" class="text-primary font-medium">登录</ULink>
