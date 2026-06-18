@@ -14,6 +14,5 @@ export default defineNuxtConfig({
       '/.well-known': { target: 'http://localhost:8081', changeOrigin: true }
     }
   },
-  runtimeConfig: { public: { apiBase: '' } },
   devtools: { enabled: true }
 })

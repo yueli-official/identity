@@ -12,7 +12,7 @@ const loading = ref(false)
 const schema = z.object({
   displayName: z.string().min(1, '请输入昵称'),
   email: z.email('邮箱格式不正确'),
-  password: z.string().min(8, '密码至少 8 位')
+  password: z.string().min(8, '密码至少 8 位').max(128, '密码最多 128 位')
 })
 type Schema = z.output<typeof schema>
 const state = reactive<Partial<Schema>>({ displayName: '', email: '', password: '' })
