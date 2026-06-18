@@ -16,6 +16,9 @@ func TestCodesRegisteredWithStatus(t *testing.T) {
 		iderr.CodeWeakPassword:       400,
 		iderr.CodeInvalidEmail:       400,
 		iderr.CodeNotAuthenticated:   401,
+		iderr.CodeOAuthEmailConflict: 409,
+		iderr.CodeOAuthNoEmail:       400,
+		iderr.CodeOAuthFailed:        401,
 	}
 	for code, want := range cases {
 		if got := errs.Status(code); got != want {
