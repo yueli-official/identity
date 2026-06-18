@@ -451,9 +451,16 @@ func (m *Memory) QueryAudit(_ context.Context, f AuditFilter) ([]AuditRow, error
 		matches = matches[:limit]
 	}
 
-	// Return a copy to avoid leaking internal slice storage.
+	// Return a copy to avoid leaking internal slice storage. Normalize Detail to a
+	// non-nil empty map so this impl matches the dao.PG.QueryAudit contract
+	// (QueryAudit always returns a non-nil Detail).
 	out := make([]AuditRow, len(matches))
 	copy(out, matches)
+	for i := range out {
+		if out[i].Detail == nil {
+			out[i].Detail = map[string]any{}
+		}
+	}
 	return out, nil
 }
 

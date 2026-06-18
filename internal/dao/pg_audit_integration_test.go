@@ -214,6 +214,14 @@ func TestPGAuditLimitOffset(t *testing.T) {
 	if len(rows) != 5 {
 		t.Fatalf("want 5 rows (limit=0→default), got %d", len(rows))
 	}
+	// Results must be newest-first (ORDER BY id DESC): IDs strictly decreasing.
+	// Catches a regression flipping the order to ASC.
+	for i := 1; i < len(rows); i++ {
+		if rows[i-1].ID <= rows[i].ID {
+			t.Fatalf("rows not newest-first: rows[%d].ID=%d <= rows[%d].ID=%d",
+				i-1, rows[i-1].ID, i, rows[i].ID)
+		}
+	}
 
 	// Offset 3 → 2 remaining rows.
 	rows, err = d.QueryAudit(ctx, repo.AuditFilter{Event: event, Limit: 50, Offset: 3})

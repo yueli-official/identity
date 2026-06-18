@@ -346,6 +346,15 @@ func TestMemory_Audit(t *testing.T) {
 		t.Fatalf("Detail round-trip failed: got %v", roleRowResult[0].Detail)
 	}
 
+	// Nil-Detail contract: loginRow was inserted with Detail: nil, but QueryAudit
+	// must normalize it to a non-nil, len-0 map (matching dao.PG.QueryAudit).
+	if loginRows[0].Detail == nil {
+		t.Fatalf("nil Detail must be normalized to non-nil map, got nil")
+	}
+	if len(loginRows[0].Detail) != 0 {
+		t.Fatalf("want empty Detail for nil-Detail row, got %v", loginRows[0].Detail)
+	}
+
 	// Negative offset must not panic and behaves as offset=0 (returns all u1 rows).
 	negOffset, err := m.QueryAudit(ctx, repo.AuditFilter{IdentityID: "u1", Offset: -1})
 	if err != nil {

@@ -29,15 +29,6 @@ type auditRow struct {
 	OccurredAt time.Time `orm:"occurred_at"`
 }
 
-// nilIfEmpty returns nil if s is empty, otherwise the string s.
-// Used to map empty-string sentinel values to SQL NULL for UUID columns.
-func nilIfEmpty(s string) any {
-	if s == "" {
-		return nil
-	}
-	return s
-}
-
 // InsertAudit writes a single audit event row to audit_logs.
 // UUID columns (actor_identity_id, target_identity_id) must be NULL, not "",
 // when the caller passes an empty string — Postgres rejects "" for uuid columns.
@@ -105,6 +96,9 @@ func (p *PG) QueryAudit(ctx context.Context, f repo.AuditFilter) ([]repo.AuditRo
 	out := make([]repo.AuditRow, 0, len(rows))
 	for _, r := range rows {
 		var detail map[string]any
+		// The "null" guard handles rows written outside this DAO: our insert path
+		// normalizes nil → {} so it never emits literal JSON null, but a row from
+		// another writer might store the string "null".
 		if r.Detail != "" && r.Detail != "null" {
 			if err := json.Unmarshal([]byte(r.Detail), &detail); err != nil {
 				return nil, err
