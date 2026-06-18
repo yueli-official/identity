@@ -11,11 +11,12 @@ import (
 )
 
 var (
-	ErrEmailTaken      = errors.New("email taken")
-	ErrIdentityMissing = errors.New("identity not found")
-	ErrSessionNotFound = errors.New("session not found")
-	ErrClientNotFound  = errors.New("oidc client not found")
-	ErrNoActiveKey     = errors.New("no active signing key")
+	ErrEmailTaken       = errors.New("email taken")
+	ErrIdentityMissing  = errors.New("identity not found")
+	ErrSessionNotFound  = errors.New("session not found")
+	ErrClientNotFound   = errors.New("oidc client not found")
+	ErrNoActiveKey      = errors.New("no active signing key")
+	ErrProviderUIDTaken = errors.New("provider uid already linked")
 )
 
 // NewIdentityInput is an atomic identity+profile+password-credential creation.
@@ -32,6 +33,27 @@ type IdentityRepo interface {
 	GetByID(ctx context.Context, id string) (model.Identity, error)                  // ErrIdentityMissing
 	GetPasswordHash(ctx context.Context, identityID string) (string, error)
 	GetProfile(ctx context.Context, identityID string) (model.Profile, error)        // ErrIdentityMissing
+}
+
+// NewOAuthIdentityInput atomically creates identity + profile + an OAuth credential
+// (no password credential — OAuth-only accounts have no local password until they set one).
+type NewOAuthIdentityInput struct {
+	Email         string // canonical; may be "" only if the provider returned none
+	EmailVerified bool
+	DisplayName   string
+	Locale        string
+	Provider      string // e.g. "google"
+	ProviderUID   string // provider's stable user id (Google "sub")
+}
+
+// OAuthRepo resolves and persists external-provider identity links.
+type OAuthRepo interface {
+	// GetByProviderUID returns the linked identity, or ErrIdentityMissing if none.
+	GetByProviderUID(ctx context.Context, provider, providerUID string) (model.Identity, error)
+	// CreateOAuthIdentity atomically creates identity+profile+oauth credential.
+	CreateOAuthIdentity(ctx context.Context, in NewOAuthIdentityInput) (model.Identity, error)
+	// LinkOAuthCredential attaches an oauth credential to an existing identity.
+	LinkOAuthCredential(ctx context.Context, identityID, provider, providerUID, email string, emailVerified bool) error
 }
 
 type SessionStore interface {
@@ -54,6 +76,7 @@ type Store interface {
 	IdentityRepo
 	SessionStore
 	LoginThrottle
+	OAuthRepo
 }
 
 // ClientRepo provides read access to registered OIDC relying parties.

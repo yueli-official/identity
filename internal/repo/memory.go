@@ -20,9 +20,10 @@ type Memory struct {
 	sessions  map[string]model.Session
 	failCount map[string]int
 	lockUntil map[string]time.Time
-	now       func() time.Time
-	clients   map[string]model.OIDCClient
-	keys      []model.SigningKey
+	now        func() time.Time
+	clients    map[string]model.OIDCClient
+	keys       []model.SigningKey
+	oauthLinks map[string]string // provider+"\x00"+providerUID -> identity id
 }
 
 func NewMemory() *Memory {
@@ -32,7 +33,13 @@ func NewMemory() *Memory {
 		sessions: map[string]model.Session{}, failCount: map[string]int{},
 		lockUntil: map[string]time.Time{}, now: time.Now,
 		clients: map[string]model.OIDCClient{}, keys: nil,
+		oauthLinks: map[string]string{},
 	}
+}
+
+// oauthKey builds the composite map key for an (provider, providerUID) pair.
+func oauthKey(provider, providerUID string) string {
+	return provider + "\x00" + providerUID
 }
 
 func (m *Memory) CreateIdentityWithProfile(_ context.Context, in NewIdentityInput) (model.Identity, error) {
@@ -80,6 +87,58 @@ func (m *Memory) GetPasswordHash(_ context.Context, identityID string) (string, 
 		return "", ErrIdentityMissing
 	}
 	return h, nil
+}
+
+// GetByProviderUID returns the identity linked to (provider, providerUID).
+// Returns ErrIdentityMissing when no link exists.
+func (m *Memory) GetByProviderUID(_ context.Context, provider, providerUID string) (model.Identity, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	id, ok := m.oauthLinks[oauthKey(provider, providerUID)]
+	if !ok {
+		return model.Identity{}, ErrIdentityMissing
+	}
+	return m.byID[id], nil
+}
+
+// CreateOAuthIdentity atomically creates an identity + profile + oauth link
+// (no password credential). Returns ErrEmailTaken on email collision and
+// ErrProviderUIDTaken when the (provider, providerUID) key is already linked.
+func (m *Memory) CreateOAuthIdentity(_ context.Context, in NewOAuthIdentityInput) (model.Identity, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.oauthLinks[oauthKey(in.Provider, in.ProviderUID)]; ok {
+		return model.Identity{}, ErrProviderUIDTaken
+	}
+	if in.Email != "" {
+		if _, ok := m.byEmail[in.Email]; ok {
+			return model.Identity{}, ErrEmailTaken
+		}
+	}
+	id := model.Identity{
+		ID: uuid.NewString(), Email: in.Email, EmailVerified: in.EmailVerified,
+		Status: model.StatusActive, CreatedAt: m.now(), UpdatedAt: m.now(),
+	}
+	m.byID[id.ID] = id
+	if in.Email != "" {
+		m.byEmail[in.Email] = id.ID
+	}
+	m.profiles[id.ID] = model.Profile{IdentityID: id.ID, DisplayName: in.DisplayName, Locale: in.Locale}
+	m.oauthLinks[oauthKey(in.Provider, in.ProviderUID)] = id.ID
+	return id, nil
+}
+
+// LinkOAuthCredential records an oauth link against an existing identity.
+// Returns ErrProviderUIDTaken when the (provider, providerUID) key already exists.
+func (m *Memory) LinkOAuthCredential(_ context.Context, identityID, provider, providerUID, _ string, _ bool) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	key := oauthKey(provider, providerUID)
+	if _, ok := m.oauthLinks[key]; ok {
+		return ErrProviderUIDTaken
+	}
+	m.oauthLinks[key] = identityID
+	return nil
 }
 
 func (m *Memory) CreateSession(_ context.Context, s model.Session, _ time.Duration) error {
