@@ -24,6 +24,16 @@ type Memory struct {
 	clients    map[string]model.OIDCClient
 	keys       []model.SigningKey
 	oauthLinks map[string]string // provider+"\x00"+providerUID -> identity id
+	verifs     map[string]memVerification // token_hash -> verification record
+}
+
+// memVerification mirrors a single email_verifications row in memory.
+type memVerification struct {
+	IdentityID string
+	Email      string
+	Purpose    string
+	ExpiresAt  time.Time
+	Used       bool
 }
 
 func NewMemory() *Memory {
@@ -34,6 +44,7 @@ func NewMemory() *Memory {
 		lockUntil: map[string]time.Time{}, now: time.Now,
 		clients: map[string]model.OIDCClient{}, keys: nil,
 		oauthLinks: map[string]string{},
+		verifs:     map[string]memVerification{},
 	}
 }
 
@@ -139,6 +150,59 @@ func (m *Memory) LinkOAuthCredential(_ context.Context, identityID, provider, pr
 	}
 	m.oauthLinks[key] = identityID
 	return nil
+}
+
+// SetEmailVerified flips the stored identity's email_verified flag.
+// Returns ErrIdentityMissing when the identity does not exist.
+func (m *Memory) SetEmailVerified(_ context.Context, identityID string, verified bool) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	id, ok := m.byID[identityID]
+	if !ok {
+		return ErrIdentityMissing
+	}
+	id.EmailVerified = verified
+	id.UpdatedAt = m.now()
+	m.byID[identityID] = id
+	return nil
+}
+
+// UpdatePasswordHash replaces the stored bcrypt password hash for an identity.
+// Returns ErrIdentityMissing when the identity has no password credential.
+func (m *Memory) UpdatePasswordHash(_ context.Context, identityID, passwordHash string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.pwHash[identityID]; !ok {
+		return ErrIdentityMissing
+	}
+	m.pwHash[identityID] = passwordHash
+	return nil
+}
+
+// CreateVerification records an issued email token keyed by its hash.
+func (m *Memory) CreateVerification(_ context.Context, in NewVerificationInput) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.verifs[in.TokenHash] = memVerification{
+		IdentityID: in.IdentityID, Email: in.Email,
+		Purpose: in.Purpose, ExpiresAt: in.ExpiresAt,
+	}
+	return nil
+}
+
+// ConsumeVerification atomically validates and marks a token used (single-use).
+// Returns ErrVerificationInvalid when no unused, unexpired token matches both
+// the hash and the purpose.
+func (m *Memory) ConsumeVerification(_ context.Context, tokenHash, purpose string) (VerificationRecord, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	v, ok := m.verifs[tokenHash]
+	if !ok || v.Used || v.Purpose != purpose || !v.ExpiresAt.After(m.now()) {
+		return VerificationRecord{}, ErrVerificationInvalid
+	}
+	v.Used = true
+	m.verifs[tokenHash] = v
+	return VerificationRecord{IdentityID: v.IdentityID, Email: v.Email}, nil
 }
 
 func (m *Memory) CreateSession(_ context.Context, s model.Session, _ time.Duration) error {

@@ -21,6 +21,10 @@ var (
 	CodeOAuthEmailConflict = errs.Register("identity.oauth_email_conflict", http.StatusConflict)
 	CodeOAuthNoEmail       = errs.Register("identity.oauth_no_email", http.StatusBadRequest)
 	CodeOAuthFailed        = errs.Register("identity.oauth_failed", http.StatusUnauthorized)
+
+	CodeVerificationInvalid = errs.Register("identity.verification_invalid", http.StatusBadRequest)
+	CodeResetThrottled      = errs.Register("identity.reset_throttled", http.StatusTooManyRequests)
+	CodeVerifyThrottled     = errs.Register("identity.verify_throttled", http.StatusTooManyRequests)
 )
 
 func EmailTaken(email string) *errs.Coded {
@@ -67,4 +71,20 @@ func OAuthNoEmail() *errs.Coded {
 // that needs a coded error (the redirect endpoints surface errors via query string).
 func OAuthFailed() *errs.Coded {
 	return errs.New(CodeOAuthFailed, "oauth login failed", nil)
+}
+
+// VerificationInvalid: a verify/reset token is missing, expired, already used, or
+// scoped to a different purpose (intentionally generic — no detail leak).
+func VerificationInvalid() *errs.Coded {
+	return errs.New(CodeVerificationInvalid, "verification token invalid, expired, or used", nil)
+}
+
+// ResetThrottled: too many password-reset requests for this account/IP.
+func ResetThrottled() *errs.Coded {
+	return errs.New(CodeResetThrottled, "too many reset requests, try again later", nil)
+}
+
+// VerifyThrottled: too many email-verification requests for this account/IP.
+func VerifyThrottled() *errs.Coded {
+	return errs.New(CodeVerifyThrottled, "too many verification requests, try again later", nil)
 }

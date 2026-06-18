@@ -59,6 +59,46 @@ func (c *Controller) Logout(ctx context.Context, _ *v1.LogoutReq) (*v1.LogoutRes
 	return &v1.LogoutRes{}, nil
 }
 
+// EmailVerifyRequest sends a verify-email link to the logged-in caller. The
+// caller is resolved from the session cookie (same seam as Me).
+func (c *Controller) EmailVerifyRequest(ctx context.Context, _ *v1.EmailVerifyRequestReq) (*v1.EmailVerifyRequestRes, error) {
+	r := ghttp.RequestFromCtx(ctx)
+	id, err := c.svc.Me(ctx, r.Cookie.Get(sessionCookie, "").String())
+	if err != nil {
+		return nil, err
+	}
+	if err := c.svc.RequestEmailVerification(ctx, id.ID, r.GetClientIp()); err != nil {
+		return nil, err
+	}
+	return &v1.EmailVerifyRequestRes{}, nil
+}
+
+// EmailVerify consumes an email-verification token.
+func (c *Controller) EmailVerify(ctx context.Context, req *v1.EmailVerifyReq) (*v1.EmailVerifyRes, error) {
+	if err := c.svc.VerifyEmail(ctx, req.Token); err != nil {
+		return nil, err
+	}
+	return &v1.EmailVerifyRes{}, nil
+}
+
+// PasswordForgot requests a password-reset email. Always returns success to
+// avoid account enumeration (the service swallows unknown-email cases).
+func (c *Controller) PasswordForgot(ctx context.Context, req *v1.PasswordForgotReq) (*v1.PasswordForgotRes, error) {
+	r := ghttp.RequestFromCtx(ctx)
+	if err := c.svc.RequestPasswordReset(ctx, req.Email, r.GetClientIp()); err != nil {
+		return nil, err
+	}
+	return &v1.PasswordForgotRes{}, nil
+}
+
+// PasswordReset sets a new password via a single-use reset token.
+func (c *Controller) PasswordReset(ctx context.Context, req *v1.PasswordResetReq) (*v1.PasswordResetRes, error) {
+	if err := c.svc.ResetPassword(ctx, req.Token, req.Password); err != nil {
+		return nil, err
+	}
+	return &v1.PasswordResetRes{}, nil
+}
+
 func (c *Controller) setSessionCookie(r *ghttp.Request, sid string) {
 	r.Cookie.SetHttpCookie(&http.Cookie{
 		Name: sessionCookie, Value: sid, Path: "/",

@@ -18,6 +18,7 @@ import (
 	"platform/services/identity/internal/controller"
 	"platform/services/identity/internal/dao"
 	"platform/services/identity/internal/logic"
+	"platform/services/identity/internal/mailer"
 	"platform/services/identity/internal/oauthlogin"
 	"platform/services/identity/internal/oidc"
 	"platform/services/identity/internal/repo"
@@ -34,6 +35,7 @@ func main() {
 		panic(fmt.Sprintf("oidc.globalSecret must be >= 32 bytes (got %d); set GF_OIDC_GLOBALSECRET", len(globalSecret)))
 	}
 	secureCookie := g.Cfg().MustGet(ctx, "cookie.secure", true).Bool()
+	accountBaseURL := g.Cfg().MustGet(ctx, "account.baseUrl", "http://localhost:3000").String()
 
 	// ── Data layer ──────────────────────────────────────────────────────────
 	daoPG := dao.NewPG(g.DB())
@@ -41,8 +43,26 @@ func main() {
 
 	// ── Business auth (milestone ②) ─────────────────────────────────────────
 	store := repo.NewComposite(daoPG, rdb, rdb)
-	svc := logic.New(store, logic.DefaultConfig())
+	cfg := logic.DefaultConfig()
+	cfg.AccountBaseURL = accountBaseURL // base for verify-email / reset links (milestone ⑤)
+	svc := logic.New(store, cfg)
 	authCtl := controller.New(svc, secureCookie)
+
+	// ── Mailer (milestone ⑤) ─────────────────────────────────────────────────
+	// Default to the dev-log mailer (links printed to logs); switch to real SMTP
+	// only when mail.smtp.host is configured.
+	var mlr mailer.Mailer = mailer.NewDev()
+	if host := g.Cfg().MustGet(ctx, "mail.smtp.host").String(); host != "" {
+		mlr = mailer.NewSMTP(
+			host,
+			g.Cfg().MustGet(ctx, "mail.smtp.port", "465").String(),
+			g.Cfg().MustGet(ctx, "mail.smtp.username").String(),
+			g.Cfg().MustGet(ctx, "mail.smtp.password").String(),
+			g.Cfg().MustGet(ctx, "mail.from").String(),
+			g.Cfg().MustGet(ctx, "mail.fromName").String(),
+		)
+	}
+	svc.SetMailer(mlr)
 
 	// ── OIDC / OAuth2 (milestone ③ + ④) ────────────────────────────────────
 	mgr, err := oidc.NewManager(ctx, daoPG)

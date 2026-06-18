@@ -29,3 +29,33 @@ type LogoutReq struct {
 	g.Meta `path:"/api/v1/auth/logout" method:"post" tags:"auth" summary:"Log out current session"`
 }
 type LogoutRes struct{}
+
+// EmailVerifyRequestReq sends a verify-email link to the logged-in user. The
+// caller is resolved from the session cookie; no body is needed.
+type EmailVerifyRequestReq struct {
+	g.Meta `path:"/api/v1/auth/email/verify-request" method:"post" tags:"auth" summary:"Send an email-verification link to the logged-in user"`
+}
+type EmailVerifyRequestRes struct{}
+
+// EmailVerifyReq consumes an email-verification token from the emailed link.
+type EmailVerifyReq struct {
+	g.Meta `path:"/api/v1/auth/email/verify" method:"post" tags:"auth" summary:"Consume an email-verification token"`
+	Token  string `json:"token" v:"required"`
+}
+type EmailVerifyRes struct{}
+
+// PasswordForgotReq requests a password-reset email. Always returns success to
+// avoid account enumeration.
+type PasswordForgotReq struct {
+	g.Meta `path:"/api/v1/auth/password/forgot" method:"post" tags:"auth" summary:"Request a password-reset email"`
+	Email  string `json:"email" v:"required|email"`
+}
+type PasswordForgotRes struct{}
+
+// PasswordResetReq sets a new password via a single-use reset token.
+type PasswordResetReq struct {
+	g.Meta   `path:"/api/v1/auth/password/reset" method:"post" tags:"auth" summary:"Reset password via token"`
+	Token    string `json:"token" v:"required"`
+	Password string `json:"password" v:"required|length:8,128"`
+}
+type PasswordResetRes struct{}

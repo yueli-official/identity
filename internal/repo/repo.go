@@ -11,12 +11,20 @@ import (
 )
 
 var (
-	ErrEmailTaken       = errors.New("email taken")
-	ErrIdentityMissing  = errors.New("identity not found")
-	ErrSessionNotFound  = errors.New("session not found")
-	ErrClientNotFound   = errors.New("oidc client not found")
-	ErrNoActiveKey      = errors.New("no active signing key")
-	ErrProviderUIDTaken = errors.New("provider uid already linked")
+	ErrEmailTaken          = errors.New("email taken")
+	ErrIdentityMissing     = errors.New("identity not found")
+	ErrSessionNotFound     = errors.New("session not found")
+	ErrClientNotFound      = errors.New("oidc client not found")
+	ErrNoActiveKey         = errors.New("no active signing key")
+	ErrProviderUIDTaken    = errors.New("provider uid already linked")
+	ErrVerificationInvalid = errors.New("verification token invalid, expired, or used")
+)
+
+// Verification purpose scopes (a token issued for one purpose must not work for
+// another — spec §11 "登录码 ≠ 找回码").
+const (
+	PurposeVerifyEmail   = "verify_email"
+	PurposePasswordReset = "password_reset"
 )
 
 // NewIdentityInput is an atomic identity+profile+password-credential creation.
@@ -33,6 +41,34 @@ type IdentityRepo interface {
 	GetByID(ctx context.Context, id string) (model.Identity, error)                  // ErrIdentityMissing
 	GetPasswordHash(ctx context.Context, identityID string) (string, error)
 	GetProfile(ctx context.Context, identityID string) (model.Profile, error)        // ErrIdentityMissing
+	// SetEmailVerified flips the identity's email_verified flag.
+	SetEmailVerified(ctx context.Context, identityID string, verified bool) error
+	// UpdatePasswordHash replaces the identity's stored bcrypt password hash.
+	UpdatePasswordHash(ctx context.Context, identityID, passwordHash string) error
+}
+
+// NewVerificationInput records an issued email token (stored hashed, with TTL).
+type NewVerificationInput struct {
+	IdentityID string
+	Email      string
+	Purpose    string // PurposeVerifyEmail | PurposePasswordReset
+	TokenHash  string // sha256 hex
+	ExpiresAt  time.Time
+}
+
+// VerificationRecord is the subset of a consumed token's row the logic needs.
+type VerificationRecord struct {
+	IdentityID string
+	Email      string
+}
+
+// VerificationRepo persists and atomically consumes single-use email tokens.
+type VerificationRepo interface {
+	CreateVerification(ctx context.Context, in NewVerificationInput) error
+	// ConsumeVerification atomically finds an unused, unexpired token matching
+	// (tokenHash, purpose), marks it used, and returns its identity/email.
+	// Returns ErrVerificationInvalid if none matches.
+	ConsumeVerification(ctx context.Context, tokenHash, purpose string) (VerificationRecord, error)
 }
 
 // NewOAuthIdentityInput atomically creates identity + profile + an OAuth credential
@@ -77,6 +113,7 @@ type Store interface {
 	SessionStore
 	LoginThrottle
 	OAuthRepo
+	VerificationRepo
 }
 
 // ClientRepo provides read access to registered OIDC relying parties.
