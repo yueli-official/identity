@@ -121,6 +121,11 @@ func main() {
 	// ── Routing ─────────────────────────────────────────────────────────────
 	s := g.Server()
 
+	// Actor middleware runs globally (before all handlers) so that every
+	// request — business API, OIDC endpoints, and OAuth login callbacks —
+	// has IP / User-Agent / X-Request-Id available via actor.From(ctx).
+	s.Use(controller.ActorMiddleware)
+
 	// Business API: JSON envelope middleware applied to this group only.
 	s.Group("/", func(grp *ghttp.RouterGroup) {
 		grp.Middleware(ghttpx.Middleware)
