@@ -34,6 +34,7 @@ func TestPGAuditRoundTrip(t *testing.T) {
 		IP:         "127.0.0.1",
 		UserAgent:  "Go-test/1.0",
 		ClientID:   "demo-web",
+		RequestID:  "test-req-" + uuid.NewString(),
 		Result:     "success",
 		Detail:     map[string]any{"role": "admin"},
 	}
@@ -83,6 +84,9 @@ func TestPGAuditRoundTrip(t *testing.T) {
 	}
 	if got.ClientID != "demo-web" {
 		t.Errorf("ClientID: want %q, got %q", "demo-web", got.ClientID)
+	}
+	if got.RequestID != row.RequestID {
+		t.Errorf("RequestID: want %q, got %q", row.RequestID, got.RequestID)
 	}
 	if got.Result != "success" {
 		t.Errorf("Result: want %q, got %q", "success", got.Result)

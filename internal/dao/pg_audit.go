@@ -23,6 +23,7 @@ type auditRow struct {
 	IP        string    `orm:"ip"`
 	UserAgent string    `orm:"user_agent"`
 	ClientID  string    `orm:"client_id"`
+	RequestID string    `orm:"request_id"`
 	Result    string    `orm:"result"`
 	// Detail is read as a raw JSON string from Postgres; we unmarshal it ourselves.
 	Detail    string    `orm:"detail"`
@@ -52,6 +53,7 @@ func (p *PG) InsertAudit(ctx context.Context, row repo.AuditRow) error {
 		"ip":                 nilIfEmpty(row.IP),
 		"user_agent":         nilIfEmpty(row.UserAgent),
 		"client_id":          nilIfEmpty(row.ClientID),
+		"request_id":         nilIfEmpty(row.RequestID),
 		"result":             orDefault(row.Result, "success"),
 		"detail":             string(detailJSON),
 	}).Insert()
@@ -76,7 +78,7 @@ func (p *PG) QueryAudit(ctx context.Context, f repo.AuditFilter) ([]repo.AuditRo
 	}
 
 	q := p.db.Model("audit_logs").Ctx(ctx).
-		Fields("id, event, actor_identity_id, target_identity_id, actor_email, ip, user_agent, client_id, result, detail, occurred_at").
+		Fields("id, event, actor_identity_id, target_identity_id, actor_email, ip, user_agent, client_id, request_id, result, detail, occurred_at").
 		Order("id DESC").
 		Limit(limit).
 		Offset(offset)
@@ -116,6 +118,7 @@ func (p *PG) QueryAudit(ctx context.Context, f repo.AuditFilter) ([]repo.AuditRo
 			IP:         r.IP,
 			UserAgent:  r.UserAgent,
 			ClientID:   r.ClientID,
+			RequestID:  r.RequestID,
 			Result:     r.Result,
 			Detail:     detail,
 			OccurredAt: r.OccurredAt,

@@ -120,6 +120,7 @@ func toAuditEntry(r repo.AuditRow) v1.AuditEntry {
 		IP:         r.IP,
 		UserAgent:  r.UserAgent,
 		ClientID:   r.ClientID,
+		RequestID:  r.RequestID,
 		Result:     r.Result,
 		Detail:     r.Detail,
 		OccurredAt: r.OccurredAt.Format(time.RFC3339),

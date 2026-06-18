@@ -129,6 +129,7 @@ type AuditRow struct {
 	IP         string
 	UserAgent  string
 	ClientID   string
+	RequestID  string
 	Result     string         // "success" | "failure"
 	Detail     map[string]any
 	OccurredAt time.Time

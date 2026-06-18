@@ -60,6 +60,7 @@ func (s *Service) audit(ctx context.Context, e AuditEvent) {
 		IP:         ac.IP,
 		UserAgent:  ac.UserAgent,
 		ClientID:   e.ClientID,
+		RequestID:  ac.RequestID,
 		Result:     result,
 		Detail:     e.Detail,
 	}

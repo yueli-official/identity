@@ -12,6 +12,7 @@ CREATE TABLE audit_logs (
     ip                 TEXT        NULL,
     user_agent         TEXT        NULL,
     client_id          TEXT        NULL,
+    request_id         TEXT        NULL,
     result             TEXT        NOT NULL DEFAULT 'success',
     detail             JSONB       NOT NULL DEFAULT '{}',
     occurred_at        TIMESTAMPTZ NOT NULL DEFAULT now()

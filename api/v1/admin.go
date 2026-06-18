@@ -43,6 +43,7 @@ type AuditEntry struct {
 	IP         string         `json:"ip,omitempty"`
 	UserAgent  string         `json:"userAgent,omitempty"`
 	ClientID   string         `json:"clientId,omitempty"`
+	RequestID  string         `json:"requestId,omitempty"`
 	Result     string         `json:"result"`
 	Detail     map[string]any `json:"detail,omitempty"`
 	OccurredAt string         `json:"occurredAt"` // RFC3339
