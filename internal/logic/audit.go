@@ -24,6 +24,9 @@ const (
 	EvRoleGranted          = "role.granted"
 	EvRoleRevoked          = "role.revoked"
 	EvRoleDefaultGranted   = "role.default_granted"
+
+	EvPATCreated = "pat.created"
+	EvPATRevoked = "pat.revoked"
 )
 
 // AuditEvent is the logic-layer description of one auditable event. IP/UA/request-id

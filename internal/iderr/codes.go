@@ -104,3 +104,44 @@ func Forbidden() *errs.Coded {
 func UnknownRole(slug string) *errs.Coded {
 	return errs.New(CodeUnknownRole, "unknown role slug", map[string]any{"role": slug})
 }
+
+// ── Personal Access Token (PAT) codes ───────────────────────────────────────
+
+var (
+	CodePATNameRequired   = errs.Register("identity.pat_name_required", http.StatusBadRequest)
+	CodePATScopesRequired = errs.Register("identity.pat_scopes_required", http.StatusBadRequest)
+	CodePATScopeInvalid   = errs.Register("identity.pat_scope_invalid", http.StatusBadRequest)
+	CodePATLimitReached   = errs.Register("identity.pat_limit_reached", http.StatusConflict)
+	CodePATNotFound       = errs.Register("identity.pat_not_found", http.StatusNotFound)
+	CodePATInvalid        = errs.Register("identity.pat_invalid", http.StatusUnauthorized)
+	CodePATExpired        = errs.Register("identity.pat_expired", http.StatusUnauthorized)
+)
+
+func PATNameRequired() *errs.Coded {
+	return errs.New(CodePATNameRequired, "token name required", nil)
+}
+
+func PATScopesRequired() *errs.Coded {
+	return errs.New(CodePATScopesRequired, "at least one scope required", nil)
+}
+
+func PATScopeInvalid() *errs.Coded {
+	return errs.New(CodePATScopeInvalid, "scope is invalid", nil)
+}
+
+func PATLimitReached(max int) *errs.Coded {
+	return errs.New(CodePATLimitReached, "personal access token limit reached", map[string]any{"max": max})
+}
+
+func PATNotFound() *errs.Coded {
+	return errs.New(CodePATNotFound, "token not found", nil)
+}
+
+// PATInvalid is intentionally generic (no enumeration of why the token is bad).
+func PATInvalid() *errs.Coded {
+	return errs.New(CodePATInvalid, "invalid token", nil)
+}
+
+func PATExpired() *errs.Coded {
+	return errs.New(CodePATExpired, "token has expired", nil)
+}
