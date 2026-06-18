@@ -31,3 +31,12 @@ oidc:
     redirectUrl: "http://localhost:3000/api/v1/auth/oauth/google/callback"  # env GF_OIDC_GOOGLE_REDIRECTURL
 account:
   loginUrl: "http://localhost:3000/login"
+  baseUrl: "http://localhost:3000"   # env GF_ACCOUNT_BASEURL — used to build email links
+mail:
+  smtp:
+    host: ""        # env GF_MAIL_SMTP_HOST — empty ⇒ dev-log mailer
+    port: "465"     # env GF_MAIL_SMTP_PORT — implicit TLS
+    username: ""    # env GF_MAIL_SMTP_USERNAME
+    password: ""    # env GF_MAIL_SMTP_PASSWORD
+  from: ""          # env GF_MAIL_FROM
+  fromName: "用户中心"  # env GF_MAIL_FROMNAME
