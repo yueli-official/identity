@@ -63,7 +63,11 @@ func TestE2E_AuditLogging(t *testing.T) {
 
 		// --- HTTP helpers ---
 
-		doPost := func(path, jsonBody string, headers map[string]string) (string, *http.Response) {
+		// doPost issues a POST and returns the response body string and the
+		// response headers. The response body is fully drained and closed before
+		// returning, so callers get the headers (e.g. Set-Cookie) rather than the
+		// (already consumed) *http.Response.
+		doPost := func(path, jsonBody string, headers map[string]string) (string, http.Header) {
 			req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+path,
 				strings.NewReader(jsonBody))
 			t.AssertNil(err)
@@ -76,7 +80,7 @@ func TestE2E_AuditLogging(t *testing.T) {
 			defer resp.Body.Close()
 			buf := new(strings.Builder)
 			_, _ = io.Copy(buf, resp.Body)
-			return buf.String(), resp
+			return buf.String(), resp.Header
 		}
 
 		doGet := func(path string, headers map[string]string) (string, int) {
@@ -94,8 +98,8 @@ func TestE2E_AuditLogging(t *testing.T) {
 		}
 
 		// extractSessionCookie reads the id_session value from Set-Cookie on a login response.
-		extractSessionCookie := func(resp *http.Response) string {
-			for _, raw := range resp.Header["Set-Cookie"] {
+		extractSessionCookie := func(hdr http.Header) string {
+			for _, raw := range hdr["Set-Cookie"] {
 				parts := strings.Split(raw, ";")
 				if len(parts) > 0 {
 					kv := strings.SplitN(strings.TrimSpace(parts[0]), "=", 2)
@@ -126,10 +130,10 @@ func TestE2E_AuditLogging(t *testing.T) {
 		adminID := adminOut.ID
 
 		// Log the admin in over HTTP so we get a real session cookie:
-		adminLoginBody, adminLoginResp := doPost("/api/v1/auth/login",
+		adminLoginBody, adminLoginHdr := doPost("/api/v1/auth/login",
 			`{"email":"admin@audit.test","password":"longenough123"}`, nil)
 		t.Assert(gjson.New(adminLoginBody).Get("code").String(), "ok")
-		adminSID := extractSessionCookie(adminLoginResp)
+		adminSID := extractSessionCookie(adminLoginHdr)
 		t.AssertNE(adminSID, "")
 
 		// =====================================================================
@@ -152,12 +156,12 @@ func TestE2E_AuditLogging(t *testing.T) {
 		userID := userIdentity.ID
 
 		// Log the user in over HTTP with a recognisable User-Agent:
-		loginBody, loginResp := doPost("/api/v1/auth/login",
+		loginBody, loginHdr := doPost("/api/v1/auth/login",
 			fmt.Sprintf(`{"email":%q,"password":%q}`, userEmail, userPassword),
 			map[string]string{"User-Agent": testUA},
 		)
 		t.Assert(gjson.New(loginBody).Get("code").String(), "ok")
-		userSID := extractSessionCookie(loginResp)
+		userSID := extractSessionCookie(loginHdr)
 		t.AssertNE(userSID, "")
 
 		// Query the admin audit endpoint for the user's events:
@@ -170,14 +174,17 @@ func TestE2E_AuditLogging(t *testing.T) {
 		entries := aj.Get("data.entries").Array()
 		t.AssertGT(len(entries), 0)
 
-		// Collect event names for membership checks:
+		// Collect event names for membership checks. Capture the login.success
+		// entry whose userAgent matches the testUA we sent so the IP/UA assertion
+		// below is meaningful even if more login events accumulate later.
 		eventNames := make(map[string]bool)
 		var loginSuccessEntry *gjson.Json
 		for _, raw := range entries {
 			entry := gjson.New(raw)
 			ev := entry.Get("event").String()
 			eventNames[ev] = true
-			if ev == "login.success" {
+			if ev == "login.success" && loginSuccessEntry == nil &&
+				entry.Get("userAgent").String() == testUA {
 				loginSuccessEntry = entry
 			}
 		}
@@ -186,10 +193,11 @@ func TestE2E_AuditLogging(t *testing.T) {
 		t.Assert(eventNames["role.default_granted"], true)
 		t.Assert(eventNames["login.success"], true)
 
-		// Assert IP and userAgent are non-empty on login.success (proves ActorMiddleware ran):
+		// Assert IP is non-empty and userAgent matches what we sent on login.success
+		// (proves ActorMiddleware populated ctx from the real request):
 		t.AssertNE(loginSuccessEntry, nil)
 		t.AssertNE(loginSuccessEntry.Get("ip").String(), "")
-		t.AssertNE(loginSuccessEntry.Get("userAgent").String(), "")
+		t.Assert(loginSuccessEntry.Get("userAgent").String(), testUA)
 
 		// =====================================================================
 		// Scenario 2: Login failure → login.failure entry with result=failure
@@ -205,7 +213,7 @@ func TestE2E_AuditLogging(t *testing.T) {
 
 		// Query audit logs filtered by event=login.failure:
 		failAuditBody, failAuditStatus := doGet(
-			fmt.Sprintf("/api/v1/admin/audit?event=login.failure"),
+			"/api/v1/admin/audit?event=login.failure",
 			cookieHdr(adminSID),
 		)
 		t.Assert(failAuditStatus, 200)
@@ -234,14 +242,7 @@ func TestE2E_AuditLogging(t *testing.T) {
 
 		const grantedRole = "admin"
 		grantPath := fmt.Sprintf("/api/v1/admin/identities/%s/roles?role=%s", userID, grantedRole)
-		grantReq, err := http.NewRequestWithContext(ctx, http.MethodPost, base+grantPath, nil)
-		t.AssertNil(err)
-		grantReq.Header.Set("Cookie", "id_session="+adminSID)
-		grantHTTPResp, err := http.DefaultClient.Do(grantReq)
-		t.AssertNil(err)
-		grantHTTPBody, _ := io.ReadAll(grantHTTPResp.Body)
-		grantHTTPResp.Body.Close()
-		t.Assert(grantHTTPResp.StatusCode, 200)
+		grantHTTPBody, _ := doPost(grantPath, "", cookieHdr(adminSID))
 		t.Assert(gjson.New(grantHTTPBody).Get("code").String(), "ok")
 
 		// Query audit for role.granted on the target user:
@@ -285,20 +286,25 @@ func TestE2E_AuditLogging(t *testing.T) {
 
 		// 4b. Non-admin session (regular user) → 403 forbidden
 		{
+			// userSID belongs to the user we promoted to admin in scenario 3, so
+			// the same session now passes the admin gate. Assert that first (confirms
+			// a promoted user gets 200), then create a fresh plain user to exercise
+			// the true non-admin 403 path:
 			body, status := doGet("/api/v1/admin/audit", cookieHdr(userSID))
-			// userSID belongs to the user who now has admin (we granted it above);
-			// create a fresh plain user to get a clean non-admin session:
+			t.Assert(status, 200)
+			t.Assert(gjson.New(body).Get("code").String(), "ok")
+
 			plainBody, _ := doPost("/api/v1/auth/register",
 				`{"email":"plain@audit.test","password":"longenough123","displayName":"Plain"}`,
 				nil,
 			)
 			t.Assert(gjson.New(plainBody).Get("code").String(), "ok")
-			plainLoginBody, plainLoginResp := doPost("/api/v1/auth/login",
+			plainLoginBody, plainLoginHdr := doPost("/api/v1/auth/login",
 				`{"email":"plain@audit.test","password":"longenough123"}`,
 				nil,
 			)
 			t.Assert(gjson.New(plainLoginBody).Get("code").String(), "ok")
-			plainSID := extractSessionCookie(plainLoginResp)
+			plainSID := extractSessionCookie(plainLoginHdr)
 			t.AssertNE(plainSID, "")
 
 			body, status = doGet("/api/v1/admin/audit", cookieHdr(plainSID))
