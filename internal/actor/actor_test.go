@@ -7,6 +7,8 @@ import (
 	"platform/services/identity/internal/actor"
 )
 
+type otherKey struct{}
+
 func TestWith_From_roundTrip(t *testing.T) {
 	want := actor.Actor{
 		IP:         "192.168.1.1",
@@ -28,9 +30,9 @@ func TestFrom_emptyContext_returnsZero(t *testing.T) {
 	}
 }
 
-func TestFrom_nilDerivedContext_returnsZero(t *testing.T) {
+func TestFrom_unrelatedKeyContext_returnsZero(t *testing.T) {
 	// A derived context that has no actor value should also return zero.
-	ctx := context.WithValue(context.Background(), "some-other-key", "value")
+	ctx := context.WithValue(context.Background(), otherKey{}, "value")
 	got := actor.From(ctx)
 	if got != (actor.Actor{}) {
 		t.Errorf("expected zero Actor from ctx without actor, got %+v", got)

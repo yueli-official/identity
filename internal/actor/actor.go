@@ -13,6 +13,7 @@ type Actor struct {
 	IdentityID string
 }
 
+// With stores a in ctx, replacing any previously stored Actor.
 func With(ctx context.Context, a Actor) context.Context {
 	return context.WithValue(ctx, ctxKey{}, a)
 }
