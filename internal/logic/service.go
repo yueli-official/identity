@@ -27,7 +27,7 @@ type Config struct {
 
 	// Personal Access Tokens (PAT).
 	PATHMACSecret string // HKDF secret; empty → dev fallback (codec handles it)
-	PATMaxPerUser int    // max PATs per identity (0 → default 20)
+	PATMaxPerUser int    // max PATs per identity (≤0 → clamped to 20 in New)
 }
 
 func DefaultConfig() Config {
@@ -61,6 +61,11 @@ type Service struct {
 }
 
 func New(store repo.Store, cfg Config) *Service {
+	// Defensive default: a zero/unset cap would make CreatePAT reject every token
+	// (count >= 0 is always true). DefaultConfig sets 20; clamp bare configs too.
+	if cfg.PATMaxPerUser <= 0 {
+		cfg.PATMaxPerUser = 20
+	}
 	return &Service{
 		store:  store,
 		cfg:    cfg,
