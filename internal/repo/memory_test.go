@@ -211,6 +211,42 @@ func TestMemory_SetEmailVerified_And_UpdatePassword(t *testing.T) {
 	}
 }
 
+func TestMemory_Roles_GrantGetRevoke(t *testing.T) {
+	m := repo.NewMemory()
+	ctx := context.Background()
+	id, _ := m.CreateIdentityWithProfile(ctx, repo.NewIdentityInput{Email: "r@example.com", DisplayName: "R", PasswordHash: "h"})
+	if r, _ := m.GetRoles(ctx, id.ID); len(r) != 0 {
+		t.Fatalf("new identity has no roles, got %v", r)
+	}
+	if err := m.GrantRole(ctx, id.ID, "admin"); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.GrantRole(ctx, id.ID, "user"); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.GrantRole(ctx, id.ID, "admin"); err != nil {
+		t.Fatal("grant must be idempotent", err)
+	}
+	roles, _ := m.GetRoles(ctx, id.ID)
+	if len(roles) != 2 {
+		t.Fatalf("want 2 roles, got %v", roles)
+	}
+	// GetRoles must return a sorted slice ("admin" < "user").
+	if roles[0] != "admin" || roles[1] != "user" {
+		t.Fatalf("roles must be sorted, got %v", roles)
+	}
+	if err := m.GrantRole(ctx, id.ID, "nope"); !errors.Is(err, repo.ErrUnknownRole) {
+		t.Fatalf("unknown role must error, got %v", err)
+	}
+	if err := m.RevokeRole(ctx, id.ID, "admin"); err != nil {
+		t.Fatal(err)
+	}
+	roles, _ = m.GetRoles(ctx, id.ID)
+	if len(roles) != 1 || roles[0] != "user" {
+		t.Fatalf("after revoke want [user], got %v", roles)
+	}
+}
+
 func TestMemorySessionLifecycle(t *testing.T) {
 	ctx := context.Background()
 	m := repo.NewMemory()

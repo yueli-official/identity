@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"sort"
 	"sync"
 	"time"
 
@@ -9,6 +10,10 @@ import (
 
 	"platform/services/identity/internal/model"
 )
+
+// memRoleCatalog is the fixed role catalog the in-memory store validates grants
+// against. It mirrors the rows seeded by migration 0006 (roles table).
+var memRoleCatalog = map[string]bool{"user": true, "admin": true}
 
 // Memory is a hermetic in-memory Store for unit tests and local dev.
 type Memory struct {
@@ -25,6 +30,7 @@ type Memory struct {
 	keys       []model.SigningKey
 	oauthLinks map[string]string // provider+"\x00"+providerUID -> identity id
 	verifs     map[string]memVerification // token_hash -> verification record
+	roles      map[string]map[string]bool // identity id -> set of granted role slugs
 }
 
 // memVerification mirrors a single email_verifications row in memory.
@@ -45,6 +51,7 @@ func NewMemory() *Memory {
 		clients: map[string]model.OIDCClient{}, keys: nil,
 		oauthLinks: map[string]string{},
 		verifs:     map[string]memVerification{},
+		roles:      map[string]map[string]bool{},
 	}
 }
 
@@ -203,6 +210,45 @@ func (m *Memory) ConsumeVerification(_ context.Context, tokenHash, purpose strin
 	v.Used = true
 	m.verifs[tokenHash] = v
 	return VerificationRecord{IdentityID: v.IdentityID, Email: v.Email}, nil
+}
+
+// GetRoles returns the identity's granted role slugs, sorted (possibly empty).
+func (m *Memory) GetRoles(_ context.Context, identityID string) ([]string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	set := m.roles[identityID]
+	out := make([]string, 0, len(set))
+	for slug := range set {
+		out = append(out, slug)
+	}
+	sort.Strings(out)
+	return out, nil
+}
+
+// GrantRole grants a catalog role to the identity. It is idempotent and returns
+// ErrUnknownRole when slug is not in the catalog.
+func (m *Memory) GrantRole(_ context.Context, identityID, slug string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if !memRoleCatalog[slug] {
+		return ErrUnknownRole
+	}
+	set := m.roles[identityID]
+	if set == nil {
+		set = map[string]bool{}
+		m.roles[identityID] = set
+	}
+	set[slug] = true
+	return nil
+}
+
+// RevokeRole removes a role grant from the identity. Revoking a role the
+// identity does not have is a no-op.
+func (m *Memory) RevokeRole(_ context.Context, identityID, slug string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.roles[identityID], slug)
+	return nil
 }
 
 func (m *Memory) CreateSession(_ context.Context, s model.Session, _ time.Duration) error {
