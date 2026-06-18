@@ -63,7 +63,8 @@ func OAuthNoEmail() *errs.Coded {
 	return errs.New(CodeOAuthNoEmail, "oauth provider returned no email", nil)
 }
 
-// OAuthFailed is a generic provider/exchange failure (used by the controller).
+// OAuthFailed is a generic provider/exchange failure for any non-redirect caller
+// that needs a coded error (the redirect endpoints surface errors via query string).
 func OAuthFailed() *errs.Coded {
 	return errs.New(CodeOAuthFailed, "oauth login failed", nil)
 }

@@ -101,9 +101,18 @@ func (c *OAuthController) GoogleCallback(r *ghttp.Request) {
 }
 
 // safeReturnTo permits only same-origin relative paths; everything else → "/".
-// This guards against open redirects (a "//evil.com" path is treated as absolute).
+// Guards against open redirects: reject anything that is not a single leading
+// "/", plus "//" and "/\" (both normalize to a scheme-relative //host URL in
+// browsers) and any backslash / control char (CRLF, tab) that a browser may
+// normalize or that could enable header injection.
 func safeReturnTo(v string) string {
-	if v == "" || !strings.HasPrefix(v, "/") || strings.HasPrefix(v, "//") {
+	if v == "" || v[0] != '/' {
+		return "/"
+	}
+	if strings.ContainsAny(v, "\\\r\n\t") {
+		return "/"
+	}
+	if len(v) > 1 && v[1] == '/' {
 		return "/"
 	}
 	return v
