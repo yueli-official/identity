@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"platform/services/identity/internal/model"
 	"platform/services/identity/internal/repo"
@@ -150,6 +151,63 @@ func TestMemory_OAuth_LinkExistingIdentity(t *testing.T) {
 	got, _ := m.GetByProviderUID(ctx, "google", "uid-2")
 	if got.ID != base.ID {
 		t.Fatalf("link should resolve to base identity, got %s", got.ID)
+	}
+}
+
+func TestMemory_Verification_ConsumeOnce(t *testing.T) {
+	m := repo.NewMemory()
+	ctx := context.Background()
+	id, _ := m.CreateIdentityWithProfile(ctx, repo.NewIdentityInput{Email: "v@example.com", DisplayName: "V", PasswordHash: "h"})
+	in := repo.NewVerificationInput{IdentityID: id.ID, Email: "v@example.com", Purpose: repo.PurposeVerifyEmail, TokenHash: "hash1", ExpiresAt: time.Now().Add(time.Hour)}
+	if err := m.CreateVerification(ctx, in); err != nil {
+		t.Fatal(err)
+	}
+	rec, err := m.ConsumeVerification(ctx, "hash1", repo.PurposeVerifyEmail)
+	if err != nil || rec.IdentityID != id.ID {
+		t.Fatalf("first consume: %+v %v", rec, err)
+	}
+	if _, err := m.ConsumeVerification(ctx, "hash1", repo.PurposeVerifyEmail); !errors.Is(err, repo.ErrVerificationInvalid) {
+		t.Fatalf("second consume must fail single-use, got %v", err)
+	}
+}
+
+func TestMemory_Verification_WrongPurpose(t *testing.T) {
+	m := repo.NewMemory()
+	ctx := context.Background()
+	id, _ := m.CreateIdentityWithProfile(ctx, repo.NewIdentityInput{Email: "p@example.com", DisplayName: "P", PasswordHash: "h"})
+	_ = m.CreateVerification(ctx, repo.NewVerificationInput{IdentityID: id.ID, Email: "p@example.com", Purpose: repo.PurposePasswordReset, TokenHash: "h2", ExpiresAt: time.Now().Add(time.Hour)})
+	if _, err := m.ConsumeVerification(ctx, "h2", repo.PurposeVerifyEmail); !errors.Is(err, repo.ErrVerificationInvalid) {
+		t.Fatalf("purpose mismatch must fail, got %v", err)
+	}
+}
+
+func TestMemory_Verification_Expired(t *testing.T) {
+	m := repo.NewMemory()
+	ctx := context.Background()
+	id, _ := m.CreateIdentityWithProfile(ctx, repo.NewIdentityInput{Email: "e@example.com", DisplayName: "E", PasswordHash: "h"})
+	_ = m.CreateVerification(ctx, repo.NewVerificationInput{IdentityID: id.ID, Email: "e@example.com", Purpose: repo.PurposeVerifyEmail, TokenHash: "h3", ExpiresAt: time.Now().Add(-time.Minute)})
+	if _, err := m.ConsumeVerification(ctx, "h3", repo.PurposeVerifyEmail); !errors.Is(err, repo.ErrVerificationInvalid) {
+		t.Fatalf("expired must fail, got %v", err)
+	}
+}
+
+func TestMemory_SetEmailVerified_And_UpdatePassword(t *testing.T) {
+	m := repo.NewMemory()
+	ctx := context.Background()
+	id, _ := m.CreateIdentityWithProfile(ctx, repo.NewIdentityInput{Email: "s@example.com", DisplayName: "S", PasswordHash: "old"})
+	if err := m.SetEmailVerified(ctx, id.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := m.GetByID(ctx, id.ID)
+	if !got.EmailVerified {
+		t.Fatal("email_verified not set")
+	}
+	if err := m.UpdatePasswordHash(ctx, id.ID, "newhash"); err != nil {
+		t.Fatal(err)
+	}
+	h, _ := m.GetPasswordHash(ctx, id.ID)
+	if h != "newhash" {
+		t.Fatalf("password not updated: %q", h)
 	}
 }
 
