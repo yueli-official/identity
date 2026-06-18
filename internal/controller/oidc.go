@@ -82,9 +82,10 @@ func (c *OIDCController) Authorize(r *ghttp.Request) {
 	}
 
 	profile, _ := c.svc.GetProfile(ctx, id.ID) // empty profile is acceptable
+	roles, _ := c.svc.GetRoles(ctx, id.ID)     // empty roles is acceptable
 	session := oidc.BuildSession(
 		c.issuer, ar.GetClient().GetID(), c.keys.ActiveKID(), sid,
-		id, profile, ar.GetGrantedScopes(), time.Now().UTC(),
+		id, profile, ar.GetGrantedScopes(), roles, time.Now().UTC(),
 	)
 
 	resp, err := c.provider.NewAuthorizeResponse(ctx, ar, session)
@@ -95,7 +96,22 @@ func (c *OIDCController) Authorize(r *ghttp.Request) {
 	c.provider.WriteAuthorizeResponse(ctx, w, ar, resp)
 }
 
-// Token handles POST /oauth2/token.
+// Token handles POST /oauth2/token (authorization_code + refresh_token grants).
+//
+// ROLES ON REFRESH: the refresh_token grant is fully owned by fosite's stock
+// RefreshTokenGrantHandler (compose.OAuth2RefreshTokenGrantFactory). On refresh
+// it re-hydrates the ORIGINAL request session from storage and re-signs the
+// access-token JWT from those frozen claims (handler/oauth2/flow_refresh.go:87
+// `request.SetSession(originalRequest.GetSession().Clone())`, then
+// strategy_jwt.go reads claims off that cloned session). This handler is a pure
+// delegation to NewAccessRequest/NewAccessResponse, so there is NO
+// application-level reconstruction seam where fresh roles could be injected
+// without forking the fosite handler. Consequence: the "roles" claim is frozen
+// at authorize time; role changes (grant/revoke) propagate on the next FULL
+// authorize, not on token refresh. Acceptable for the MVP — refresh TTL bounds
+// staleness. FOLLOW-UP (spec §6, deferred): to refresh roles on every grant,
+// register a custom post-refresh hook / wrap the refresh handler that re-fetches
+// c.svc.GetRoles(subject) and overwrites the access-token Extra before signing.
 func (c *OIDCController) Token(r *ghttp.Request) {
 	ctx := r.Context()
 	w := r.Response.RawWriter()
@@ -139,7 +155,8 @@ func (c *OIDCController) Userinfo(r *ghttp.Request) {
 		return
 	}
 	profile, _ := c.svc.GetProfile(ctx, sub)
-	r.Response.WriteJson(oidc.Userinfo(id, profile, ar.GetGrantedScopes()))
+	roles, _ := c.svc.GetRoles(ctx, sub)
+	r.Response.WriteJson(oidc.Userinfo(id, profile, ar.GetGrantedScopes(), roles))
 }
 
 // Revoke handles POST /oauth2/revoke (RFC 7009). Raw RFC response.
