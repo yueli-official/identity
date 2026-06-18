@@ -38,6 +38,12 @@ type AuditEvent struct {
 	Detail   map[string]any
 }
 
+// QueryAudit is a thin read-only passthrough to the store so the controller
+// layer can serve admin audit-log queries without bypassing the service seam.
+func (s *Service) QueryAudit(ctx context.Context, f repo.AuditFilter) ([]repo.AuditRow, error) {
+	return s.store.QueryAudit(ctx, f)
+}
+
 // audit records an event best-effort: actor IP/UA are merged from ctx, and a write
 // failure is logged and swallowed (it must never break the business operation).
 func (s *Service) audit(ctx context.Context, e AuditEvent) {
