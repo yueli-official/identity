@@ -37,5 +37,6 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (model.Identit
 	if err != nil {
 		return model.Identity{}, err
 	}
+	_ = s.store.GrantRole(ctx, id.ID, DefaultRole) // best-effort default role
 	return id, nil
 }
