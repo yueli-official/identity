@@ -19,7 +19,7 @@ const oauthStateCookie = "g_oauth_state"
 
 // OAuthController handles the external-provider (Google) login redirect dance.
 // These are raw redirect endpoints that bypass the gokit JSON envelope, the same
-// precedent as the OIDC endpoints (spec §5).
+// precedent as the OIDC endpoints.
 type OAuthController struct {
 	svc          *logic.Service
 	google       oauthlogin.Provider // nil when unconfigured
@@ -63,7 +63,7 @@ func (c *OAuthController) GoogleStart(r *ghttp.Request) {
 
 // GoogleCallback handles GET /api/v1/auth/oauth/google/callback.
 // It verifies the signed state + nonce cookie (CSRF), exchanges the code, fetches
-// the profile, performs §10 account-linking via OAuthLogin, mints an id_session
+// the profile, performs account-linking via OAuthLogin, mints an id_session
 // cookie, and redirects back to the validated return_to.
 func (c *OAuthController) GoogleCallback(r *ghttp.Request) {
 	ctx := r.Context()

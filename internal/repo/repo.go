@@ -22,7 +22,7 @@ var (
 )
 
 // Verification purpose scopes (a token issued for one purpose must not work for
-// another — spec §11 "登录码 ≠ 找回码").
+// another — 登录码 ≠ 找回码).
 const (
 	PurposeVerifyEmail   = "verify_email"
 	PurposePasswordReset = "password_reset"

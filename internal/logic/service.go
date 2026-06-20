@@ -16,7 +16,7 @@ type Config struct {
 	LoginLockFor    time.Duration
 	IPMaxFails      int
 
-	// Email verification + password reset (milestone ⑤).
+	// Email verification + password reset.
 	AccountBaseURL     string        // base URL the action links point at
 	VerifyTokenTTL     time.Duration // verify-email token lifetime
 	ResetTokenTTL      time.Duration // password-reset token lifetime

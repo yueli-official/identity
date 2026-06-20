@@ -13,7 +13,7 @@ import (
 
 // Store adapts our Backend + ClientRepo to fosite's storage interfaces.
 // Transient sessions persist via Backend (PG in prod, memory in tests). Access
-// tokens are NOT stored (JWT self-contained, spec §3) — those methods no-op.
+// tokens are NOT stored (JWT self-contained) — those methods no-op.
 type Store struct {
 	be      Backend
 	clients repo.ClientRepo

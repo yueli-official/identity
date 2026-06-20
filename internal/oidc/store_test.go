@@ -15,7 +15,7 @@ import (
 	"platform/services/identity/internal/repo"
 )
 
-// Compile-time: Store satisfies every fosite storage facet milestone ④ uses.
+// Compile-time: Store satisfies every fosite storage facet the provider uses.
 var (
 	_ fosite.Storage                     = (*Store)(nil)
 	_ oauth2.CoreStorage                 = (*Store)(nil)

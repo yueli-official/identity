@@ -1,5 +1,5 @@
 // Package cache implements the Redis-backed SessionStore and LoginThrottle
-// (repo interfaces). Sessions are Redis-only (spec): a string per session
+// (repo interfaces). Sessions are Redis-only: a string per session
 // plus a per-identity set index for list/revoke.
 package cache
 

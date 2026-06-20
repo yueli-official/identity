@@ -29,7 +29,7 @@ type Record struct {
 	Data      []byte // serialized fosite.Requester (storedRequest JSON)
 }
 
-// RefreshRecord is a refresh-token row with security columns (spec §4).
+// RefreshRecord is a refresh-token row with security columns.
 type RefreshRecord struct {
 	RequestID       string
 	ClientID        string

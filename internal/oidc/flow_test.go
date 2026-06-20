@@ -54,7 +54,7 @@ type e2eEnv struct {
 	subject string // identity ID == JWT sub
 }
 
-// setupE2E builds the full hermetic OIDC stack used by milestone-③ and ④ tests:
+// setupE2E builds the full hermetic OIDC stack used by the e2e tests:
 //   - in-memory repo + a demo client (authorization_code + refresh_token grants,
 //     offline_access scope so refresh can be exercised),
 //   - a registered+logged-in user (yielding the id_session cookie value),
@@ -127,7 +127,7 @@ func setupE2E(t *testing.T, clientID string) *e2eEnv {
 	ctl := controller.NewOIDC(provider, mgr, svc, base, base+"/login")
 
 	// 5. Start GoFrame server on the pre-chosen port (NO ghttpx.Middleware), with
-	//    the full milestone-④ route set.
+	//    the full OIDC route set.
 	s := g.Server(t.Name())
 	s.SetAddr(fmt.Sprintf("127.0.0.1:%d", port)) // loopback-only: avoids the Windows Firewall prompt
 	s.SetDumpRouterMap(false)
@@ -292,7 +292,7 @@ func assertValidTokenResponse(t *testing.T, status int, body []byte, ts tokenSet
 	}
 }
 
-// TestOIDCClientCredentialsServiceToken is the resource-site-M2 acceptance test
+// TestOIDCClientCredentialsServiceToken is the resource-site acceptance test
 // for the service-token chain's first link: a confidential client mints a
 // client_credentials access token carrying its requested scope, so a sibling
 // service (e.g. the resource site) can authorize on it (asset:sign). It guards a
@@ -387,7 +387,7 @@ func decodeJWTClaims(t *testing.T, token string) (sub, scope, kid string) {
 	return claims.Sub, claims.Scope, hdr.Kid
 }
 
-// TestOIDCFlow is the milestone-③ acceptance test: hermetic end-to-end
+// TestOIDCFlow is the OIDC acceptance test: hermetic end-to-end
 // authorization_code + PKCE flow, with local JWKS verification of the JWT
 // access token (mirrors the PoC's verifyAccessTokenLocally).
 func TestOIDCFlow(t *testing.T) {
@@ -583,7 +583,7 @@ func TestOIDCFlow(t *testing.T) {
 		len(tokenSet.AccessToken), len(tokenSet.IDToken))
 
 	// -----------------------------------------------------------------------
-	// 9. Local JWKS verification of the access token (THE milestone-③ proof)
+	// 9. Local JWKS verification of the access token (the core proof)
 	// -----------------------------------------------------------------------
 	verifyAccessTokenLocally(t, base, tokenSet.AccessToken, base, subject)
 
@@ -642,7 +642,7 @@ func TestOIDCFlow(t *testing.T) {
 	t.Logf("no-session OK: correctly redirected to %s", noSessLoc)
 }
 
-// TestOIDCRefreshFlow is the milestone-④ refresh happy path: an authorize with
+// TestOIDCRefreshFlow is the refresh happy path: an authorize with
 // offline_access yields a refresh token; the refresh_token grant then mints a
 // NEW access token (JWKS-verified) and a NEW, distinct refresh token (rotation).
 func TestOIDCRefreshFlow(t *testing.T) {
@@ -723,7 +723,7 @@ func TestOIDCRefreshRolesUpdated(t *testing.T) {
 	t.Logf("refresh access token roles = %v (admin propagated on refresh)", roles1)
 }
 
-// TestOIDCRotationReplayKillsFamily is the milestone-④ rotation/replay defense:
+// TestOIDCRotationReplayKillsFamily is the rotation/replay defense:
 // after rt→rt2 rotation, replaying the OLD rt is rejected AND poisons the whole
 // family, so rt2 is then dead too. fosite revokes by request_id, which is reused
 // across the refresh chain.
@@ -769,7 +769,7 @@ func TestOIDCRotationReplayKillsFamily(t *testing.T) {
 	t.Logf("rt2 also dead after replay (status=%d) — family revocation confirmed", rt2Status)
 }
 
-// TestOIDCRevoke is the milestone-④ RFC 7009 path: a freshly minted refresh
+// TestOIDCRevoke is the RFC 7009 path: a freshly minted refresh
 // token rt3 is revoked via /oauth2/revoke (HTTP 200), after which it is unusable
 // at the token endpoint.
 func TestOIDCRevoke(t *testing.T) {
@@ -817,7 +817,7 @@ func TestOIDCRevoke(t *testing.T) {
 	t.Logf("revoked rt3 rejected at token endpoint (status=%d)", rStatus)
 }
 
-// TestOIDCEndSessionPassiveLogout is the milestone-④ RP-initiated logout +
+// TestOIDCEndSessionPassiveLogout is the RP-initiated logout +
 // passive-logout path: a refresh token rt4 bound to the login session is revoked
 // when /oauth2/end_session clears that session, AND the IdP session itself is
 // gone afterwards. Requires svc.SetRefreshRevoker(store) in setup.

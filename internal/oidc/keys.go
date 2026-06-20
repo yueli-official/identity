@@ -18,7 +18,7 @@ import (
 )
 
 // Manager holds the in-memory active private key (loaded once at startup) and
-// the public JWKS (active + retired). Per spec: don't hit the DB per request.
+// the public JWKS (active + retired), loaded once so we don't hit the DB per request.
 type Manager struct {
 	keys      repo.SigningKeyRepo
 	activeKID string

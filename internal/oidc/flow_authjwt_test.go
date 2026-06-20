@@ -7,13 +7,13 @@ import (
 	"platform/gokit/authjwt"
 )
 
-// TestAccessTokenVerifiableByGokitAuthjwt is the cross-service contract proof for
-// milestone ⑥-gokit-JWT. A REAL fosite-signed access token (issued by the live
+// TestAccessTokenVerifiableByGokitAuthjwt is the cross-service contract proof:
+// a REAL fosite-signed access token (issued by the live
 // IdP stack via authorization_code + PKCE) must pass verification by the shared
 // platform/gokit/authjwt verifier — the exact code path the resource services
 // (blog / shop / resources) will run when they adopt the JWT middleware.
 //
-// This closes the gap IdP spec §12 warned about ("避免 service② 接入才发现缺漏"):
+// It closes the gap up front, before another service adopts the middleware:
 // it proves authjwt and fosite agree on issuer, the kid header ↔ JWKS lookup,
 // RS256, the space-delimited "scope" claim, and the "roles" array — against a
 // token minted by the production signing path, not one hand-modeled in a test.

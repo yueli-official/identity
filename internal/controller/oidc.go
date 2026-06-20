@@ -78,7 +78,7 @@ func (c *OIDCController) JWKS(r *ghttp.Request) {
 }
 
 // Authorize handles GET /oauth2/authorize.
-// Subject comes from the IdP login session (id_session cookie from milestone ②).
+// Subject comes from the IdP login session (id_session cookie).
 // No session → redirect to login.
 func (c *OIDCController) Authorize(r *ghttp.Request) {
 	ctx := r.Context()
@@ -130,7 +130,7 @@ func (c *OIDCController) Authorize(r *ghttp.Request) {
 // LIVE at signing time (during NewAccessResponse). That gives us an
 // application-level seam: between NewAccessRequest and NewAccessResponse we
 // re-fetch the identity's CURRENT roles and overwrite the "roles" claim, so role
-// grants/revocations take effect on refresh (spec §6) instead of only on the
+// grants/revocations take effect on refresh instead of only on the
 // next full authorize. Without this, a revoked admin would keep "admin" in their
 // access token until the refresh token itself expired.
 func (c *OIDCController) Token(r *ghttp.Request) {
@@ -265,8 +265,8 @@ func (c *OIDCController) Revoke(r *ghttp.Request) {
 
 // EndSession handles GET/POST /oauth2/end_session (RP-initiated logout, MVP).
 // Clears the IdP login session and revokes refresh tokens bound to it (via
-// svc.Logout, which milestone ④ makes session-bound). Does NOT honor arbitrary
-// post_logout_redirect_uri (open-redirect guard; whitelist redirect is ⑦).
+// svc.Logout, which is session-bound). Does NOT honor arbitrary
+// post_logout_redirect_uri (open-redirect guard; whitelist redirect is future work).
 func (c *OIDCController) EndSession(r *ghttp.Request) {
 	ctx := r.Context()
 	sid := r.Cookie.Get("id_session", "").String()

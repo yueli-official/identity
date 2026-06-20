@@ -41,7 +41,7 @@ func ValidatePasswordStrength(plain string) error {
 // ChangePassword verifies the caller's current password, sets a new one, and
 // revokes all OTHER sessions (keeping currentSessionID so the caller stays
 // logged in here). Mirrors the reset flow's "force logout other sessions"
-// (spec §11) but for the authenticated change-password path.
+// but for the authenticated change-password path.
 func (s *Service) ChangePassword(ctx context.Context, identityID, currentSessionID, current, newPassword string) error {
 	hash, err := s.store.GetPasswordHash(ctx, identityID)
 	if err != nil {

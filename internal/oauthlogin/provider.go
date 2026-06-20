@@ -1,6 +1,5 @@
 // Package oauthlogin abstracts external OAuth login providers (e.g. Google) and
-// the CSRF-safe signed state passed through the redirect dance. The Provider
-// shape is harvested from plugins/auth-oauth (read-only donor).
+// the CSRF-safe signed state passed through the redirect dance.
 package oauthlogin
 
 import "context"

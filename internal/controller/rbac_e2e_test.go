@@ -30,7 +30,7 @@ import (
 	"platform/services/identity/internal/repo"
 )
 
-// TestE2E_RBAC is the milestone integration witness that ties the admin role
+// TestE2E_RBAC is the integration witness that ties the admin role
 // endpoint and the OIDC token issuance together over real HTTP, hermetically.
 //
 // It deliberately fills the gap left by the two existing tests:

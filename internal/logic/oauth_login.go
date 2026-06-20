@@ -23,7 +23,7 @@ type OAuthLoginInput struct {
 }
 
 // OAuthLogin resolves (or links/creates) the identity behind an external provider
-// per spec §10, then mints a session identical to password login.
+// then mints a session identical to password login.
 func (s *Service) OAuthLogin(ctx context.Context, in OAuthLoginInput) (LoginOutput, error) {
 	email := CanonicalizeEmail(in.Email)
 
@@ -75,7 +75,7 @@ func (s *Service) resolveOAuthIdentity(ctx context.Context, in OAuthLoginInput, 
 	existing, gerr := s.store.GetByEmail(ctx, email)
 	switch {
 	case gerr == nil:
-		// §10: verified email matches an existing identity → link; unverified → refuse.
+		// verified email matches an existing identity → link; unverified → refuse.
 		if !in.EmailVerified {
 			return model.Identity{}, false, iderr.OAuthEmailConflict(email)
 		}

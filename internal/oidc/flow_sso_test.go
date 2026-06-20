@@ -12,7 +12,7 @@ import (
 // TestOIDCMultiClientSSO proves single sign-on across two OIDC clients: one IdP
 // login session lets BOTH clients complete authorization_code WITHOUT a second
 // login, and after logout neither can (the /authorize redirects to login). This
-// is the milestone-⑦ multi-client SSO + logout-chain acceptance test; the
+// is the multi-client SSO + logout-chain acceptance test; the
 // single-client SSO / logout / passive-logout paths are covered by flow_test.go.
 func TestOIDCMultiClientSSO(t *testing.T) {
 	env := setupE2E(t, "client-a")

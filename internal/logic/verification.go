@@ -92,7 +92,7 @@ func (s *Service) VerifyEmail(ctx context.Context, token string) error {
 }
 
 // RequestPasswordReset emails a reset link IF the account exists; it always
-// returns nil to avoid account enumeration (spec §11).
+// returns nil to avoid account enumeration.
 func (s *Service) RequestPasswordReset(ctx context.Context, email, ip string) error {
 	email = CanonicalizeEmail(email)
 	acctKey, ipKey := "pwreset:acct:"+email, "pwreset:ip:"+ip
@@ -141,7 +141,7 @@ func (s *Service) RequestPasswordReset(ctx context.Context, email, ip string) er
 }
 
 // ResetPassword consumes a reset token, sets the new password, and force-logs-out
-// all of the identity's sessions (spec §11).
+// all of the identity's sessions.
 func (s *Service) ResetPassword(ctx context.Context, token, newPassword string) error {
 	if token == "" {
 		return iderr.VerificationInvalid()

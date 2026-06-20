@@ -47,7 +47,7 @@ const (
 
 	// Confidential service client for the resource site's AssetClient: mints a
 	// client_credentials service token (scope asset:sign) so the resource service
-	// can sign GET URLs for login-gated downloads (resource-site M2). The secret
+	// can sign GET URLs for login-gated downloads. The secret
 	// must match resource's config (resource.assetService.serviceToken.clientSecret).
 	demoResourceSvcID     = "resource-svc"
 	demoResourceSvcSecret = "demo-resource-svc-secret-0123456789"
@@ -83,7 +83,7 @@ func main() {
 		ResponseTypes: []string{"code"},
 		Scopes:        []string{"openid", "profile", "email", "roles", "offline_access"},
 	})
-	// Consumer-site OIDC client for the resource app's BFF (spec: consumer-site-auth).
+	// Consumer-site OIDC client for the resource app's BFF.
 	// Public + PKCE in dev; a confidential client (secret) is the prod hardening.
 	store.SetClient(model.OIDCClient{
 		ID:            "resource-web",
@@ -95,7 +95,7 @@ func main() {
 	})
 	// Confidential service client (client_credentials) for the resource site's
 	// AssetClient → mints a service token scoped `asset:sign` to sign GET URLs for
-	// login-gated downloads (resource-site M2). Secret is bcrypt-hashed; fosite
+	// login-gated downloads. Secret is bcrypt-hashed; fosite
 	// validates the presented secret against it on the token endpoint.
 	svcSecretHash, _ := bcrypt.GenerateFromPassword([]byte(demoResourceSvcSecret), bcrypt.DefaultCost)
 	store.SetClient(model.OIDCClient{

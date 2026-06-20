@@ -1,5 +1,5 @@
 // Package v1 holds identity-service request/response types. g.Meta drives the
-// auto-generated OpenAPI document (backend-platform-conventions).
+// auto-generated OpenAPI document.
 package v1
 
 import "github.com/gogf/gf/v2/frame/g"

@@ -68,7 +68,7 @@ func NotAuthenticated() *errs.Coded {
 }
 
 // OAuthEmailConflict: the provider's (unverified) email collides with an
-// existing local account, so we refuse to auto-link (spec §10).
+// existing local account, so we refuse to auto-link.
 func OAuthEmailConflict(email string) *errs.Coded {
 	return errs.New(CodeOAuthEmailConflict, "email already registered to another account", map[string]any{"email": email})
 }
@@ -135,7 +135,7 @@ func CredentialNotFound() *errs.Coded {
 	return errs.New(CodeCredentialNotFound, "credential not found", nil)
 }
 
-// LastCredential: refusing to remove the only remaining login credential (spec §10).
+// LastCredential: refusing to remove the only remaining login credential.
 func LastCredential() *errs.Coded {
 	return errs.New(CodeLastCredential, "cannot remove the last login credential", nil)
 }

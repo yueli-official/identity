@@ -62,7 +62,7 @@ func TestOAuthLogin_UnverifiedEmailCollision_Rejected(t *testing.T) {
 		Provider: "google", ProviderUID: "sub-4", Email: "taken@example.com", EmailVerified: false,
 	})
 	if err == nil {
-		t.Fatal("unverified-email collision must be rejected (§10)")
+		t.Fatal("unverified-email collision must be rejected")
 	}
 	if codeOfErr(err) != iderr.CodeOAuthEmailConflict {
 		t.Fatalf("want oauth_email_conflict, got %v", err)

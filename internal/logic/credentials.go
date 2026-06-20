@@ -41,7 +41,7 @@ func (s *Service) hasPassword(ctx context.Context, identityID string) (bool, err
 
 // BindOAuth links an external-provider account to identityID. Idempotent if the
 // same identity already owns the link; rejects when the (provider, uid) is bound
-// to a DIFFERENT identity (spec §10 — no silent account takeover).
+// to a DIFFERENT identity (no silent account takeover).
 func (s *Service) BindOAuth(ctx context.Context, identityID, provider, providerUID, email string, emailVerified bool) error {
 	switch existing, err := s.store.GetByProviderUID(ctx, provider, providerUID); {
 	case err == nil:
@@ -68,7 +68,7 @@ func (s *Service) BindOAuth(ctx context.Context, identityID, provider, providerU
 }
 
 // UnbindCredential removes an oauth provider credential, refusing to remove the
-// LAST login credential (spec §10: "不得解绑最后一个可登录凭据").
+// LAST login credential ("不得解绑最后一个可登录凭据").
 func (s *Service) UnbindCredential(ctx context.Context, identityID, provider string) error {
 	summary, err := s.ListCredentials(ctx, identityID)
 	if err != nil {

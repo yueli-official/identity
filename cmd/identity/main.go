@@ -1,5 +1,5 @@
-// Command identity is the user-center IdP backend (milestone 3: OIDC /
-// OAuth2 authorization server layered on top of the milestone 2 identity core).
+// Command identity is the user-center IdP backend: an OIDC / OAuth2
+// authorization server layered on the identity core.
 package main
 
 import (
@@ -42,10 +42,10 @@ func main() {
 	daoPG := dao.NewPG(g.DB())
 	rdb := cache.NewRedis(g.Redis())
 
-	// ── Business auth (milestone ②) ─────────────────────────────────────────
+	// ── Business auth ───────────────────────────────────────────────────────
 	store := repo.NewComposite(daoPG, rdb, rdb)
 	cfg := logic.DefaultConfig()
-	cfg.AccountBaseURL = accountBaseURL // base for verify-email / reset links (milestone ⑤)
+	cfg.AccountBaseURL = accountBaseURL // base for verify-email / reset links
 
 	// PAT HMAC secret: warn at startup when falling back to the insecure dev key.
 	cfg.PATHMACSecret = g.Cfg().MustGet(ctx, "pat.hmacSecret").String()
@@ -79,7 +79,7 @@ func main() {
 		}
 	}
 
-	// ── Mailer (milestone ⑤) ─────────────────────────────────────────────────
+	// ── Mailer ──────────────────────────────────────────────────────────────
 	// Default to the dev-log mailer (links printed to logs); switch to real SMTP
 	// only when mail.smtp.host is configured.
 	var mlr mailer.Mailer = mailer.NewDev()
@@ -95,13 +95,13 @@ func main() {
 	}
 	svc.SetMailer(mlr)
 
-	// ── OIDC / OAuth2 (milestone ③ + ④) ────────────────────────────────────
+	// ── OIDC / OAuth2 ───────────────────────────────────────────────────────
 	mgr, err := oidc.NewManager(ctx, daoPG)
 	if err != nil {
 		panic(fmt.Sprintf("oidc.NewManager: %v", err))
 	}
 	// Durable PG-backed OIDC store: persists OAuth requests and refresh tokens
-	// across restarts (milestone ④). Access tokens remain stateless JWTs.
+	// across restarts. Access tokens remain stateless JWTs.
 	oidcStore := oidc.NewStore(oidc.NewPGBackend(g.DB()), daoPG)
 	// Wire passive logout: logic.Service calls RevokeRefreshBySession on logout,
 	// which revokes all refresh tokens belonging to that identity session.
@@ -116,7 +116,7 @@ func main() {
 	}, mgr.KeyGetter)
 	oidcCtl := controller.NewOIDC(provider, mgr, svc, issuer, loginURL)
 
-	// ── Google OAuth login (milestone ⑤) ────────────────────────────────────
+	// ── Google OAuth login ──────────────────────────────────────────────────
 	// Provider stays nil when credentials are unconfigured; the controller then
 	// redirects the start/callback endpoints to login with ?error=oauth_unavailable.
 	googleClientID := g.Cfg().MustGet(ctx, "oidc.google.clientId").String()
