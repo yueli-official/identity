@@ -75,6 +75,16 @@ func main() {
 		ResponseTypes: []string{"code"},
 		Scopes:        []string{"openid", "profile", "email", "roles", "offline_access"},
 	})
+	// Consumer-site OIDC client for the resource app's BFF (spec: consumer-site-auth).
+	// Public + PKCE in dev; a confidential client (secret) is the prod hardening.
+	store.SetClient(model.OIDCClient{
+		ID:            "resource-web",
+		Public:        true,
+		RedirectURIs:  []string{"http://localhost:3001/auth/callback"},
+		GrantTypes:    []string{"authorization_code", "refresh_token"},
+		ResponseTypes: []string{"code"},
+		Scopes:        []string{"openid", "profile", "email", "roles", "offline_access"},
+	})
 
 	authCtl := controller.New(svc, false) // insecure cookie: round-trips over plain HTTP
 
