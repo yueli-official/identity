@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/gogf/gf/v2/net/ghttp"
@@ -14,11 +15,32 @@ import (
 
 // OIDCController handles the OAuth2/OIDC protocol endpoints.
 type OIDCController struct {
-	provider fosite.OAuth2Provider
-	keys     *oidc.Manager
-	svc      *logic.Service
-	issuer   string
-	loginURL string
+	provider   fosite.OAuth2Provider
+	keys       *oidc.Manager
+	svc        *logic.Service
+	issuer     string
+	loginURL   string
+	postLogout map[string]bool // allowed post_logout_redirect_uri origins (RP logout)
+}
+
+// SetPostLogoutRedirects registers the origins a post_logout_redirect_uri may
+// point at (RP-initiated logout, end_session). Without a match the uri is
+// ignored — guards against an open redirect. Prod should derive this from each
+// client's registered post_logout_redirect_uris; the seeded consumer origins
+// suffice for the self-operated station group.
+func (c *OIDCController) SetPostLogoutRedirects(origins []string) {
+	c.postLogout = map[string]bool{}
+	for _, o := range origins {
+		c.postLogout[strings.TrimRight(o, "/")] = true
+	}
+}
+
+func (c *OIDCController) allowedPostLogout(uri string) bool {
+	u, err := url.Parse(uri)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return false
+	}
+	return c.postLogout[u.Scheme+"://"+u.Host]
 }
 
 // NewOIDC creates an OIDCController wired to a fosite provider and key manager.
@@ -213,6 +235,13 @@ func (c *OIDCController) EndSession(r *ghttp.Request) {
 	if sid != "" {
 		_ = c.svc.Logout(ctx, sid)
 		r.Cookie.Remove("id_session")
+	}
+	// RP-initiated logout: after clearing the IdP session, bounce back to the
+	// relying party (so the user lands on the consumer site, logged out) when it
+	// supplies an allow-listed post_logout_redirect_uri.
+	if uri := r.GetQuery("post_logout_redirect_uri").String(); uri != "" && c.allowedPostLogout(uri) {
+		r.Response.RedirectTo(uri)
+		return
 	}
 	r.Response.WriteJson(map[string]interface{}{"logged_out": true})
 }

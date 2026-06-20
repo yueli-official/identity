@@ -103,6 +103,9 @@ func main() {
 		RefreshTTL:   720 * time.Hour,
 	}, mgr.KeyGetter)
 	oidcCtl := controller.NewOIDC(provider, mgr, svc, demoIssuer, demoLoginURL)
+	// Consumer sites' RP-initiated logout bounces back here (end_session); allow
+	// their dev origins (resource :3001, account :3000).
+	oidcCtl.SetPostLogoutRedirects([]string{"http://localhost:3001", "http://localhost:3000"})
 
 	// Google OAuth: enabled when GF_OIDC_GOOGLE_CLIENTID/SECRET are present
 	// (read from .env.local via loadDotEnv). Otherwise nil → the start/callback
