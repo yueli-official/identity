@@ -57,5 +57,10 @@ func NewProvider(store fosite.Storage, cfg Config, keyGetter func(context.Contex
 		compose.OAuth2StatelessJWTIntrospectionFactory,
 		compose.OAuth2RefreshTokenGrantFactory, // milestone ④: refresh_token grant + rotation
 		compose.OAuth2TokenRevocationFactory,   // milestone ④: RFC 7009 /revoke
+		// Service-to-service tokens: a confidential client (e.g. the resource
+		// site) authenticates with its secret and mints a scoped access token for
+		// itself (no user). Powers cross-service calls like the asset service's
+		// service-scope signed delivery (resource-site M2).
+		compose.OAuth2ClientCredentialsGrantFactory,
 	)
 }
