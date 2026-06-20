@@ -59,7 +59,7 @@ func (c *OIDCController) discoveryDoc() map[string]interface{} {
 		"revocation_endpoint":                   c.issuer + "/oauth2/revoke",
 		"end_session_endpoint":                  c.issuer + "/oauth2/end_session",
 		"response_types_supported":              []string{"code"},
-		"grant_types_supported":                 []string{"authorization_code", "refresh_token"},
+		"grant_types_supported":                 []string{"authorization_code", "refresh_token", "client_credentials"},
 		"scopes_supported":                      []string{"openid", "profile", "email", "roles", "offline_access"},
 		"code_challenge_methods_supported":      []string{"S256"},
 		"id_token_signing_alg_values_supported": []string{"RS256"},
@@ -145,6 +145,7 @@ func (c *OIDCController) Token(r *ghttp.Request) {
 		return
 	}
 	c.refreshRolesClaim(ctx, accessReq)
+	c.applyServiceClaims(ctx, accessReq)
 	resp, err := c.provider.NewAccessResponse(ctx, accessReq)
 	if err != nil {
 		c.provider.WriteAccessError(ctx, w, accessReq, err)
@@ -186,6 +187,43 @@ func (c *OIDCController) refreshRolesClaim(ctx context.Context, accessReq fosite
 	// non-nil claims map to avoid introducing a nil-map panic.
 	if sess.DefaultSession != nil && sess.DefaultSession.Claims != nil && sess.DefaultSession.Claims.Extra != nil {
 		sess.DefaultSession.Claims.Extra["roles"] = roles
+	}
+}
+
+// applyServiceClaims stamps the service identity onto a client_credentials
+// access token. fosite's client_credentials handler grants the requested scopes
+// (they land in the JWT "scope" claim automatically) but never sets a subject —
+// there is no user. We set sub = client_id so the token names the calling
+// service, and copy the active "kid" into the JWT header so resource servers can
+// resolve the signing key (EmptySession carries no kid). No-op for every other
+// grant, whose session already holds an authenticated subject + kid.
+func (c *OIDCController) applyServiceClaims(_ context.Context, accessReq fosite.AccessRequester) {
+	if !accessReq.GetGrantTypes().ExactOne("client_credentials") {
+		return
+	}
+	// fosite's client_credentials handler validates the requested scopes against
+	// the client's allowlist but does NOT itself grant them, so the access token
+	// would carry an empty "scope" claim. Grant the (already validated) requested
+	// scopes here so resource servers can authorize on them (e.g. asset:sign).
+	for _, sc := range accessReq.GetRequestedScopes() {
+		accessReq.GrantScope(sc)
+	}
+	sess, ok := accessReq.GetSession().(*oidc.Session)
+	if !ok {
+		return
+	}
+	clientID := accessReq.GetClient().GetID()
+	if sess.JWTClaims != nil {
+		sess.JWTClaims.Subject = clientID
+	}
+	if sess.DefaultSession != nil {
+		sess.DefaultSession.Subject = clientID
+	}
+	if sess.JWTHeader != nil {
+		if sess.JWTHeader.Extra == nil {
+			sess.JWTHeader.Extra = map[string]interface{}{}
+		}
+		sess.JWTHeader.Extra["kid"] = c.keys.ActiveKID()
 	}
 }
 

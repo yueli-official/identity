@@ -21,6 +21,7 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/gogf/gf/v2/os/gctx"
+	"golang.org/x/crypto/bcrypt"
 
 	"platform/gokit/ghttpx"
 	"platform/services/identity/internal/controller"
@@ -43,6 +44,13 @@ const (
 	demoEmail    = "demo@example.com"
 	demoPassword = "demo-password-123"
 	demoClientID = "demo-web" // a sample consumer-site OIDC client (for SSO testing)
+
+	// Confidential service client for the resource site's AssetClient: mints a
+	// client_credentials service token (scope asset:sign) so the resource service
+	// can sign GET URLs for login-gated downloads (resource-site M2). The secret
+	// must match resource's config (resource.assetService.serviceToken.clientSecret).
+	demoResourceSvcID     = "resource-svc"
+	demoResourceSvcSecret = "demo-resource-svc-secret-0123456789"
 )
 
 func main() {
@@ -84,6 +92,18 @@ func main() {
 		GrantTypes:    []string{"authorization_code", "refresh_token"},
 		ResponseTypes: []string{"code"},
 		Scopes:        []string{"openid", "profile", "email", "roles", "offline_access"},
+	})
+	// Confidential service client (client_credentials) for the resource site's
+	// AssetClient → mints a service token scoped `asset:sign` to sign GET URLs for
+	// login-gated downloads (resource-site M2). Secret is bcrypt-hashed; fosite
+	// validates the presented secret against it on the token endpoint.
+	svcSecretHash, _ := bcrypt.GenerateFromPassword([]byte(demoResourceSvcSecret), bcrypt.DefaultCost)
+	store.SetClient(model.OIDCClient{
+		ID:         demoResourceSvcID,
+		Public:     false,
+		SecretHash: string(svcSecretHash),
+		GrantTypes: []string{"client_credentials"},
+		Scopes:     []string{"asset:sign"},
 	})
 
 	authCtl := controller.New(svc, false) // insecure cookie: round-trips over plain HTTP

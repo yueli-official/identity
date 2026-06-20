@@ -18,6 +18,7 @@ import (
 	jose "github.com/go-jose/go-jose/v3"
 	josejwt "github.com/go-jose/go-jose/v3/jwt"
 	"github.com/gogf/gf/v2/frame/g"
+	"golang.org/x/crypto/bcrypt"
 
 	"platform/services/identity/internal/controller"
 	"platform/services/identity/internal/logic"
@@ -289,6 +290,101 @@ func assertValidTokenResponse(t *testing.T, status int, body []byte, ts tokenSet
 	if n := strings.Count(ts.AccessToken, "."); n != 2 {
 		t.Fatalf("token: access_token not a JWT (want 2 dots, got %d)", n)
 	}
+}
+
+// TestOIDCClientCredentialsServiceToken is the resource-site-M2 acceptance test
+// for the service-token chain's first link: a confidential client mints a
+// client_credentials access token carrying its requested scope, so a sibling
+// service (e.g. the resource site) can authorize on it (asset:sign). It guards a
+// fosite v0.49 sharp edge — ClientCredentialsGrantHandler VALIDATES the
+// requested scopes against the client's allowlist but does NOT grant them, so
+// the controller must GrantScope itself (applyServiceClaims); otherwise the
+// token ships an empty "scope" claim and every downstream scope check fails.
+func TestOIDCClientCredentialsServiceToken(t *testing.T) {
+	env := setupE2E(t, "demo-cc")
+
+	// Seed a confidential service client: bcrypt secret, client_credentials only,
+	// allowed scope asset:sign.
+	const secret = "svc-secret-0123456789"
+	hash, err := bcrypt.GenerateFromPassword([]byte(secret), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("hash secret: %v", err)
+	}
+	env.repo.SetClient(model.OIDCClient{
+		ID:         "svc-test",
+		Public:     false,
+		SecretHash: string(hash),
+		GrantTypes: []string{"client_credentials"},
+		Scopes:     []string{"asset:sign"},
+	})
+
+	// Happy path: client_secret_post → 200, sub = client, scope granted, kid set.
+	status, body, ts := postToken(t, env, url.Values{
+		"grant_type":    {"client_credentials"},
+		"client_id":     {"svc-test"},
+		"client_secret": {secret},
+		"scope":         {"asset:sign"},
+	})
+	if status != http.StatusOK {
+		t.Fatalf("cc grant: want 200, got %d: %s", status, body)
+	}
+	if n := strings.Count(ts.AccessToken, "."); n != 2 {
+		t.Fatalf("cc grant: access_token not a JWT: %s", body)
+	}
+	sub, scope, kid := decodeJWTClaims(t, ts.AccessToken)
+	if sub != "svc-test" {
+		t.Fatalf("cc grant: sub = %q, want svc-test", sub)
+	}
+	if scope != "asset:sign" {
+		t.Fatalf("cc grant: scope = %q, want asset:sign (fosite does not GrantScope itself)", scope)
+	}
+	if kid == "" {
+		t.Fatalf("cc grant: missing kid header → resource servers cannot resolve the signing key")
+	}
+
+	// Wrong secret → invalid_client, no token (confidential auth enforced).
+	badStatus, badBody, badTs := postToken(t, env, url.Values{
+		"grant_type":    {"client_credentials"},
+		"client_id":     {"svc-test"},
+		"client_secret": {"WRONG"},
+		"scope":         {"asset:sign"},
+	})
+	if badStatus == http.StatusOK || badTs.AccessToken != "" {
+		t.Fatalf("cc grant with bad secret: expected failure, got %d: %s", badStatus, badBody)
+	}
+	if !strings.Contains(string(badBody), "invalid_client") {
+		t.Fatalf("cc grant with bad secret: want invalid_client, got: %s", badBody)
+	}
+}
+
+// decodeJWTClaims splits a compact JWT and returns its sub + scope claims and the
+// kid header (no signature check — claim presence is what this test asserts).
+func decodeJWTClaims(t *testing.T, token string) (sub, scope, kid string) {
+	t.Helper()
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		t.Fatalf("decodeJWTClaims: not a compact JWT")
+	}
+	var hdr struct {
+		Kid string `json:"kid"`
+	}
+	var claims struct {
+		Sub   string `json:"sub"`
+		Scope string `json:"scope"`
+	}
+	for _, d := range []struct {
+		seg string
+		dst any
+	}{{parts[0], &hdr}, {parts[1], &claims}} {
+		raw, err := base64.RawURLEncoding.DecodeString(d.seg)
+		if err != nil {
+			t.Fatalf("decodeJWTClaims: base64: %v", err)
+		}
+		if err := json.Unmarshal(raw, d.dst); err != nil {
+			t.Fatalf("decodeJWTClaims: json: %v", err)
+		}
+	}
+	return claims.Sub, claims.Scope, hdr.Kid
 }
 
 // TestOIDCFlow is the milestone-③ acceptance test: hermetic end-to-end

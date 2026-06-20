@@ -52,10 +52,17 @@ func (s *Store) SetClientAssertionJWT(ctx context.Context, jti string, exp time.
 }
 
 func toFositeClient(c model.OIDCClient) *fosite.DefaultClient {
+	// Confidential clients (e.g. a service using client_credentials) carry a
+	// bcrypt secret hash; fosite compares the presented secret against it with
+	// the default BCrypt hasher. Public clients (PKCE) keep Secret nil.
+	var secret []byte
+	if !c.Public && c.SecretHash != "" {
+		secret = []byte(c.SecretHash)
+	}
 	return &fosite.DefaultClient{
 		ID:            c.ID,
 		Public:        c.Public,
-		Secret:        nil,
+		Secret:        secret,
 		RedirectURIs:  c.RedirectURIs,
 		GrantTypes:    c.GrantTypes,
 		ResponseTypes: c.ResponseTypes,
