@@ -35,7 +35,10 @@ async function onSubmit(e: FormSubmitEvent<Schema>) {
   try {
     await call('/api/v1/auth/login', { method: 'POST', body: e.data })
     await refresh()
-    await navigateTo(safeReturnTo(route.query.return_to as string))
+    // external: full-page nav so a return_to like /oauth2/authorize hits the
+    // dev proxy → identity, instead of Nuxt's client router (which 404s — there
+    // is no /oauth2/authorize page in this app).
+    await navigateTo(safeReturnTo(route.query.return_to as string), { external: true })
   } catch (err: any) {
     error.value = err?.data?.message || '登录失败,请重试'
   } finally {
