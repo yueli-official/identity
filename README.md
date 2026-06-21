@@ -18,10 +18,11 @@ throttle counters live exclusively in Redis (no PG writes on hot paths).
 | `TEST_PG_LINK`        | Integration tests only | Same format as `IDENTITY_PG_LINK`, test DB             |
 | `TEST_REDIS_ADDR`     | Integration tests only | Redis address for integration tests                    |
 
-GoFrame reads runtime secrets via its `GF_*` env-var override convention:
+The DB connection is structured fields in `manifest/config/config.yaml`
+(host/port/user/pass/name; GoFrame's pgsql driver ignores `link` — see flightdeck
+local-dev-gotchas §6). Redis address is still supplied via the `GF_*` override:
 
 ```sh
-export GF_DATABASE_DEFAULT_LINK="$IDENTITY_PG_LINK"
 export GF_REDIS_DEFAULT_ADDRESS="$IDENTITY_REDIS_ADDR"
 ```
 
