@@ -3,16 +3,15 @@ package dao
 import (
 	"context"
 
-	"github.com/lib/pq"
-
 	"platform/services/identity/internal/model"
 	"platform/services/identity/internal/repo"
 )
 
-// GetClient loads a registered OIDC client from oidc_clients.
-// The text[] columns (redirect_uris, grant_types, response_types, scopes) are
-// decoded with pq.Array because gdb.Scan does not automatically convert a
-// PostgreSQL text[] column into []string.
+// GetClient loads a registered OIDC client from oidc_clients. gdb's pgsql driver
+// already decodes the text[] columns (redirect_uris, grant_types, response_types,
+// scopes) into []string, so they are read directly via gvar's .Strings(). The
+// earlier pq.Array path double-decoded and failed on current drivers with
+// "cannot convert []string to pq.StringArray", which made every client load fail.
 func (p *PG) GetClient(ctx context.Context, id string) (model.OIDCClient, error) {
 	row, err := p.db.GetOne(ctx,
 		"SELECT id, public, secret_hash, redirect_uris, grant_types, response_types, scopes FROM oidc_clients WHERE id = $1",
@@ -25,36 +24,14 @@ func (p *PG) GetClient(ctx context.Context, id string) (model.OIDCClient, error)
 		return model.OIDCClient{}, repo.ErrClientNotFound
 	}
 
-	var redirectURIs, grantTypes, responseTypes, scopes pq.StringArray
-	if v, ok := row["redirect_uris"]; ok && v != nil {
-		if err := pq.Array(&redirectURIs).Scan(v.Val()); err != nil {
-			return model.OIDCClient{}, err
-		}
-	}
-	if v, ok := row["grant_types"]; ok && v != nil {
-		if err := pq.Array(&grantTypes).Scan(v.Val()); err != nil {
-			return model.OIDCClient{}, err
-		}
-	}
-	if v, ok := row["response_types"]; ok && v != nil {
-		if err := pq.Array(&responseTypes).Scan(v.Val()); err != nil {
-			return model.OIDCClient{}, err
-		}
-	}
-	if v, ok := row["scopes"]; ok && v != nil {
-		if err := pq.Array(&scopes).Scan(v.Val()); err != nil {
-			return model.OIDCClient{}, err
-		}
-	}
-
 	return model.OIDCClient{
 		ID:            row["id"].String(),
 		Public:        row["public"].Bool(),
 		SecretHash:    row["secret_hash"].String(),
-		RedirectURIs:  []string(redirectURIs),
-		GrantTypes:    []string(grantTypes),
-		ResponseTypes: []string(responseTypes),
-		Scopes:        []string(scopes),
+		RedirectURIs:  row["redirect_uris"].Strings(),
+		GrantTypes:    row["grant_types"].Strings(),
+		ResponseTypes: row["response_types"].Strings(),
+		Scopes:        row["scopes"].Strings(),
 	}, nil
 }
 
