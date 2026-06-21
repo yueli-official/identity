@@ -115,6 +115,14 @@ func main() {
 		RefreshTTL:   refreshTTL,
 	}, mgr.KeyGetter)
 	oidcCtl := controller.NewOIDC(provider, mgr, svc, issuer, loginURL)
+	// Allow-list the consumer-site origins a post_logout_redirect_uri may bounce
+	// back to (RP-initiated logout / end_session). Configurable via
+	// oidc.postLogoutOrigins; falls back to the dev consumer origins.
+	postLogoutOrigins := g.Cfg().MustGet(ctx, "oidc.postLogoutOrigins").Strings()
+	if len(postLogoutOrigins) == 0 {
+		postLogoutOrigins = []string{"http://localhost:3000", "http://localhost:3001", "http://localhost:3002"}
+	}
+	oidcCtl.SetPostLogoutRedirects(postLogoutOrigins)
 
 	// ── Google OAuth login ──────────────────────────────────────────────────
 	// Provider stays nil when credentials are unconfigured; the controller then
