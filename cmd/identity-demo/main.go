@@ -74,6 +74,11 @@ func main() {
 		// Demo convenience: pre-verify the seeded account so the UI isn't gated
 		// behind an email link that the dev mailer only prints to this log.
 		_ = store.SetEmailVerified(ctx, id.ID, true)
+		// Dev convenience: grant the demo account the admin role so the local stack
+		// exercises the blog superadmin path end-to-end without manual setup.
+		if err := svc.GrantRole(ctx, id.ID, logic.AdminRole); err != nil {
+			g.Log().Warningf(ctx, "seed demo admin role: %v", err)
+		}
 	}
 	store.SetClient(model.OIDCClient{
 		ID:            demoClientID,
