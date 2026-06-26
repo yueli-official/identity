@@ -4,6 +4,7 @@ package dao
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
 	"github.com/gogf/gf/v2/database/gdb"
@@ -116,13 +117,41 @@ func (p *PG) GetProfile(ctx context.Context, identityID string) (model.Profile, 
 }
 
 // UpdateProfile replaces the editable display fields of an identity's profile.
+// social_links is stored as a JSONB document (marshalled here so the column gets
+// valid JSON text rather than a Postgres array literal).
 func (p *PG) UpdateProfile(ctx context.Context, identityID string, in repo.ProfileUpdate) error {
+	links := in.SocialLinks
+	if links == nil {
+		links = []model.SocialLink{}
+	}
+	linksJSON, err := json.Marshal(links)
+	if err != nil {
+		return err
+	}
 	res, err := p.db.Model("user_profiles").Ctx(ctx).Where("identity_id", identityID).Data(g.Map{
 		"username":     in.Username,
 		"display_name": in.DisplayName,
 		"avatar_url":   in.AvatarURL,
+		"cover_url":    in.CoverURL,
+		"bio":          in.Bio,
+		"social_links": string(linksJSON),
 		"locale":       in.Locale,
 	}).Update()
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return repo.ErrIdentityMissing
+	}
+	return nil
+}
+
+// SetProfileImage updates a single image column (avatar_url or cover_url) of a
+// profile without touching the other editable fields — used by the avatar/cover
+// upload proxy, which commits the image immediately after a successful upload.
+func (p *PG) SetProfileImage(ctx context.Context, identityID, column, url string) error {
+	res, err := p.db.Model("user_profiles").Ctx(ctx).Where("identity_id", identityID).
+		Data(g.Map{column: url}).Update()
 	if err != nil {
 		return err
 	}

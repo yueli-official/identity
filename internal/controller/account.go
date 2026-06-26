@@ -18,13 +18,17 @@ func (c *Controller) UpdateProfile(ctx context.Context, req *v1.UpdateProfileReq
 		return nil, err
 	}
 	p, err := c.svc.UpdateProfile(ctx, id.ID, logic.ProfileUpdate{
-		DisplayName: req.DisplayName, Username: req.Username, AvatarURL: req.AvatarURL, Locale: req.Locale,
+		DisplayName: req.DisplayName, Username: req.Username, AvatarURL: req.AvatarURL,
+		CoverURL: req.CoverURL, Bio: req.Bio, SocialLinks: socialFromDTO(req.SocialLinks),
+		Locale: req.Locale,
 	})
 	if err != nil {
 		return nil, err
 	}
 	return &v1.UpdateProfileRes{
-		DisplayName: p.DisplayName, Username: p.Username, AvatarURL: p.AvatarURL, Locale: p.Locale,
+		DisplayName: p.DisplayName, Username: p.Username, AvatarURL: p.AvatarURL,
+		CoverURL: p.CoverURL, Bio: p.Bio, SocialLinks: socialToDTO(p.SocialLinks),
+		Locale: p.Locale,
 	}, nil
 }
 

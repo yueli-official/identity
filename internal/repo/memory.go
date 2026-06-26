@@ -394,7 +394,28 @@ func (m *Memory) UpdateProfile(_ context.Context, identityID string, in ProfileU
 	p.DisplayName = in.DisplayName
 	p.Username = in.Username
 	p.AvatarURL = in.AvatarURL
+	p.CoverURL = in.CoverURL
+	p.Bio = in.Bio
+	p.SocialLinks = in.SocialLinks
 	p.Locale = in.Locale
+	m.profiles[identityID] = p
+	return nil
+}
+
+// SetProfileImage updates a single image column ("avatar_url" | "cover_url").
+func (m *Memory) SetProfileImage(_ context.Context, identityID, column, url string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	p, ok := m.profiles[identityID]
+	if !ok {
+		return ErrIdentityMissing
+	}
+	switch column {
+	case "avatar_url":
+		p.AvatarURL = url
+	case "cover_url":
+		p.CoverURL = url
+	}
 	m.profiles[identityID] = p
 	return nil
 }

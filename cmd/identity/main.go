@@ -15,6 +15,7 @@ import (
 	_ "github.com/gogf/gf/contrib/nosql/redis/v2"
 
 	"platform/gokit/ghttpx"
+	"platform/services/identity/internal/assetclient"
 	"platform/services/identity/internal/cache"
 	"platform/services/identity/internal/controller"
 	"platform/services/identity/internal/dao"
@@ -37,6 +38,7 @@ func main() {
 	}
 	secureCookie := g.Cfg().MustGet(ctx, "cookie.secure", true).Bool()
 	accountBaseURL := g.Cfg().MustGet(ctx, "account.baseUrl", "http://localhost:3000").String()
+	assetBaseURL := g.Cfg().MustGet(ctx, "asset.baseUrl", "http://localhost:8082").String()
 
 	// ── Data layer ──────────────────────────────────────────────────────────
 	daoPG := dao.NewPG(g.DB())
@@ -136,6 +138,10 @@ func main() {
 	}
 	oauthCtl := controller.NewOAuth(svc, googleProvider, secureCookie, []byte(globalSecret), loginURL)
 
+	// Avatar/cover upload proxy: the IdP drives the asset upload server-side on
+	// behalf of the cookie-authenticated caller (mints a short-lived user token).
+	avatarCtl := controller.NewAvatar(svc, mgr, assetclient.New(assetBaseURL), issuer)
+
 	// ── Routing ─────────────────────────────────────────────────────────────
 	s := g.Server()
 
@@ -149,6 +155,7 @@ func main() {
 		grp.Middleware(ghttpx.Middleware)
 		grp.GET("/healthz", controller.Healthz)
 		grp.Bind(authCtl)
+		grp.Bind(avatarCtl)
 	})
 
 	// OIDC standard endpoints: raw RFC responses — NO envelope middleware.

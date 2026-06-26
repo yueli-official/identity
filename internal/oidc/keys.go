@@ -9,8 +9,10 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"time"
 
 	jose "github.com/go-jose/go-jose/v3"
+	"github.com/go-jose/go-jose/v3/jwt"
 	"github.com/google/uuid"
 
 	"platform/services/identity/internal/model"
@@ -99,6 +101,34 @@ func (m *Manager) JWKS() jose.JSONWebKeySet { return m.jwks }
 
 // KeyGetter is fosite's key getter: returns the active private key.
 func (m *Manager) KeyGetter(context.Context) (interface{}, error) { return m.activeKey, nil }
+
+// MintServiceToken self-signs a short-lived RS256 access token (kid in JWKS) for
+// the given subject. Used for first-party server-to-server calls where the IdP
+// acts on behalf of a logged-in user (e.g. proxying an avatar upload to the
+// asset service): the user authenticates to the IdP by session cookie, and the
+// IdP mints a user-scoped bearer the resource server verifies via JWKS. scope is
+// space-delimited (may be empty).
+func (m *Manager) MintServiceToken(issuer, subject, scope string, ttl time.Duration, now time.Time) (string, error) {
+	sig, err := jose.NewSigner(
+		jose.SigningKey{Algorithm: jose.RS256, Key: m.activeKey},
+		(&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", m.activeKID),
+	)
+	if err != nil {
+		return "", err
+	}
+	claims := jwt.Claims{
+		Issuer:    issuer,
+		Subject:   subject,
+		IssuedAt:  jwt.NewNumericDate(now),
+		NotBefore: jwt.NewNumericDate(now),
+		Expiry:    jwt.NewNumericDate(now.Add(ttl)),
+	}
+	builder := jwt.Signed(sig).Claims(claims)
+	if scope != "" {
+		builder = builder.Claims(map[string]interface{}{"scope": scope})
+	}
+	return builder.CompactSerialize()
+}
 
 func parseRSAPrivate(pemStr string) (*rsa.PrivateKey, error) {
 	block, _ := pem.Decode([]byte(pemStr))

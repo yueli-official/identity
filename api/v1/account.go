@@ -4,19 +4,31 @@ import "github.com/gogf/gf/v2/frame/g"
 
 // ── Profile edit (account self-management) ──────────────────────────────────
 
+// SocialLinkDTO is one labelled external link on a profile.
+type SocialLinkDTO struct {
+	Label string `json:"label"`
+	URL   string `json:"url"`
+}
+
 type UpdateProfileReq struct {
 	g.Meta      `path:"/api/v1/session/profile" method:"put" tags:"account" summary:"Update own profile"`
-	DisplayName string `json:"displayName" v:"required#display name required"`
-	Username    string `json:"username"`
-	AvatarURL   string `json:"avatarUrl"`
-	Locale      string `json:"locale"`
+	DisplayName string          `json:"displayName" v:"required#display name required"`
+	Username    string          `json:"username"`
+	AvatarURL   string          `json:"avatarUrl"`
+	CoverURL    string          `json:"coverUrl"`
+	Bio         string          `json:"bio"`
+	SocialLinks []SocialLinkDTO `json:"socialLinks"`
+	Locale      string          `json:"locale"`
 }
 
 type UpdateProfileRes struct {
-	DisplayName string `json:"displayName"`
-	Username    string `json:"username"`
-	AvatarURL   string `json:"avatarUrl"`
-	Locale      string `json:"locale"`
+	DisplayName string          `json:"displayName"`
+	Username    string          `json:"username"`
+	AvatarURL   string          `json:"avatarUrl"`
+	CoverURL    string          `json:"coverUrl"`
+	Bio         string          `json:"bio"`
+	SocialLinks []SocialLinkDTO `json:"socialLinks"`
+	Locale      string          `json:"locale"`
 }
 
 // ── Change password (authenticated; not the token-based reset) ──────────────
