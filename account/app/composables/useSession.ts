@@ -13,6 +13,7 @@ export interface Me {
   coverUrl: string
   bio: string
   socialLinks: SocialLink[]
+  roles: string[]
 }
 
 export function useSession() {
@@ -27,5 +28,7 @@ export function useSession() {
     await call('/api/v1/auth/logout', { method: 'POST' })
     me.value = null
   }
-  return { me, refresh, logout }
+  // 站群超级管理员:identity 全局 admin 角色(网关/控制台用)。
+  const isAdmin = computed(() => me.value?.roles?.includes('admin') ?? false)
+  return { me, refresh, logout, isAdmin }
 }
