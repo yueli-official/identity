@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
 
-const { me, logout } = useSession()
+const { me, logout, isAdmin } = useSession()
 
 const initial = computed(() =>
   (me.value?.displayName || me.value?.email || '?').charAt(0).toUpperCase()
@@ -11,6 +11,8 @@ const userItems = computed<DropdownMenuItem[][]>(() => [
   [{ label: me.value?.displayName || me.value?.email || '', type: 'label' }],
   [
     { label: '账户中心', icon: 'i-tabler-user-circle', to: '/' },
+    // 仅站群超级管理员可见:进入用户管理控制台。
+    ...(isAdmin.value ? [{ label: '管理控制台', icon: 'i-tabler-shield-cog', to: '/admin/users' }] : []),
     {
       label: '退出登录',
       icon: 'i-tabler-logout',
