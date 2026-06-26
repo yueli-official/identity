@@ -1,3 +1,8 @@
+export interface SocialLink {
+  label: string
+  url: string
+}
+
 export interface Me {
   id: string
   email: string
@@ -5,6 +10,9 @@ export interface Me {
   displayName: string
   username: string
   avatarUrl: string
+  coverUrl: string
+  bio: string
+  socialLinks: SocialLink[]
 }
 
 export function useSession() {
