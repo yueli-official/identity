@@ -56,9 +56,9 @@ type IdentityRepo interface {
 	// UpdateProfile replaces the user-editable display fields of an identity's
 	// profile. Returns ErrIdentityMissing if the profile row does not exist.
 	UpdateProfile(ctx context.Context, identityID string, in ProfileUpdate) error
-	// SetProfileImage updates a single image column ("avatar_url" | "cover_url")
-	// without touching the other editable fields. ErrIdentityMissing if absent.
-	SetProfileImage(ctx context.Context, identityID, column, url string) error
+	// SetProfileImage updates one image's url + asset-id columns (kind "avatar" |
+	// "cover") without touching the other editable fields. ErrIdentityMissing if absent.
+	SetProfileImage(ctx context.Context, identityID, kind, url, assetID string) error
 	// SetEmailVerified flips the identity's email_verified flag.
 	SetEmailVerified(ctx context.Context, identityID string, verified bool) error
 	// UpdatePasswordHash replaces the identity's stored bcrypt password hash.

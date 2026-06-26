@@ -402,19 +402,20 @@ func (m *Memory) UpdateProfile(_ context.Context, identityID string, in ProfileU
 	return nil
 }
 
-// SetProfileImage updates a single image column ("avatar_url" | "cover_url").
-func (m *Memory) SetProfileImage(_ context.Context, identityID, column, url string) error {
+// SetProfileImage updates one image's url + asset-id (kind "avatar" | "cover").
+func (m *Memory) SetProfileImage(_ context.Context, identityID, kind, url, assetID string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	p, ok := m.profiles[identityID]
 	if !ok {
 		return ErrIdentityMissing
 	}
-	switch column {
-	case "avatar_url":
-		p.AvatarURL = url
-	case "cover_url":
+	if kind == "cover" {
 		p.CoverURL = url
+		p.CoverAssetID = assetID
+	} else {
+		p.AvatarURL = url
+		p.AvatarAssetID = assetID
 	}
 	m.profiles[identityID] = p
 	return nil

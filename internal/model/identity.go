@@ -35,6 +35,9 @@ type Profile struct {
 	Bio         string       `orm:"bio"`
 	SocialLinks []SocialLink `orm:"social_links"`
 	Locale      string       `orm:"locale"`
+	// asset ids behind avatar_url / cover_url, so a replacement can delete the old.
+	AvatarAssetID string `orm:"avatar_asset_id"`
+	CoverAssetID  string `orm:"cover_asset_id"`
 }
 
 // Session is an IdP self-hosted login session (Redis-backed).

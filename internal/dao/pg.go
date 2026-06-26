@@ -146,12 +146,16 @@ func (p *PG) UpdateProfile(ctx context.Context, identityID string, in repo.Profi
 	return nil
 }
 
-// SetProfileImage updates a single image column (avatar_url or cover_url) of a
-// profile without touching the other editable fields — used by the avatar/cover
+// SetProfileImage updates one image's url + asset-id columns (kind "avatar" |
+// "cover") without touching the other editable fields — used by the avatar/cover
 // upload proxy, which commits the image immediately after a successful upload.
-func (p *PG) SetProfileImage(ctx context.Context, identityID, column, url string) error {
+func (p *PG) SetProfileImage(ctx context.Context, identityID, kind, url, assetID string) error {
+	urlCol, idCol := "avatar_url", "avatar_asset_id"
+	if kind == "cover" {
+		urlCol, idCol = "cover_url", "cover_asset_id"
+	}
 	res, err := p.db.Model("user_profiles").Ctx(ctx).Where("identity_id", identityID).
-		Data(g.Map{column: url}).Update()
+		Data(g.Map{urlCol: url, idCol: assetID}).Update()
 	if err != nil {
 		return err
 	}

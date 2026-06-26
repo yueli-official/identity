@@ -81,6 +81,14 @@ func (c *AvatarController) upload(ctx context.Context, kind string, file *ghttp.
 		return "", iderr.InvalidProfile("cannot read upload")
 	}
 
+	// Old asset behind this image (if any) — deleted after the replacement lands
+	// so each user keeps exactly one avatar + one cover, no orphaned blobs.
+	prev, _ := c.svc.GetProfile(ctx, id.ID)
+	oldAssetID := prev.AvatarAssetID
+	if kind == "cover" {
+		oldAssetID = prev.CoverAssetID
+	}
+
 	bearer, err := c.mgr.MintServiceToken(c.issuer, id.ID, "", serviceTokenTTL, time.Now())
 	if err != nil {
 		return "", err
@@ -92,8 +100,12 @@ func (c *AvatarController) upload(ctx context.Context, kind string, file *ghttp.
 	if err != nil {
 		return "", err
 	}
-	if err := c.svc.SetProfileImage(ctx, id.ID, kind, view.CdnURL); err != nil {
+	if err := c.svc.SetProfileImage(ctx, id.ID, kind, view.CdnURL, view.ID); err != nil {
 		return "", err
+	}
+	// Best-effort: drop the replaced asset (skip when dedup returned the same id).
+	if oldAssetID != "" && oldAssetID != view.ID {
+		_ = c.asset.Delete(ctx, bearer, oldAssetID)
 	}
 	return view.CdnURL, nil
 }

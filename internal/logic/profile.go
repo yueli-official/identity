@@ -51,13 +51,10 @@ func (s *Service) UpdateProfile(ctx context.Context, identityID string, in Profi
 }
 
 // SetProfileImage commits a single uploaded image (avatar or cover) to the
-// caller's profile. kind is "avatar" or "cover".
-func (s *Service) SetProfileImage(ctx context.Context, identityID, kind, url string) error {
-	column := "avatar_url"
-	if kind == "cover" {
-		column = "cover_url"
-	}
-	if err := s.store.SetProfileImage(ctx, identityID, column, url); err != nil {
+// caller's profile, recording both its public url and asset id. kind is
+// "avatar" or "cover".
+func (s *Service) SetProfileImage(ctx context.Context, identityID, kind, url, assetID string) error {
+	if err := s.store.SetProfileImage(ctx, identityID, kind, url, assetID); err != nil {
 		return err
 	}
 	s.audit(ctx, AuditEvent{Event: EvProfileUpdated, ActorID: identityID, TargetID: identityID})

@@ -97,6 +97,22 @@ func (c *Client) putBlob(ctx context.Context, uploadURL, mime string, data []byt
 	return nil
 }
 
+// Delete removes an asset by id (owner-scoped via the bearer). Best-effort:
+// used to drop the previous avatar/cover when a new one replaces it.
+func (c *Client) Delete(ctx context.Context, bearer, assetID string) error {
+	cli := g.Client()
+	cli.SetHeader("Authorization", "Bearer "+bearer)
+	resp, err := cli.Delete(ctx, c.base+"/api/v1/assets/"+assetID)
+	if err != nil {
+		return fmt.Errorf("asset service unreachable: %w", err)
+	}
+	defer resp.Close()
+	if code := gjson.New(resp.ReadAllString()).Get("code").String(); code != "ok" {
+		return fmt.Errorf("asset delete failed: %s", code)
+	}
+	return nil
+}
+
 // Upload runs the full init → PUT → finalize cycle and returns the public asset
 // view. bearer is the user-scoped token minted by the IdP.
 func (c *Client) Upload(ctx context.Context, bearer string, in InitInput, data []byte) (View, error) {
