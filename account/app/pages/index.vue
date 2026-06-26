@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
+import { SOCIAL_PLATFORMS, socialPlatform } from '@platform/ui/social'
 import type { SocialLink } from '~/composables/useSession'
 
 definePageMeta({ middleware: 'auth' })
@@ -28,8 +29,8 @@ async function onResendVerification() {
 }
 
 // ── Profile edit ────────────────────────────────────────────────────────────
-// avatar/cover are committed immediately by their crop uploaders (the IdP proxy
-// stores them on save); the form below saves the text fields + social links.
+// avatar/cover are committed immediately by their crop uploaders; the form below
+// saves the text fields + social links.
 const profileSchema = z.object({
   displayName: z.string().min(1, '请输入昵称'),
   username: z.string().max(50, '用户名最多 50 字').optional(),
@@ -38,10 +39,15 @@ const profileSchema = z.object({
 })
 type ProfileSchema = z.output<typeof profileSchema>
 const profileState = reactive<ProfileSchema>({ displayName: '', username: '', bio: '', locale: '' })
-// avatar/cover live outside the validated form (managed by the crop uploaders).
 const avatarUrl = ref('')
 const coverUrl = ref('')
-const socialLinks = ref<SocialLink[]>([])
+
+// social links: edited as {platform-key, url} rows; persisted as {label, url}.
+const platformItems = SOCIAL_PLATFORMS.map(p => ({ label: p.label, value: p.key, icon: p.icon }))
+const plat = (key: string) => SOCIAL_PLATFORMS.find(p => p.key === key) ?? SOCIAL_PLATFORMS[SOCIAL_PLATFORMS.length - 1]!
+interface SocialRow { key: string, url: string }
+const socialRows = ref<SocialRow[]>([])
+
 watchEffect(() => {
   if (!me.value) return
   profileState.displayName = me.value.displayName
@@ -49,19 +55,25 @@ watchEffect(() => {
   profileState.bio = me.value.bio
   avatarUrl.value = me.value.avatarUrl
   coverUrl.value = me.value.coverUrl
-  socialLinks.value = me.value.socialLinks?.length ? me.value.socialLinks.map(l => ({ ...l })) : []
+  socialRows.value = (me.value.socialLinks ?? []).map(l => ({ key: socialPlatform(l).key, url: l.url }))
 })
-function addLink() { socialLinks.value.push({ label: '', url: '' }) }
-function removeLink(i: number) { socialLinks.value.splice(i, 1) }
+
+function addLink() {
+  const used = new Set(socialRows.value.map(r => r.key))
+  const next = SOCIAL_PLATFORMS.find(p => !used.has(p.key)) ?? SOCIAL_PLATFORMS[0]!
+  socialRows.value.push({ key: next.key, url: '' })
+}
+function removeLink(i: number) { socialRows.value.splice(i, 1) }
+
 const savingProfile = ref(false)
 async function onSaveProfile(e: FormSubmitEvent<ProfileSchema>) {
   savingProfile.value = true
   try {
+    const socialLinks: SocialLink[] = socialRows.value
+      .filter(r => r.url.trim())
+      .map(r => ({ label: plat(r.key).label, url: r.url.trim() }))
     await call('/api/v1/session/profile', { method: 'PUT', body: {
-      ...e.data,
-      avatarUrl: avatarUrl.value,
-      coverUrl: coverUrl.value,
-      socialLinks: socialLinks.value.filter(l => l.url.trim())
+      ...e.data, avatarUrl: avatarUrl.value, coverUrl: coverUrl.value, socialLinks
     } })
     await refresh()
     toast.add({ title: '资料已更新', color: 'success', icon: 'i-tabler-check' })
@@ -71,7 +83,6 @@ async function onSaveProfile(e: FormSubmitEvent<ProfileSchema>) {
     savingProfile.value = false
   }
 }
-// crop uploaders persist immediately; mirror the new URL locally + re-sync me.
 async function onAvatarUpdated(url: string) { avatarUrl.value = url; await refresh() }
 async function onCoverUpdated(url: string) { coverUrl.value = url; await refresh() }
 
@@ -130,6 +141,10 @@ interface SessionEntry {
 const { data: sessionData, refresh: refreshSessions } = await useAsyncData('sessions',
   () => call<{ entries: SessionEntry[] }>('/api/v1/session/list'))
 const sessions = computed(() => sessionData.value?.entries ?? [])
+const currentSession = computed(() => sessions.value.find(s => s.current))
+const otherSessions = computed(() => sessions.value.filter(s => !s.current))
+const showAllSessions = ref(false)
+const visibleOthers = computed(() => showAllSessions.value ? otherSessions.value : otherSessions.value.slice(0, 3))
 async function loadSessions() { await refreshSessions() }
 
 const revoking = ref<string>('')
@@ -145,9 +160,15 @@ async function onRevoke(id: string) {
     revoking.value = ''
   }
 }
+const loggingOutAll = ref(false)
 async function onLogoutAll() {
-  await call('/api/v1/auth/logout-all', { method: 'POST' })
-  await navigateTo('/login')
+  loggingOutAll.value = true
+  try {
+    await call('/api/v1/auth/logout-all', { method: 'POST' })
+    await navigateTo('/login')
+  } finally {
+    loggingOutAll.value = false
+  }
 }
 async function onLogout() {
   await logout()
@@ -160,9 +181,6 @@ const { data: credData, refresh: refreshCreds } = await useAsyncData('credential
   () => call<CredRes>('/api/v1/session/credentials'))
 const hasGoogle = computed(() => (credData.value?.oauth ?? []).some(o => o.provider === 'google'))
 const bindGoogleUrl = '/api/v1/auth/oauth/google/start?intent=bind&return_to=' + encodeURIComponent('/')
-// Google is the LAST login credential when there's no password and it's the only
-// oauth link. The backend refuses to unbind it (anti-lockout) — so disable the
-// button and steer the user to set a password first, instead of failing on click.
 const isGoogleLastCredential = computed(() =>
   !credData.value?.hasPassword && (credData.value?.oauth?.length ?? 0) <= 1
 )
@@ -181,7 +199,6 @@ async function onUnbindGoogle() {
     unbinding.value = false
   }
 }
-// Surface a failed Google bind handed back via ?error on the callback redirect.
 const route = useRoute()
 onMounted(() => {
   if (route.query.error === 'oauth_bind') {
@@ -197,21 +214,35 @@ function fmt(ts: string) {
 function deviceIcon(ua: string) {
   return /mobile|android|iphone|ipad/i.test(ua) ? 'i-tabler-device-mobile' : 'i-tabler-device-desktop'
 }
+function shortUA(ua: string) {
+  if (!ua) return '未知设备'
+  const browser = /edg/i.test(ua) ? 'Edge' : /chrome/i.test(ua) ? 'Chrome' : /firefox/i.test(ua) ? 'Firefox' : /safari/i.test(ua) ? 'Safari' : '浏览器'
+  const os = /windows/i.test(ua) ? 'Windows' : /mac/i.test(ua) ? 'macOS' : /android/i.test(ua) ? 'Android' : /iphone|ipad/i.test(ua) ? 'iOS' : /linux/i.test(ua) ? 'Linux' : ''
+  return os ? `${browser} · ${os}` : browser
+}
+
+// section header helper
+const cardHeaderClass = 'flex items-center gap-2 font-semibold text-highlighted'
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="mx-auto max-w-2xl space-y-6">
     <!-- Identity header: cover banner + overlapping avatar (both crop-uploadable) -->
-    <div>
+    <section class="overflow-hidden rounded-xl ring-1 ring-default bg-default shadow-sm">
       <UserCoverCrop :model-value="coverUrl" editable @update:model-value="onCoverUpdated" />
-      <div class="-mt-12 flex items-end gap-4 px-4">
-        <UserAvatarCrop :model-value="avatarUrl" :initial="initial" editable @update:model-value="onAvatarUpdated" />
-        <div class="min-w-0 pb-1">
-          <h1 class="font-display truncate text-2xl font-semibold text-highlighted">{{ me?.displayName || '我的账户' }}</h1>
+      <div class="flex items-end gap-4 px-5 pb-5">
+        <div class="-mt-12 shrink-0 rounded-full ring-4 ring-default">
+          <UserAvatarCrop :model-value="avatarUrl" :initial="initial" editable @update:model-value="onAvatarUpdated" />
+        </div>
+        <div class="min-w-0 flex-1 pb-1">
+          <h1 class="font-display flex items-center gap-2 truncate text-xl font-semibold text-highlighted">
+            {{ me?.displayName || '我的账户' }}
+            <UBadge v-if="me?.emailVerified" color="success" variant="subtle" size="sm" icon="i-tabler-rosette-discount-check">已验证</UBadge>
+          </h1>
           <p class="truncate text-sm text-muted">{{ me?.email }}</p>
         </div>
       </div>
-    </div>
+    </section>
 
     <UAlert
       v-if="me && !me.emailVerified"
@@ -224,62 +255,68 @@ function deviceIcon(ua: string) {
     </UAlert>
 
     <!-- Profile edit -->
-    <UCard class="shadow-soft">
+    <UCard>
       <template #header>
-        <div class="flex items-center gap-2">
-          <UIcon name="i-tabler-user-edit" class="size-5 text-muted" />
-          <h2 class="font-medium text-highlighted">个人资料</h2>
-        </div>
+        <h2 :class="cardHeaderClass"><UIcon name="i-tabler-user-edit" class="size-5 text-primary" />个人资料</h2>
       </template>
       <UForm :schema="profileSchema" :state="profileState" class="space-y-4" @submit="onSaveProfile">
         <UFormField name="displayName" label="昵称">
-          <UInput v-model="profileState.displayName" class="w-full" />
+          <UInput v-model="profileState.displayName" class="w-full" placeholder="你的昵称" />
         </UFormField>
-        <UFormField name="username" label="用户名" hint="可选">
+        <UFormField name="username" label="用户名" hint="可选,用于个性化地址">
           <UInput v-model="profileState.username" class="w-full" placeholder="li" />
         </UFormField>
         <UFormField name="bio" label="简介" hint="可选">
           <UTextarea v-model="profileState.bio" :rows="3" class="w-full" placeholder="一句话介绍自己" />
         </UFormField>
-        <!-- social links -->
+
+        <!-- social links: preset platform picker + url -->
         <div>
           <div class="mb-2 flex items-center justify-between">
             <p class="text-sm font-medium text-default">社交链接</p>
-            <UButton label="添加" icon="i-tabler-plus" color="neutral" variant="soft" size="xs" @click="addLink" />
+            <UButton label="添加链接" icon="i-tabler-plus" color="neutral" variant="soft" size="xs"
+              :disabled="socialRows.length >= platformItems.length" @click="addLink" />
           </div>
-          <div v-if="!socialLinks.length" class="rounded-lg border border-dashed border-default px-3 py-4 text-center text-xs text-dimmed">还没有链接</div>
-          <div v-for="(link, i) in socialLinks" :key="i" class="mb-2 flex items-center gap-2">
-            <UInput v-model="link.label" placeholder="标签 (GitHub)" class="w-36" />
-            <UInput v-model="link.url" placeholder="https://…" class="flex-1" />
-            <UButton icon="i-tabler-trash" color="error" variant="ghost" size="sm" square aria-label="删除" @click="removeLink(i)" />
+          <div v-if="!socialRows.length" class="rounded-md border border-dashed border-default px-3 py-5 text-center text-xs text-dimmed">
+            还没有链接 —— 点「添加链接」从预设平台中选择
+          </div>
+          <div v-else class="space-y-2">
+            <div v-for="(row, i) in socialRows" :key="i" class="flex items-center gap-2">
+              <USelectMenu
+                v-model="row.key" :items="platformItems" value-key="value"
+                :icon="plat(row.key).icon" class="w-36 shrink-0" :search-input="false"
+              />
+              <UInput v-model="row.url" :placeholder="plat(row.key).placeholder" class="min-w-0 flex-1" />
+              <UButton icon="i-tabler-trash" color="error" variant="ghost" size="sm" square aria-label="删除" @click="removeLink(i)" />
+            </div>
           </div>
         </div>
-        <div class="flex items-center justify-between gap-4">
+
+        <div class="flex items-center justify-between gap-4 border-t border-default pt-4">
           <p class="text-xs text-muted">邮箱 {{ me?.email }} 不可在此修改</p>
-          <UButton type="submit" label="保存资料" :loading="savingProfile" />
+          <UButton type="submit" icon="i-tabler-device-floppy" label="保存资料" :loading="savingProfile" />
         </div>
       </UForm>
     </UCard>
 
     <!-- Security: change password (only when a password is already set) -->
-    <UCard v-if="credData?.hasPassword" class="shadow-soft">
+    <UCard v-if="credData?.hasPassword">
       <template #header>
-        <div class="flex items-center gap-2">
-          <UIcon name="i-tabler-lock" class="size-5 text-muted" />
-          <h2 class="font-medium text-highlighted">修改密码</h2>
-        </div>
+        <h2 :class="cardHeaderClass"><UIcon name="i-tabler-lock" class="size-5 text-primary" />修改密码</h2>
       </template>
       <UForm :schema="pwSchema" :state="pwState" class="space-y-4" @submit="onChangePassword">
         <UFormField name="currentPassword" label="当前密码">
           <UInput v-model="pwState.currentPassword" type="password" autocomplete="current-password" class="w-full" />
         </UFormField>
-        <UFormField name="newPassword" label="新密码" hint="至少 8 位">
-          <UInput v-model="pwState.newPassword" type="password" autocomplete="new-password" class="w-full" />
-        </UFormField>
-        <UFormField name="confirm" label="确认新密码">
-          <UInput v-model="pwState.confirm" type="password" autocomplete="new-password" class="w-full" />
-        </UFormField>
-        <div class="flex items-center justify-between gap-4">
+        <div class="grid gap-4 sm:grid-cols-2">
+          <UFormField name="newPassword" label="新密码" hint="至少 8 位">
+            <UInput v-model="pwState.newPassword" type="password" autocomplete="new-password" class="w-full" />
+          </UFormField>
+          <UFormField name="confirm" label="确认新密码">
+            <UInput v-model="pwState.confirm" type="password" autocomplete="new-password" class="w-full" />
+          </UFormField>
+        </div>
+        <div class="flex items-center justify-between gap-4 border-t border-default pt-4">
           <p class="text-xs text-muted">改密后其他设备会被强制登出</p>
           <UButton type="submit" color="neutral" label="修改密码" :loading="savingPw" />
         </div>
@@ -287,25 +324,24 @@ function deviceIcon(ua: string) {
     </UCard>
 
     <!-- Security: set an initial password (accounts without one, e.g. OAuth-only) -->
-    <UCard v-else class="shadow-soft">
+    <UCard v-else>
       <template #header>
-        <div class="flex items-center gap-2">
-          <UIcon name="i-tabler-lock-plus" class="size-5 text-muted" />
-          <h2 class="font-medium text-highlighted">设置密码</h2>
-        </div>
+        <h2 :class="cardHeaderClass"><UIcon name="i-tabler-lock-plus" class="size-5 text-primary" />设置密码</h2>
       </template>
       <UForm :schema="setPwSchema" :state="setPwState" class="space-y-4" @submit="onSetPassword">
         <UAlert
-          color="info" variant="soft" icon="i-tabler-info-circle" class="mb-1"
+          color="info" variant="soft" icon="i-tabler-info-circle"
           title="你还没有设置密码"
           description="你目前只能用第三方账号登录。设置密码后即可用邮箱 + 密码登录,也才能解绑第三方账号。"
         />
-        <UFormField name="newPassword" label="新密码" hint="至少 8 位">
-          <UInput v-model="setPwState.newPassword" type="password" autocomplete="new-password" class="w-full" />
-        </UFormField>
-        <UFormField name="confirm" label="确认密码">
-          <UInput v-model="setPwState.confirm" type="password" autocomplete="new-password" class="w-full" />
-        </UFormField>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <UFormField name="newPassword" label="新密码" hint="至少 8 位">
+            <UInput v-model="setPwState.newPassword" type="password" autocomplete="new-password" class="w-full" />
+          </UFormField>
+          <UFormField name="confirm" label="确认密码">
+            <UInput v-model="setPwState.confirm" type="password" autocomplete="new-password" class="w-full" />
+          </UFormField>
+        </div>
         <div class="flex justify-end">
           <UButton type="submit" label="设置密码" :loading="settingPw" />
         </div>
@@ -313,19 +349,18 @@ function deviceIcon(ua: string) {
     </UCard>
 
     <!-- Credentials / login methods -->
-    <UCard class="shadow-soft">
+    <UCard>
       <template #header>
-        <div class="flex items-center gap-2">
-          <UIcon name="i-tabler-key" class="size-5 text-muted" />
-          <h2 class="font-medium text-highlighted">登录方式</h2>
-        </div>
+        <h2 :class="cardHeaderClass"><UIcon name="i-tabler-key" class="size-5 text-primary" />登录方式</h2>
       </template>
       <ul class="divide-y divide-default">
-        <li class="flex items-center justify-between gap-4 py-3">
+        <li class="flex items-center justify-between gap-4 py-3 first:pt-0">
           <div class="flex items-center gap-3">
-            <UIcon name="i-tabler-lock" class="size-5 text-dimmed" />
+            <div class="grid size-9 shrink-0 place-items-center rounded-full bg-elevated">
+              <UIcon name="i-tabler-lock" class="size-4.5 text-muted" />
+            </div>
             <div>
-              <p class="text-sm text-highlighted">密码</p>
+              <p class="text-sm font-medium text-highlighted">密码</p>
               <p class="text-xs text-muted">邮箱 + 密码登录</p>
             </div>
           </div>
@@ -333,11 +368,13 @@ function deviceIcon(ua: string) {
             {{ credData?.hasPassword ? '已设置' : '未设置' }}
           </UBadge>
         </li>
-        <li class="flex items-center justify-between gap-4 py-3">
+        <li class="flex items-center justify-between gap-4 py-3 last:pb-0">
           <div class="flex items-center gap-3">
-            <UIcon name="i-tabler-brand-google" class="size-5 text-dimmed" />
+            <div class="grid size-9 shrink-0 place-items-center rounded-full bg-elevated">
+              <UIcon name="i-tabler-brand-google" class="size-4.5 text-muted" />
+            </div>
             <div>
-              <p class="text-sm text-highlighted">Google</p>
+              <p class="text-sm font-medium text-highlighted">Google</p>
               <p class="text-xs text-muted">
                 {{ hasGoogle ? '已绑定' : '未绑定' }}
                 <span v-if="hasGoogle && isGoogleLastCredential" class="text-warning">· 唯一登录方式,需先设置密码才能解绑</span>
@@ -374,46 +411,66 @@ function deviceIcon(ua: string) {
       </template>
     </UModal>
 
-    <!-- Sessions -->
-    <UCard class="shadow-soft">
+    <!-- Sessions: current device highlighted, others collapsed -->
+    <UCard>
       <template #header>
         <div class="flex items-center justify-between gap-2">
-          <div class="flex items-center gap-2">
-            <UIcon name="i-tabler-devices" class="size-5 text-muted" />
-            <h2 class="font-medium text-highlighted">登录会话</h2>
-          </div>
+          <h2 :class="cardHeaderClass"><UIcon name="i-tabler-devices" class="size-5 text-primary" />登录会话</h2>
           <UButton
+            v-if="otherSessions.length"
             color="error" variant="soft" size="xs" icon="i-tabler-logout-2"
-            label="退出所有设备" @click="onLogoutAll"
+            label="退出其他设备" :loading="loggingOutAll" @click="onLogoutAll"
           />
         </div>
       </template>
-      <ul class="divide-y divide-default">
-        <li v-for="s in sessions" :key="s.id" class="flex items-center gap-3 py-3">
-          <UIcon :name="deviceIcon(s.userAgent)" class="size-5 shrink-0 text-dimmed" />
-          <div class="min-w-0 flex-1">
-            <p class="flex items-center gap-2 text-sm text-highlighted">
-              <span class="truncate">{{ s.ip || '未知 IP' }}</span>
-              <UBadge v-if="s.current" color="primary" variant="soft" size="sm">当前设备</UBadge>
-            </p>
-            <p class="truncate text-xs text-muted">
-              {{ s.userAgent || '未知设备' }} · 最近活跃
-              <!-- toLocaleString is timezone/locale dependent → render client-only so
-                   the SSR and client markup agree (a mismatch here was eating the
-                   page's first click after a hard load / OAuth redirect). -->
-              <ClientOnly fallback="…">{{ fmt(s.lastSeen) }}</ClientOnly>
-            </p>
-          </div>
-          <UButton
-            v-if="!s.current"
-            color="neutral" variant="ghost" size="xs" icon="i-tabler-trash"
-            :loading="revoking === s.id" aria-label="退出该会话" @click="onRevoke(s.id)"
-          />
-        </li>
-      </ul>
+
+      <!-- current device -->
+      <div v-if="currentSession" class="flex items-center gap-3 rounded-md bg-primary/5 ring-1 ring-primary/15 px-3 py-3">
+        <div class="grid size-9 shrink-0 place-items-center rounded-full bg-primary/10">
+          <UIcon :name="deviceIcon(currentSession.userAgent)" class="size-4.5 text-primary" />
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="flex items-center gap-2 text-sm font-medium text-highlighted">
+            <span class="truncate">{{ shortUA(currentSession.userAgent) }}</span>
+            <UBadge color="primary" variant="soft" size="sm">当前设备</UBadge>
+          </p>
+          <p class="truncate text-xs text-muted">
+            {{ currentSession.ip || '未知 IP' }} · 最近活跃 <ClientOnly fallback="…">{{ fmt(currentSession.lastSeen) }}</ClientOnly>
+          </p>
+        </div>
+      </div>
+
+      <!-- other devices -->
+      <div v-if="otherSessions.length" class="mt-2">
+        <p class="px-1 pb-1 pt-2 text-xs font-medium text-muted">其他设备 ({{ otherSessions.length }})</p>
+        <ul class="divide-y divide-default">
+          <li v-for="s in visibleOthers" :key="s.id" class="flex items-center gap-3 py-3">
+            <div class="grid size-9 shrink-0 place-items-center rounded-full bg-elevated">
+              <UIcon :name="deviceIcon(s.userAgent)" class="size-4.5 text-muted" />
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-sm text-highlighted">{{ shortUA(s.userAgent) }}</p>
+              <p class="truncate text-xs text-muted">
+                {{ s.ip || '未知 IP' }} · <ClientOnly fallback="…">{{ fmt(s.lastSeen) }}</ClientOnly>
+              </p>
+            </div>
+            <UButton
+              color="neutral" variant="ghost" size="xs" icon="i-tabler-x" square
+              :loading="revoking === s.id" aria-label="退出该会话" @click="onRevoke(s.id)"
+            />
+          </li>
+        </ul>
+        <UButton
+          v-if="otherSessions.length > 3"
+          :label="showAllSessions ? '收起' : `显示全部 ${otherSessions.length} 个会话`"
+          :icon="showAllSessions ? 'i-tabler-chevron-up' : 'i-tabler-chevron-down'"
+          color="neutral" variant="ghost" size="xs" block class="mt-1"
+          @click="showAllSessions = !showAllSessions"
+        />
+      </div>
     </UCard>
 
-    <div class="flex justify-end">
+    <div class="flex justify-end pb-4">
       <UButton color="neutral" variant="outline" icon="i-tabler-logout" label="退出登录" @click="onLogout" />
     </div>
   </div>
