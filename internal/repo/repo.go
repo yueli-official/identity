@@ -47,6 +47,32 @@ type ProfileUpdate struct {
 	Locale      string
 }
 
+// AdminUserFilter constrains AdminListUsers. All fields are optional (zero value
+// = no constraint). Keyword matches email / display_name / username (ILIKE).
+type AdminUserFilter struct {
+	Keyword string
+	Status  string // "" = any; else active|disabled|deleted
+	Role    string // "" = any role; else a role slug the identity must hold
+	OrderBy string // "created_at" (default) | "display_name"
+	Order   string // "asc" | "desc" (default desc)
+	Limit   int    // 0 → default 20; capped at 100
+	Offset  int
+}
+
+// AdminUserRow is one identity as surfaced to the admin user-management list:
+// the identity row joined with its profile display fields and its role slugs.
+type AdminUserRow struct {
+	ID            string
+	Email         string
+	EmailVerified bool
+	Status        model.Status
+	CreatedAt     time.Time
+	DisplayName   string
+	Username      string
+	AvatarURL     string
+	Roles         []string
+}
+
 type IdentityRepo interface {
 	CreateIdentityWithProfile(ctx context.Context, in NewIdentityInput) (model.Identity, error)
 	GetByEmail(ctx context.Context, email string) (model.Identity, error)            // ErrIdentityMissing
@@ -68,6 +94,16 @@ type IdentityRepo interface {
 	// UpdatePasswordHash it does NOT require an existing credential — it's how an
 	// OAuth-only account adds an initial password.
 	SetPasswordHash(ctx context.Context, identityID, passwordHash string) error
+	// AdminListUsers returns a page of identities (joined with profile + roles)
+	// matching the filter, plus the total count for that filter (ignoring paging).
+	AdminListUsers(ctx context.Context, f AdminUserFilter) ([]AdminUserRow, int, error)
+	// AdminUserStatusCounts returns the identity count per status value
+	// (keys: "active", "disabled", "deleted") plus "total" (active+disabled,
+	// excluding soft-deleted) for the admin dashboard.
+	AdminUserStatusCounts(ctx context.Context) (map[string]int, error)
+	// SetIdentityStatus updates an identity's lifecycle status. Returns
+	// ErrIdentityMissing if no row matched.
+	SetIdentityStatus(ctx context.Context, identityID string, status model.Status) error
 }
 
 // NewVerificationInput records an issued email token (stored hashed, with TTL).

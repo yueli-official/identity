@@ -15,4 +15,5 @@ type MeRes struct {
 	CoverURL      string          `json:"coverUrl"`
 	Bio           string          `json:"bio"`
 	SocialLinks   []SocialLinkDTO `json:"socialLinks"`
+	Roles         []string        `json:"roles"`
 }
