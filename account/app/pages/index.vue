@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
+import type { SocialLink } from '~/composables/useSession'
 
 definePageMeta({ middleware: 'auth' })
 
@@ -27,25 +28,41 @@ async function onResendVerification() {
 }
 
 // ── Profile edit ────────────────────────────────────────────────────────────
+// avatar/cover are committed immediately by their crop uploaders (the IdP proxy
+// stores them on save); the form below saves the text fields + social links.
 const profileSchema = z.object({
   displayName: z.string().min(1, '请输入昵称'),
   username: z.string().max(50, '用户名最多 50 字').optional(),
-  avatarUrl: z.string().url('请输入合法链接').or(z.literal('')).optional(),
+  bio: z.string().max(500, '简介最多 500 字').optional(),
   locale: z.string().optional()
 })
 type ProfileSchema = z.output<typeof profileSchema>
-const profileState = reactive<ProfileSchema>({ displayName: '', username: '', avatarUrl: '', locale: '' })
+const profileState = reactive<ProfileSchema>({ displayName: '', username: '', bio: '', locale: '' })
+// avatar/cover live outside the validated form (managed by the crop uploaders).
+const avatarUrl = ref('')
+const coverUrl = ref('')
+const socialLinks = ref<SocialLink[]>([])
 watchEffect(() => {
   if (!me.value) return
   profileState.displayName = me.value.displayName
   profileState.username = me.value.username
-  profileState.avatarUrl = me.value.avatarUrl
+  profileState.bio = me.value.bio
+  avatarUrl.value = me.value.avatarUrl
+  coverUrl.value = me.value.coverUrl
+  socialLinks.value = me.value.socialLinks?.length ? me.value.socialLinks.map(l => ({ ...l })) : []
 })
+function addLink() { socialLinks.value.push({ label: '', url: '' }) }
+function removeLink(i: number) { socialLinks.value.splice(i, 1) }
 const savingProfile = ref(false)
 async function onSaveProfile(e: FormSubmitEvent<ProfileSchema>) {
   savingProfile.value = true
   try {
-    await call('/api/v1/session/profile', { method: 'PUT', body: e.data })
+    await call('/api/v1/session/profile', { method: 'PUT', body: {
+      ...e.data,
+      avatarUrl: avatarUrl.value,
+      coverUrl: coverUrl.value,
+      socialLinks: socialLinks.value.filter(l => l.url.trim())
+    } })
     await refresh()
     toast.add({ title: '资料已更新', color: 'success', icon: 'i-tabler-check' })
   } catch (err: any) {
@@ -54,6 +71,9 @@ async function onSaveProfile(e: FormSubmitEvent<ProfileSchema>) {
     savingProfile.value = false
   }
 }
+// crop uploaders persist immediately; mirror the new URL locally + re-sync me.
+async function onAvatarUpdated(url: string) { avatarUrl.value = url; await refresh() }
+async function onCoverUpdated(url: string) { coverUrl.value = url; await refresh() }
 
 // ── Change password ─────────────────────────────────────────────────────────
 const pwSchema = z.object({
@@ -181,12 +201,15 @@ function deviceIcon(ua: string) {
 
 <template>
   <div class="space-y-6">
-    <!-- Identity header -->
-    <div class="flex items-center gap-4">
-      <UAvatar :text="initial" :src="me?.avatarUrl || undefined" size="3xl" class="ring-2 ring-primary/20" />
-      <div class="min-w-0">
-        <h1 class="font-display truncate text-2xl font-semibold text-highlighted">{{ me?.displayName || '我的账户' }}</h1>
-        <p class="truncate text-sm text-muted">{{ me?.email }}</p>
+    <!-- Identity header: cover banner + overlapping avatar (both crop-uploadable) -->
+    <div>
+      <UserCoverCrop :model-value="coverUrl" editable @update:model-value="onCoverUpdated" />
+      <div class="-mt-12 flex items-end gap-4 px-4">
+        <UserAvatarCrop :model-value="avatarUrl" :initial="initial" editable @update:model-value="onAvatarUpdated" />
+        <div class="min-w-0 pb-1">
+          <h1 class="font-display truncate text-2xl font-semibold text-highlighted">{{ me?.displayName || '我的账户' }}</h1>
+          <p class="truncate text-sm text-muted">{{ me?.email }}</p>
+        </div>
       </div>
     </div>
 
@@ -215,9 +238,22 @@ function deviceIcon(ua: string) {
         <UFormField name="username" label="用户名" hint="可选">
           <UInput v-model="profileState.username" class="w-full" placeholder="li" />
         </UFormField>
-        <UFormField name="avatarUrl" label="头像链接" hint="可选">
-          <UInput v-model="profileState.avatarUrl" class="w-full" placeholder="https://…" />
+        <UFormField name="bio" label="简介" hint="可选">
+          <UTextarea v-model="profileState.bio" :rows="3" class="w-full" placeholder="一句话介绍自己" />
         </UFormField>
+        <!-- social links -->
+        <div>
+          <div class="mb-2 flex items-center justify-between">
+            <p class="text-sm font-medium text-default">社交链接</p>
+            <UButton label="添加" icon="i-tabler-plus" color="neutral" variant="soft" size="xs" @click="addLink" />
+          </div>
+          <div v-if="!socialLinks.length" class="rounded-lg border border-dashed border-default px-3 py-4 text-center text-xs text-dimmed">还没有链接</div>
+          <div v-for="(link, i) in socialLinks" :key="i" class="mb-2 flex items-center gap-2">
+            <UInput v-model="link.label" placeholder="标签 (GitHub)" class="w-36" />
+            <UInput v-model="link.url" placeholder="https://…" class="flex-1" />
+            <UButton icon="i-tabler-trash" color="error" variant="ghost" size="sm" square aria-label="删除" @click="removeLink(i)" />
+          </div>
+        </div>
         <div class="flex items-center justify-between gap-4">
           <p class="text-xs text-muted">邮箱 {{ me?.email }} 不可在此修改</p>
           <UButton type="submit" label="保存资料" :loading="savingProfile" />
