@@ -23,5 +23,8 @@ func (c *Controller) Me(ctx context.Context, _ *v1.MeReq) (*v1.MeRes, error) {
 		DisplayName:   p.DisplayName,
 		Username:      p.Username,
 		AvatarURL:     p.AvatarURL,
+		CoverURL:      p.CoverURL,
+		Bio:           p.Bio,
+		SocialLinks:   socialToDTO(p.SocialLinks),
 	}, nil
 }
