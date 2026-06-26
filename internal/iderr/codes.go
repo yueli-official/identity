@@ -36,6 +36,9 @@ var (
 	CodeCredentialNotFound = errs.Register("identity.credential_not_found", http.StatusNotFound)
 	CodeLastCredential     = errs.Register("identity.last_credential", http.StatusConflict)
 	CodePasswordAlreadySet = errs.Register("identity.password_already_set", http.StatusConflict)
+
+	CodeIdentityNotFound = errs.Register("identity.not_found", http.StatusNotFound)
+	CodeInvalidStatus    = errs.Register("identity.invalid_status", http.StatusBadRequest)
 )
 
 func EmailTaken(email string) *errs.Coded {
@@ -104,6 +107,24 @@ func VerifyThrottled() *errs.Coded {
 // (e.g. a non-admin hitting an admin-only endpoint).
 func Forbidden() *errs.Coded {
 	return errs.New(CodeForbidden, "insufficient privileges", nil)
+}
+
+// IdentityNotFound: the target identity does not exist (admin operations on a
+// user id that matches no row). 404.
+func IdentityNotFound() *errs.Coded {
+	return errs.New(CodeIdentityNotFound, "user not found", nil)
+}
+
+// InvalidStatus: an admin status change requested a value outside the lifecycle
+// set {active, disabled, deleted}. 400.
+func InvalidStatus(status string) *errs.Coded {
+	return errs.New(CodeInvalidStatus, "invalid status", map[string]any{"status": status})
+}
+
+// SelfAdminTarget: an admin attempted a destructive action (ban / delete /
+// demote) against their own account. Refused to prevent self-lockout. 403.
+func SelfAdminTarget() *errs.Coded {
+	return errs.New(CodeForbidden, "cannot perform this action on your own account", nil)
 }
 
 // UnknownRole: the requested role slug is not in the fixed catalog (migration

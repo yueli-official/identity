@@ -15,7 +15,11 @@ func (c *Controller) Me(ctx context.Context, _ *v1.MeReq) (*v1.MeRes, error) {
 	if err != nil {
 		return nil, err
 	}
-	p, _ := c.svc.GetProfile(ctx, id.ID) // empty profile is acceptable
+	p, _ := c.svc.GetProfile(ctx, id.ID)   // empty profile is acceptable
+	roles, _ := c.svc.GetRoles(ctx, id.ID) // empty roles acceptable
+	if roles == nil {
+		roles = []string{}
+	}
 	return &v1.MeRes{
 		ID:            id.ID,
 		Email:         id.Email,
@@ -26,5 +30,6 @@ func (c *Controller) Me(ctx context.Context, _ *v1.MeReq) (*v1.MeRes, error) {
 		CoverURL:      p.CoverURL,
 		Bio:           p.Bio,
 		SocialLinks:   socialToDTO(p.SocialLinks),
+		Roles:         roles,
 	}, nil
 }

@@ -53,3 +53,92 @@ type AuditEntry struct {
 type AdminListAuditRes struct {
 	Entries []AuditEntry `json:"entries"`
 }
+
+// ── Admin user management ────────────────────────────────────────────────────
+
+// AdminUserDTO is one user as surfaced to the admin console (list + detail):
+// the identity joined with its profile display fields and role slugs.
+type AdminUserDTO struct {
+	ID            string   `json:"id"`
+	Email         string   `json:"email"`
+	EmailVerified bool     `json:"emailVerified"`
+	Status        string   `json:"status"` // active | disabled | deleted
+	CreatedAt     string   `json:"createdAt"` // RFC3339
+	DisplayName   string   `json:"displayName"`
+	Username      string   `json:"username"`
+	AvatarURL     string   `json:"avatarUrl"`
+	Roles         []string `json:"roles"`
+}
+
+// AdminListUsersReq is the filtered, paginated user list (admin only).
+type AdminListUsersReq struct {
+	g.Meta  `path:"/api/v1/admin/users" method:"get" tags:"admin" summary:"List users (admin only)"`
+	Keyword string `json:"keyword" in:"query"`
+	Status  string `json:"status" in:"query"`  // active|disabled|deleted; "" = non-deleted
+	Role    string `json:"role" in:"query"`    // role slug; "" = any
+	OrderBy string `json:"orderBy" in:"query"` // created_at|display_name
+	Order   string `json:"order" in:"query"`   // asc|desc
+	Page    int    `json:"page" in:"query"`
+	Size    int    `json:"size" in:"query"`
+}
+type AdminListUsersRes struct {
+	List  []AdminUserDTO `json:"list"`
+	Total int            `json:"total"`
+}
+
+// AdminUserStatsReq returns identity counts per status for the dashboard.
+type AdminUserStatsReq struct {
+	g.Meta `path:"/api/v1/admin/users/stats" method:"get" tags:"admin" summary:"User counts by status (admin only)"`
+}
+type AdminUserStatsRes struct {
+	Total    int `json:"total"`
+	Active   int `json:"active"`
+	Disabled int `json:"disabled"`
+	Deleted  int `json:"deleted"`
+}
+
+// AdminGetUserReq returns one user's admin detail.
+type AdminGetUserReq struct {
+	g.Meta `path:"/api/v1/admin/users/{id}" method:"get" tags:"admin" summary:"Get a user (admin only)"`
+	ID     string `json:"id" in:"path"`
+}
+type AdminGetUserRes struct {
+	User AdminUserDTO `json:"user"`
+}
+
+// AdminUpdateStatusReq sets a user's lifecycle status (ban=disabled, unban=active).
+type AdminUpdateStatusReq struct {
+	g.Meta `path:"/api/v1/admin/users/{id}/status" method:"put" tags:"admin" summary:"Set user status (admin only)"`
+	ID     string `json:"id" in:"path"`
+	Status string `json:"status" v:"required"`
+}
+type AdminUpdateStatusRes struct {
+	User AdminUserDTO `json:"user"`
+}
+
+// AdminDeleteUserReq soft-deletes a user (status='deleted').
+type AdminDeleteUserReq struct {
+	g.Meta `path:"/api/v1/admin/users/{id}" method:"delete" tags:"admin" summary:"Soft-delete a user (admin only)"`
+	ID     string `json:"id" in:"path"`
+}
+type AdminDeleteUserRes struct{}
+
+// AdminResetPasswordReq overrides a user's password (admin override, no current-pw check).
+type AdminResetPasswordReq struct {
+	g.Meta      `path:"/api/v1/admin/users/{id}/password" method:"post" tags:"admin" summary:"Reset a user's password (admin only)"`
+	ID          string `json:"id" in:"path"`
+	NewPassword string `json:"newPassword" v:"required"`
+}
+type AdminResetPasswordRes struct{}
+
+// AdminCreateUserReq provisions a new account from the admin console.
+type AdminCreateUserReq struct {
+	g.Meta      `path:"/api/v1/admin/users" method:"post" tags:"admin" summary:"Create a user (admin only)"`
+	Email       string   `json:"email" v:"required"`
+	Password    string   `json:"password" v:"required"`
+	DisplayName string   `json:"displayName"`
+	Roles       []string `json:"roles"`
+}
+type AdminCreateUserRes struct {
+	User AdminUserDTO `json:"user"`
+}

@@ -33,6 +33,11 @@ const (
 	EvPasswordSet      = "password.set"
 	EvSessionRevoked   = "session.revoked"
 	EvCredentialUnlinked = "credential.oauth_unlinked"
+
+	EvAdminUserCreated   = "admin.user_created"
+	EvAdminStatusChanged = "admin.user_status_changed"
+	EvAdminUserDeleted   = "admin.user_deleted"
+	EvAdminPasswordReset = "admin.password_reset"
 )
 
 // AuditEvent is the logic-layer description of one auditable event. IP/UA/request-id
