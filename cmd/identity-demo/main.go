@@ -107,6 +107,15 @@ func main() {
 		ResponseTypes: []string{"code"},
 		Scopes:        []string{"openid", "profile", "email", "roles", "offline_access"},
 	})
+	// Consumer-site OIDC client for the docs app's BFF (apps/docs :3003).
+	store.SetClient(model.OIDCClient{
+		ID:            "docs-web",
+		Public:        true,
+		RedirectURIs:  []string{"http://localhost:3003/auth/callback"},
+		GrantTypes:    []string{"authorization_code", "refresh_token"},
+		ResponseTypes: []string{"code"},
+		Scopes:        []string{"openid", "profile", "email", "roles", "offline_access"},
+	})
 	// Confidential service client (client_credentials) for the resource site's
 	// AssetClient → mints a service token scoped `asset:sign` to sign GET URLs for
 	// login-gated downloads. Secret is bcrypt-hashed; fosite
