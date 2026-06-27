@@ -10,6 +10,7 @@ import (
 )
 
 type RegisterInput struct {
+	ID          string // optional: pin a fixed sub (dev seeds only); empty → generated
 	Email       string
 	Password    string
 	DisplayName string
@@ -29,7 +30,7 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (model.Identit
 		return model.Identity{}, err
 	}
 	id, err := s.store.CreateIdentityWithProfile(ctx, repo.NewIdentityInput{
-		Email: email, DisplayName: in.DisplayName, Locale: in.Locale, PasswordHash: hash,
+		ID: in.ID, Email: email, DisplayName: in.DisplayName, Locale: in.Locale, PasswordHash: hash,
 	})
 	if errors.Is(err, repo.ErrEmailTaken) {
 		return model.Identity{}, iderr.EmailTaken(email)

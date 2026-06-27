@@ -43,6 +43,11 @@ const (
 
 	demoEmail    = "demo@example.com"
 	demoPassword = "demo-password-123"
+	// Fixed sub so docs.ownerSubs (and any other per-site authz that lists the
+	// demo operator) keeps working across identity-demo restarts. In-memory store
+	// otherwise hands out a fresh UUID each boot, silently locking the seeded
+	// account out of owner-gated consoles.
+	demoSub = "11111111-1111-4111-8111-111111111111"
 	demoClientID = "demo-web" // a sample consumer-site OIDC client (for SSO testing)
 
 	// Confidential service client for the resource site's AssetClient: mints a
@@ -67,7 +72,7 @@ func main() {
 	// Seed a ready-to-use account and a sample OIDC client so the UI is usable
 	// the moment both servers are up.
 	if _, err := svc.Register(ctx, logic.RegisterInput{
-		Email: demoEmail, Password: demoPassword, DisplayName: "Demo User",
+		ID: demoSub, Email: demoEmail, Password: demoPassword, DisplayName: "Demo User",
 	}); err != nil {
 		g.Log().Warningf(ctx, "seed demo user: %v", err)
 	} else if id, err := svc.GetByEmail(ctx, demoEmail); err == nil {

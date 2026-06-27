@@ -30,6 +30,7 @@ const (
 
 // NewIdentityInput is an atomic identity+profile+password-credential creation.
 type NewIdentityInput struct {
+	ID           string // optional: pin a fixed sub (dev seeds only); empty → generated
 	Email        string // canonical
 	DisplayName  string
 	Locale       string

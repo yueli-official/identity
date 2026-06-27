@@ -72,8 +72,12 @@ func (m *Memory) CreateIdentityWithProfile(_ context.Context, in NewIdentityInpu
 	if _, ok := m.byEmail[in.Email]; ok {
 		return model.Identity{}, ErrEmailTaken
 	}
+	newID := in.ID
+	if newID == "" {
+		newID = uuid.NewString()
+	}
 	id := model.Identity{
-		ID: uuid.NewString(), Email: in.Email, Status: model.StatusActive,
+		ID: newID, Email: in.Email, Status: model.StatusActive,
 		CreatedAt: m.now(), UpdatedAt: m.now(),
 	}
 	m.byID[id.ID] = id
