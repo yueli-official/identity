@@ -147,8 +147,8 @@ func main() {
 	}, mgr.KeyGetter)
 	oidcCtl := controller.NewOIDC(provider, mgr, svc, demoIssuer, demoLoginURL)
 	// Consumer sites' RP-initiated logout bounces back here (end_session); allow
-	// their dev origins (resource :3001, account :3000).
-	oidcCtl.SetPostLogoutRedirects([]string{"http://localhost:3001", "http://localhost:3002", "http://localhost:3000"})
+	// their dev origins (resource :3001, blog :3002, account :3000, docs :3003).
+	oidcCtl.SetPostLogoutRedirects([]string{"http://localhost:3001", "http://localhost:3002", "http://localhost:3000", "http://localhost:3003"})
 
 	// Google OAuth: enabled when GF_OIDC_GOOGLE_CLIENTID/SECRET are present
 	// (read from .env.local via loadDotEnv). Otherwise nil → the start/callback
