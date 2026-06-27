@@ -107,6 +107,15 @@ func main() {
 		ResponseTypes: []string{"code"},
 		Scopes:        []string{"openid", "profile", "email", "roles", "offline_access"},
 	})
+	// Consumer-site OIDC client for the docs app's BFF (apps/docs :3003).
+	store.SetClient(model.OIDCClient{
+		ID:            "docs-web",
+		Public:        true,
+		RedirectURIs:  []string{"http://localhost:3003/auth/callback"},
+		GrantTypes:    []string{"authorization_code", "refresh_token"},
+		ResponseTypes: []string{"code"},
+		Scopes:        []string{"openid", "profile", "email", "roles", "offline_access"},
+	})
 	// Confidential service client (client_credentials) for the resource site's
 	// AssetClient → mints a service token scoped `asset:sign` to sign GET URLs for
 	// login-gated downloads. Secret is bcrypt-hashed; fosite
@@ -138,8 +147,8 @@ func main() {
 	}, mgr.KeyGetter)
 	oidcCtl := controller.NewOIDC(provider, mgr, svc, demoIssuer, demoLoginURL)
 	// Consumer sites' RP-initiated logout bounces back here (end_session); allow
-	// their dev origins (resource :3001, account :3000).
-	oidcCtl.SetPostLogoutRedirects([]string{"http://localhost:3001", "http://localhost:3002", "http://localhost:3000"})
+	// their dev origins (resource :3001, blog :3002, account :3000, docs :3003).
+	oidcCtl.SetPostLogoutRedirects([]string{"http://localhost:3001", "http://localhost:3002", "http://localhost:3000", "http://localhost:3003"})
 
 	// Google OAuth: enabled when GF_OIDC_GOOGLE_CLIENTID/SECRET are present
 	// (read from .env.local via loadDotEnv). Otherwise nil → the start/callback
