@@ -30,7 +30,7 @@ const (
 
 // NewIdentityInput is an atomic identity+profile+password-credential creation.
 type NewIdentityInput struct {
-	ID           string // optional: pin a fixed sub (dev seeds only); empty → generated
+	ID           string // optional trusted seed/bootstrap sub; empty → generated
 	Email        string // canonical
 	DisplayName  string
 	Locale       string
@@ -76,10 +76,10 @@ type AdminUserRow struct {
 
 type IdentityRepo interface {
 	CreateIdentityWithProfile(ctx context.Context, in NewIdentityInput) (model.Identity, error)
-	GetByEmail(ctx context.Context, email string) (model.Identity, error)            // ErrIdentityMissing
-	GetByID(ctx context.Context, id string) (model.Identity, error)                  // ErrIdentityMissing
+	GetByEmail(ctx context.Context, email string) (model.Identity, error) // ErrIdentityMissing
+	GetByID(ctx context.Context, id string) (model.Identity, error)       // ErrIdentityMissing
 	GetPasswordHash(ctx context.Context, identityID string) (string, error)
-	GetProfile(ctx context.Context, identityID string) (model.Profile, error)        // ErrIdentityMissing
+	GetProfile(ctx context.Context, identityID string) (model.Profile, error) // ErrIdentityMissing
 	// UpdateProfile replaces the user-editable display fields of an identity's
 	// profile. Returns ErrIdentityMissing if the profile row does not exist.
 	UpdateProfile(ctx context.Context, identityID string, in ProfileUpdate) error
@@ -192,14 +192,14 @@ type LoginThrottle interface {
 type AuditRow struct {
 	ID         int64
 	Event      string
-	ActorID    string         // "" → NULL in PG
-	TargetID   string         // "" → NULL in PG
+	ActorID    string // "" → NULL in PG
+	TargetID   string // "" → NULL in PG
 	ActorEmail string
 	IP         string
 	UserAgent  string
 	ClientID   string
 	RequestID  string
-	Result     string         // "success" | "failure"
+	Result     string // "success" | "failure"
 	Detail     map[string]any
 	OccurredAt time.Time
 }

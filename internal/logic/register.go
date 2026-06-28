@@ -10,7 +10,7 @@ import (
 )
 
 type RegisterInput struct {
-	ID          string // optional: pin a fixed sub (dev seeds only); empty → generated
+	ID          string // optional trusted seed/bootstrap sub; empty → generated
 	Email       string
 	Password    string
 	DisplayName string

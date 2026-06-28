@@ -83,9 +83,9 @@ code flow and RS256-signed JWTs.
 > These endpoints write raw RFC-compliant responses and are **not** wrapped in the
 > platform JSON envelope middleware (which applies only to the business API group).
 
-### Seeded client
+### Seeded development client
 
-Migration `0002` seeds a `demo-web` public client (PKCE, no client secret):
+Migration `0002` seeds a public PKCE client for low-level OIDC tests:
 
 | Field           | Value                         |
 |-----------------|-------------------------------|
@@ -144,6 +144,18 @@ mismatch silently breaks relying-party discovery and token validation.
    ```sh
    curl -H "Authorization: Bearer <access_token>" http://localhost:8081/oauth2/userinfo
    ```
+
+### Local stack
+
+Use `cmd/devkit` from the platform repo root for local site development. It
+starts the real PG+Redis identity service, provisions the shared test account,
+and registers each site's OIDC client from `devstack.yaml`:
+
+```sh
+go run ./cmd/devkit up --stack devstack.yaml --root . docs-ae
+```
+
+The shared local login is `test@example.com` / `Test12345`.
 
 ### Milestone ③ note — transient OIDC sessions (superseded by ④)
 
