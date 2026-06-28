@@ -125,6 +125,7 @@ func setupE2E(t *testing.T, clientID string) *e2eEnv {
 		RefreshTTL:   720 * time.Hour,
 	}, mgr.KeyGetter)
 	ctl := controller.NewOIDC(provider, mgr, svc, base, base+"/login")
+	ctl.SetPostLogoutRedirects([]string{"http://127.0.0.1"})
 
 	// 5. Start GoFrame server on the pre-chosen port (NO ghttpx.Middleware), with
 	//    the full OIDC route set.
@@ -908,6 +909,38 @@ func TestOIDCEndSessionPassiveLogout(t *testing.T) {
 		t.Fatalf("post-logout authorize: expected redirect to %s/login..., got %q", env.base, loc)
 	}
 	t.Logf("post-logout authorize correctly redirects to /login — IdP session cleared")
+}
+
+func TestOIDCEndSessionRedirectsToAllowedPostLogoutURI(t *testing.T) {
+	const clientID = "demo-web"
+	env := setupE2E(t, clientID)
+
+	postLogoutURI := "http://127.0.0.1/after-logout"
+	esReq, err := http.NewRequestWithContext(env.ctx, http.MethodGet,
+		env.base+"/oauth2/end_session?"+url.Values{
+			"post_logout_redirect_uri": {postLogoutURI},
+		}.Encode(), nil)
+	if err != nil {
+		t.Fatalf("build end_session redirect request: %v", err)
+	}
+	esReq.Header.Set("Cookie", "id_session="+env.sid)
+
+	esResp, err := noRedirectClient().Do(esReq)
+	if err != nil {
+		t.Fatalf("end_session redirect request: %v", err)
+	}
+	defer esResp.Body.Close()
+
+	if esResp.StatusCode != http.StatusFound && esResp.StatusCode != http.StatusSeeOther {
+		esBody, _ := io.ReadAll(esResp.Body)
+		t.Fatalf("end_session redirect: expected 302/303, got %d: %s", esResp.StatusCode, esBody)
+	}
+	if loc := esResp.Header.Get("Location"); loc != postLogoutURI {
+		t.Fatalf("end_session redirect: Location = %q, want %q", loc, postLogoutURI)
+	}
+	if _, err := env.svc.Me(env.ctx, env.sid); err == nil {
+		t.Fatalf("end_session redirect: IdP session still resolves via Me after logout")
+	}
 }
 
 // verifyAccessTokenLocally simulates a resource server: fetches JWKS, verifies

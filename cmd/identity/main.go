@@ -122,7 +122,12 @@ func main() {
 	// oidc.postLogoutOrigins; falls back to the dev consumer origins.
 	postLogoutOrigins := g.Cfg().MustGet(ctx, "oidc.postLogoutOrigins").Strings()
 	if len(postLogoutOrigins) == 0 {
-		postLogoutOrigins = []string{"http://localhost:3000", "http://localhost:3001", "http://localhost:3002"}
+		postLogoutOrigins = []string{
+			"http://localhost:3000",
+			"http://localhost:3001",
+			"http://localhost:3002",
+			"http://localhost:3003",
+		}
 	}
 	oidcCtl.SetPostLogoutRedirects(postLogoutOrigins)
 
@@ -166,7 +171,7 @@ func main() {
 		grp.POST("/oauth2/token", oidcCtl.Token)
 		grp.ALL("/oauth2/userinfo", oidcCtl.Userinfo)
 		grp.POST("/oauth2/revoke", oidcCtl.Revoke)         // RFC 7009 token revocation
-		grp.ALL("/oauth2/end_session", oidcCtl.EndSession)  // OIDC RP-initiated logout (MVP)
+		grp.ALL("/oauth2/end_session", oidcCtl.EndSession) // OIDC RP-initiated logout (MVP)
 	})
 
 	// Google OAuth login: raw redirect handlers — NO envelope middleware.
