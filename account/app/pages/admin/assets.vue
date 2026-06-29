@@ -29,6 +29,9 @@ interface Site {
 }
 interface StorageBackend {
   name: string
+  type?: string
+  enabled: boolean
+  managed: boolean
   isDefault: boolean
   healthy: boolean
   error?: string
@@ -196,10 +199,12 @@ const visibilityOptions = [
   { label: '公开', value: 'public' },
   { label: '私有', value: 'private' }
 ]
-const storageBackendOptions = computed(() => storageBackends.value.map(b => ({
-  label: b.isDefault ? `${b.name} · 默认` : b.name,
-  value: b.name
-})))
+const storageBackendOptions = computed(() => storageBackends.value
+  .filter(b => b.enabled !== false)
+  .map(b => ({
+    label: b.isDefault ? `${b.name} · 默认` : b.name,
+    value: b.name
+  })))
 const modeOptions = [
   { label: '等比缩放', value: 'resize' },
   { label: '填充裁剪', value: 'fill' }
@@ -338,6 +343,53 @@ async function saveSite() {
   toast.add({ title: '站点已保存', color: 'success', icon: 'i-tabler-check' })
   siteOpen.value = false
   await reloadAll()
+}
+
+const storageBackendOpen = ref(false)
+const savingStorageBackend = ref(false)
+const storageBackendForm = reactive({
+  name: '',
+  type: 's3',
+  enabled: true,
+  endpoint: '',
+  region: 'us-east-1',
+  bucketPublic: '',
+  bucketPrivate: '',
+  accessKey: '',
+  secretKey: '',
+  publicBaseUrl: '',
+  pathStyle: true,
+  useSsl: false
+})
+function editStorageBackend(backend?: StorageBackend) {
+  Object.assign(storageBackendForm, {
+    name: backend?.name || '',
+    type: backend?.type || 's3',
+    enabled: backend?.enabled !== false,
+    endpoint: '',
+    region: 'us-east-1',
+    bucketPublic: '',
+    bucketPrivate: '',
+    accessKey: '',
+    secretKey: '',
+    publicBaseUrl: '',
+    pathStyle: true,
+    useSsl: false
+  })
+  storageBackendOpen.value = true
+}
+async function saveStorageBackend() {
+  savingStorageBackend.value = true
+  try {
+    await call('/api/v1/admin/assets-proxy/storage-backends', { method: 'POST', body: storageBackendForm })
+    toast.add({ title: '存储后端已保存', color: 'success', icon: 'i-tabler-check' })
+    storageBackendOpen.value = false
+    await reloadAll()
+  } catch (e) {
+    toast.add({ title: '保存存储后端失败', description: (e as Error)?.message, color: 'error' })
+  } finally {
+    savingStorageBackend.value = false
+  }
 }
 
 const variantOpen = ref(false)
@@ -828,6 +880,14 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
             <div class="flex items-center gap-2">
               <UBadge :label="`${storageBackends.length} 个可用`" color="neutral" variant="soft" />
               <UButton
+                icon="i-tabler-database-plus"
+                label="新建后端"
+                color="neutral"
+                variant="soft"
+                size="xs"
+                @click="editStorageBackend()"
+              />
+              <UButton
                 icon="i-tabler-broom"
                 label="清理暂存"
                 color="neutral"
@@ -860,8 +920,8 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
             <UBadge
               v-for="backend in storageBackends"
               :key="backend.name"
-              :label="`${backend.name}${backend.isDefault ? ' · 默认' : ''}${backend.healthy ? '' : ' · 异常'}`"
-              :color="backend.healthy ? (backend.isDefault ? 'primary' : 'neutral') : 'error'"
+              :label="`${backend.name}${backend.type ? ` · ${backend.type}` : ''}${backend.isDefault ? ' · 默认' : ''}${backend.enabled === false ? ' · 停用' : ''}${backend.healthy ? '' : ' · 异常'}`"
+              :color="backend.enabled === false ? 'neutral' : (backend.healthy ? (backend.isDefault ? 'primary' : 'neutral') : 'error')"
               variant="soft"
             />
           </div>
@@ -1061,6 +1121,49 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
         <div class="flex w-full justify-end gap-2">
           <UButton label="取消" color="neutral" variant="ghost" @click="siteOpen = false" />
           <UButton label="保存" icon="i-tabler-device-floppy" @click="saveSite" />
+        </div>
+      </template>
+    </UModal>
+
+    <UModal v-model:open="storageBackendOpen" title="S3-compatible 存储后端">
+      <template #body>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <UFormField label="后端名称">
+            <UInput v-model="storageBackendForm.name" placeholder="s3main" />
+          </UFormField>
+          <UFormField label="Region">
+            <UInput v-model="storageBackendForm.region" placeholder="us-east-1" />
+          </UFormField>
+          <UFormField label="Endpoint">
+            <UInput v-model="storageBackendForm.endpoint" placeholder="localhost:9000" />
+          </UFormField>
+          <UFormField label="公开访问 Base URL">
+            <UInput v-model="storageBackendForm.publicBaseUrl" placeholder="https://cdn.example.com" />
+          </UFormField>
+          <UFormField label="Public Bucket">
+            <UInput v-model="storageBackendForm.bucketPublic" placeholder="asset-public" />
+          </UFormField>
+          <UFormField label="Private Bucket">
+            <UInput v-model="storageBackendForm.bucketPrivate" placeholder="asset-private" />
+          </UFormField>
+          <UFormField label="Access Key">
+            <UInput v-model="storageBackendForm.accessKey" autocomplete="off" />
+          </UFormField>
+          <UFormField label="Secret Key">
+            <UInput v-model="storageBackendForm.secretKey" type="password" autocomplete="new-password" />
+          </UFormField>
+          <UCheckbox v-model="storageBackendForm.pathStyle" label="Path-style endpoint" />
+          <UCheckbox v-model="storageBackendForm.useSsl" label="使用 HTTPS" />
+          <UCheckbox v-model="storageBackendForm.enabled" label="启用后端" />
+          <p class="text-xs text-muted sm:col-span-2">
+            保存时会先连接并注册后端；如果配置不可用，不会写入运行时。已有同名后端会被覆盖。
+          </p>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton label="取消" color="neutral" variant="ghost" :disabled="savingStorageBackend" @click="storageBackendOpen = false" />
+          <UButton label="保存" icon="i-tabler-device-floppy" :loading="savingStorageBackend" @click="saveStorageBackend" />
         </div>
       </template>
     </UModal>
