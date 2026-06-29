@@ -34,6 +34,8 @@ interface StorageBackend {
   managed: boolean
   isDefault: boolean
   healthy: boolean
+  assetCount: number
+  siteCount: number
   error?: string
 }
 interface StorageBackendDetail {
@@ -1040,7 +1042,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
             <UButton
               v-for="backend in storageBackends"
               :key="backend.name"
-              :label="`${backend.name}${backend.type ? ` · ${backend.type}` : ''}${backend.isDefault ? ' · 默认' : ''}${backend.enabled === false ? ' · 停用' : ''}${backend.healthy ? '' : ' · 异常'}`"
+              :label="`${backend.name}${backend.type ? ` · ${backend.type}` : ''}${backend.isDefault ? ' · 默认' : ''}${backend.enabled === false ? ' · 停用' : ''} · ${backend.assetCount || 0} 素材 / ${backend.siteCount || 0} 站点${backend.healthy ? '' : ' · 异常'}`"
               :color="backend.enabled === false ? 'neutral' : (backend.healthy ? (backend.isDefault ? 'primary' : 'neutral') : 'error')"
               :icon="backend.managed ? 'i-tabler-pencil' : 'i-tabler-database'"
               variant="soft"
