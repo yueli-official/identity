@@ -103,6 +103,13 @@ interface PruneResult {
   items: AssetItem[]
   errors?: PruneError[]
 }
+interface BatchRebuildResult {
+  candidates: number
+  rebuilt: number
+  generated: number
+  items: AssetItem[]
+  errors?: PruneError[]
+}
 interface OrphanObjectItem {
   key: string
   size: number
@@ -384,6 +391,11 @@ const orphanObjectsOpen = ref(false)
 const auditingOrphanObjects = ref(false)
 const orphanObjectsPreview = ref<OrphanObjectResult | null>(null)
 const orphanObjectsForm = reactive({ olderThanDays: 7, limit: 100, backend: ALL })
+const batchRebuildOpen = ref(false)
+const batchRebuilding = ref(false)
+const batchRebuildProfile = ref<Profile | null>(null)
+const batchRebuildPreview = ref<BatchRebuildResult | null>(null)
+const batchRebuildLimit = ref(50)
 async function confirmDeleteAsset() {
   if (!deleteAssetTarget.value) return
   deletingAsset.value = true
@@ -408,6 +420,50 @@ async function rebuildDerivatives(asset: AssetItem) {
     toast.add({ title: '重建派生图失败', description: (e as Error)?.message, color: 'error' })
   } finally {
     rebuildingAssetId.value = ''
+  }
+}
+
+async function previewBatchRebuild(profile: Profile) {
+  batchRebuildProfile.value = profile
+  batchRebuildPreview.value = null
+  batchRebuilding.value = true
+  try {
+    batchRebuildPreview.value = await call<BatchRebuildResult>('/api/v1/admin/assets-proxy/maintenance/rebuild-derivatives', {
+      method: 'POST',
+      body: { siteKey: profile.siteKey, profileKey: profile.profileKey, limit: batchRebuildLimit.value, dryRun: true }
+    })
+    await fetchMaintenanceTasks()
+    batchRebuildOpen.value = true
+  } catch (e) {
+    toast.add({ title: '批量重建预检失败', description: (e as Error)?.message, color: 'error' })
+  } finally {
+    batchRebuilding.value = false
+  }
+}
+
+async function confirmBatchRebuild() {
+  if (!batchRebuildProfile.value) return
+  batchRebuilding.value = true
+  try {
+    const profile = batchRebuildProfile.value
+    const data = await call<BatchRebuildResult>('/api/v1/admin/assets-proxy/maintenance/rebuild-derivatives', {
+      method: 'POST',
+      body: { siteKey: profile.siteKey, profileKey: profile.profileKey, limit: batchRebuildLimit.value, dryRun: false }
+    })
+    const failed = data.errors?.length ?? 0
+    toast.add({
+      title: '批量派生图重建完成',
+      description: `处理 ${data.rebuilt ?? 0} 个素材，生成 ${data.generated ?? 0} 个 Variant${failed ? `，${failed} 个失败` : ''}`,
+      color: failed ? 'warning' : 'success',
+      icon: failed ? 'i-tabler-alert-triangle' : 'i-tabler-check'
+    })
+    batchRebuildOpen.value = false
+    batchRebuildPreview.value = null
+    await fetchMaintenanceTasks()
+  } catch (e) {
+    toast.add({ title: '批量重建失败', description: (e as Error)?.message, color: 'error' })
+  } finally {
+    batchRebuilding.value = false
   }
 }
 
@@ -620,6 +676,7 @@ function profileActions(profile: Profile): DropdownMenuItem[][] {
   const inUse = profile.assetCount > 0 || profile.variantCount > 0
   return [[
     { label: '编辑', icon: 'i-tabler-pencil', onSelect: () => editProfile(profile) },
+    { label: '批量重建派生图', icon: 'i-tabler-refresh-dot', disabled: !profile.assetCount || batchRebuilding.value, onSelect: () => previewBatchRebuild(profile) },
     { label: '删除', icon: 'i-tabler-trash', color: 'error', disabled: inUse, onSelect: () => { deleteProfileTarget.value = profile } }
   ]]
 }
@@ -651,7 +708,8 @@ function taskTypeLabel(type: string) {
   const labels: Record<string, string> = {
     'sweep-staging': '清理暂存',
     'prune-unreferenced': '无引用素材',
-    'orphan-objects': '孤儿对象'
+    'orphan-objects': '孤儿对象',
+    'rebuild-derivatives': '重建派生图'
   }
   return labels[type] || type
 }
@@ -1214,6 +1272,54 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
         <div class="flex w-full justify-end gap-2">
           <UButton color="neutral" variant="ghost" label="取消" :disabled="deletingVariant" @click="deleteVariantTarget = null" />
           <UButton color="error" label="确认删除" :loading="deletingVariant" @click="confirmDeleteVariant" />
+        </div>
+      </template>
+    </UModal>
+
+    <UModal v-model:open="batchRebuildOpen" title="批量重建派生图">
+      <template #body>
+        <div class="space-y-4">
+          <div class="grid gap-3 sm:grid-cols-[1fr_140px]">
+            <UFormField label="Profile">
+              <UInput :model-value="batchRebuildProfile ? `${batchRebuildProfile.siteKey} / ${batchRebuildProfile.profileKey}` : ''" disabled />
+            </UFormField>
+            <UFormField label="单次上限">
+              <UInput v-model.number="batchRebuildLimit" type="number" min="1" max="200" />
+            </UFormField>
+          </div>
+          <p class="text-sm text-muted">
+            会删除并重新生成该 Profile 下图片素材的当前 Variant。建议先小批量执行，确认规则无误后再继续。
+          </p>
+          <div class="rounded-lg border border-default bg-default">
+            <div class="border-b border-default px-3 py-2 text-sm text-muted">
+              候选 {{ batchRebuildPreview?.candidates ?? 0 }} 个，本次最多处理 {{ batchRebuildLimit }} 个
+            </div>
+            <ManageEmpty v-if="!batchRebuildPreview?.items?.length" icon="i-tabler-photo-off" text="没有可重建的图片素材" />
+            <div v-else class="max-h-72 overflow-auto">
+              <div v-for="asset in batchRebuildPreview.items" :key="asset.id" class="flex items-center gap-3 border-b border-default px-3 py-2.5 last:border-b-0">
+                <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-elevated text-muted">
+                  <UIcon name="i-tabler-photo" class="size-4" />
+                </span>
+                <div class="min-w-0 flex-1">
+                  <div class="truncate text-sm font-medium text-highlighted">{{ asset.filename || asset.id }}</div>
+                  <div class="truncate text-xs text-muted">{{ asset.mime }} · {{ formatBytes(asset.size) }} · {{ briefDate(asset.createdAt) }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton color="neutral" variant="ghost" label="取消" :disabled="batchRebuilding" @click="batchRebuildOpen = false" />
+          <UButton
+            color="primary"
+            label="确认重建"
+            icon="i-tabler-refresh-dot"
+            :loading="batchRebuilding"
+            :disabled="!batchRebuildPreview?.items?.length"
+            @click="confirmBatchRebuild"
+          />
         </div>
       </template>
     </UModal>
