@@ -17,6 +17,10 @@ const userItems = computed(() => [
     }
   ]
 ])
+const navItems = [
+  { label: '用户', to: '/admin/users', icon: 'i-tabler-users' },
+  { label: '资源', to: '/admin/assets', icon: 'i-tabler-photo-cog' }
+]
 </script>
 
 <template>
@@ -33,6 +37,18 @@ const userItems = computed(() => [
             </span>
             管理控制台
           </NuxtLink>
+          <nav class="ml-4 hidden items-center gap-1 md:flex">
+            <UButton
+              v-for="item in navItems"
+              :key="item.to"
+              :to="item.to"
+              :icon="item.icon"
+              :label="item.label"
+              color="neutral"
+              variant="ghost"
+              size="sm"
+            />
+          </nav>
         </div>
 
         <div class="flex items-center gap-1.5">
