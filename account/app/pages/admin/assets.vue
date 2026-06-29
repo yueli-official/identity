@@ -363,6 +363,8 @@ const storageBackendOpen = ref(false)
 const savingStorageBackend = ref(false)
 const loadingStorageBackend = ref(false)
 const storageBackendEditingName = ref('')
+const deleteStorageBackendOpen = ref(false)
+const deletingStorageBackend = ref(false)
 const storageBackendForm = reactive({
   name: '',
   type: 's3',
@@ -423,6 +425,22 @@ async function saveStorageBackend() {
     toast.add({ title: '保存存储后端失败', description: (e as Error)?.message, color: 'error' })
   } finally {
     savingStorageBackend.value = false
+  }
+}
+async function confirmDeleteStorageBackend() {
+  if (!storageBackendEditingName.value) return
+  deletingStorageBackend.value = true
+  try {
+    await call(`/api/v1/admin/assets-proxy/storage-backends/${storageBackendEditingName.value}`, { method: 'DELETE' })
+    toast.add({ title: '存储后端已删除', color: 'success', icon: 'i-tabler-check' })
+    deleteStorageBackendOpen.value = false
+    storageBackendOpen.value = false
+    storageBackendEditingName.value = ''
+    await reloadAll()
+  } catch (e) {
+    toast.add({ title: '删除存储后端失败', description: (e as Error)?.message, color: 'error' })
+  } finally {
+    deletingStorageBackend.value = false
   }
 }
 
@@ -1199,9 +1217,35 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
         </div>
       </template>
       <template #footer>
+        <div class="flex w-full items-center justify-between gap-2">
+          <UButton
+            v-if="storageBackendEditingName"
+            label="删除后端"
+            icon="i-tabler-trash"
+            color="error"
+            variant="ghost"
+            :disabled="savingStorageBackend"
+            @click="deleteStorageBackendOpen = true"
+          />
+          <span v-else />
+          <div class="flex items-center gap-2">
+            <UButton label="取消" color="neutral" variant="ghost" :disabled="savingStorageBackend" @click="storageBackendOpen = false" />
+            <UButton label="保存" icon="i-tabler-device-floppy" :loading="savingStorageBackend" @click="saveStorageBackend" />
+          </div>
+        </div>
+      </template>
+    </UModal>
+
+    <UModal v-model:open="deleteStorageBackendOpen" title="删除存储后端?">
+      <template #body>
+        <p class="text-sm text-muted">
+          将删除 <span class="font-medium text-default">{{ storageBackendEditingName }}</span>。只有没有站点默认使用、也没有素材落在该后端时才允许删除。
+        </p>
+      </template>
+      <template #footer>
         <div class="flex w-full justify-end gap-2">
-          <UButton label="取消" color="neutral" variant="ghost" :disabled="savingStorageBackend" @click="storageBackendOpen = false" />
-          <UButton label="保存" icon="i-tabler-device-floppy" :loading="savingStorageBackend" @click="saveStorageBackend" />
+          <UButton color="neutral" variant="ghost" label="取消" :disabled="deletingStorageBackend" @click="deleteStorageBackendOpen = false" />
+          <UButton color="error" label="确认删除" :loading="deletingStorageBackend" @click="confirmDeleteStorageBackend" />
         </div>
       </template>
     </UModal>
