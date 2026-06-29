@@ -36,6 +36,20 @@ interface StorageBackend {
   healthy: boolean
   error?: string
 }
+interface StorageBackendDetail {
+  name: string
+  type: string
+  enabled: boolean
+  endpoint: string
+  region: string
+  bucketPublic: string
+  bucketPrivate: string
+  accessKey: string
+  hasSecretKey: boolean
+  publicBaseUrl: string
+  pathStyle: boolean
+  useSsl: boolean
+}
 interface Profile {
   siteKey: string
   profileKey: string
@@ -347,6 +361,8 @@ async function saveSite() {
 
 const storageBackendOpen = ref(false)
 const savingStorageBackend = ref(false)
+const loadingStorageBackend = ref(false)
+const storageBackendEditingName = ref('')
 const storageBackendForm = reactive({
   name: '',
   type: 's3',
@@ -361,22 +377,40 @@ const storageBackendForm = reactive({
   pathStyle: true,
   useSsl: false
 })
-function editStorageBackend(backend?: StorageBackend) {
+function assignStorageBackendForm(detail?: Partial<StorageBackendDetail>) {
   Object.assign(storageBackendForm, {
+    name: detail?.name || '',
+    type: detail?.type || 's3',
+    enabled: detail?.enabled ?? true,
+    endpoint: detail?.endpoint || '',
+    region: detail?.region || 'us-east-1',
+    bucketPublic: detail?.bucketPublic || '',
+    bucketPrivate: detail?.bucketPrivate || '',
+    accessKey: detail?.accessKey || '',
+    secretKey: '',
+    publicBaseUrl: detail?.publicBaseUrl || '',
+    pathStyle: detail?.pathStyle ?? true,
+    useSsl: detail?.useSsl ?? false
+  })
+}
+async function editStorageBackend(backend?: StorageBackend) {
+  storageBackendEditingName.value = backend?.managed ? backend.name : ''
+  assignStorageBackendForm({
     name: backend?.name || '',
     type: backend?.type || 's3',
     enabled: backend?.enabled !== false,
-    endpoint: '',
-    region: 'us-east-1',
-    bucketPublic: '',
-    bucketPrivate: '',
-    accessKey: '',
-    secretKey: '',
-    publicBaseUrl: '',
-    pathStyle: true,
-    useSsl: false
   })
   storageBackendOpen.value = true
+  if (!backend?.managed) return
+  loadingStorageBackend.value = true
+  try {
+    const data = await call<{ backend: StorageBackendDetail }>(`/api/v1/admin/assets-proxy/storage-backends/${backend.name}`)
+    assignStorageBackendForm(data.backend)
+  } catch (e) {
+    toast.add({ title: '加载存储后端失败', description: (e as Error)?.message, color: 'error' })
+  } finally {
+    loadingStorageBackend.value = false
+  }
 }
 async function saveStorageBackend() {
   savingStorageBackend.value = true
@@ -917,12 +951,16 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
             </div>
           </div>
           <div class="mt-3 flex flex-wrap gap-2">
-            <UBadge
+            <UButton
               v-for="backend in storageBackends"
               :key="backend.name"
               :label="`${backend.name}${backend.type ? ` · ${backend.type}` : ''}${backend.isDefault ? ' · 默认' : ''}${backend.enabled === false ? ' · 停用' : ''}${backend.healthy ? '' : ' · 异常'}`"
               :color="backend.enabled === false ? 'neutral' : (backend.healthy ? (backend.isDefault ? 'primary' : 'neutral') : 'error')"
+              :icon="backend.managed ? 'i-tabler-pencil' : 'i-tabler-database'"
               variant="soft"
+              size="xs"
+              :disabled="!backend.managed"
+              @click="editStorageBackend(backend)"
             />
           </div>
           <div class="mt-4 rounded-lg border border-default bg-elevated/30">
@@ -1129,7 +1167,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       <template #body>
         <div class="grid gap-4 sm:grid-cols-2">
           <UFormField label="后端名称">
-            <UInput v-model="storageBackendForm.name" placeholder="s3main" />
+            <UInput v-model="storageBackendForm.name" placeholder="s3main" :disabled="!!storageBackendEditingName || loadingStorageBackend" />
           </UFormField>
           <UFormField label="Region">
             <UInput v-model="storageBackendForm.region" placeholder="us-east-1" />
@@ -1150,13 +1188,13 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
             <UInput v-model="storageBackendForm.accessKey" autocomplete="off" />
           </UFormField>
           <UFormField label="Secret Key">
-            <UInput v-model="storageBackendForm.secretKey" type="password" autocomplete="new-password" />
+            <UInput v-model="storageBackendForm.secretKey" type="password" autocomplete="new-password" :placeholder="storageBackendEditingName ? '留空沿用已有密钥' : ''" />
           </UFormField>
           <UCheckbox v-model="storageBackendForm.pathStyle" label="Path-style endpoint" />
           <UCheckbox v-model="storageBackendForm.useSsl" label="使用 HTTPS" />
           <UCheckbox v-model="storageBackendForm.enabled" label="启用后端" />
           <p class="text-xs text-muted sm:col-span-2">
-            保存时会先连接并注册后端；如果配置不可用，不会写入运行时。已有同名后端会被覆盖。
+            保存时会先连接并注册后端；如果配置不可用，不会写入运行时。编辑已有后端时 Secret Key 留空会沿用旧密钥。
           </p>
         </div>
       </template>
