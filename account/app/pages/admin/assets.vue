@@ -103,6 +103,27 @@ interface PruneResult {
   items: AssetItem[]
   errors?: PruneError[]
 }
+interface OrphanObjectItem {
+  key: string
+  size: number
+  modTime?: string
+}
+interface OrphanObjectBackend {
+  backend: string
+  scanned: number
+  expected: number
+  orphans: number
+  deleted: number
+  skipped: boolean
+  error?: string
+  items: OrphanObjectItem[]
+  errors?: { key: string, error: string }[]
+}
+interface OrphanObjectResult {
+  items: OrphanObjectBackend[]
+  orphans: number
+  deleted: number
+}
 interface Grant {
   id: string
   assetId: string
@@ -340,6 +361,10 @@ const pruneOpen = ref(false)
 const pruningUnreferenced = ref(false)
 const prunePreview = ref<PruneResult | null>(null)
 const pruneForm = reactive({ olderThanDays: 30, limit: 50 })
+const orphanObjectsOpen = ref(false)
+const auditingOrphanObjects = ref(false)
+const orphanObjectsPreview = ref<OrphanObjectResult | null>(null)
+const orphanObjectsForm = reactive({ olderThanDays: 7, limit: 100, backend: ALL })
 async function confirmDeleteAsset() {
   if (!deleteAssetTarget.value) return
   deletingAsset.value = true
@@ -423,6 +448,54 @@ async function confirmPruneUnreferenced() {
     toast.add({ title: '无引用素材清理失败', description: (e as Error)?.message, color: 'error' })
   } finally {
     pruningUnreferenced.value = false
+  }
+}
+
+async function previewOrphanObjects() {
+  auditingOrphanObjects.value = true
+  try {
+    orphanObjectsPreview.value = await call<OrphanObjectResult>('/api/v1/admin/assets-proxy/maintenance/orphan-objects', {
+      method: 'POST',
+      body: {
+        olderThanDays: orphanObjectsForm.olderThanDays,
+        limit: orphanObjectsForm.limit,
+        backend: orphanObjectsForm.backend !== ALL ? orphanObjectsForm.backend : '',
+        dryRun: true
+      }
+    })
+    orphanObjectsOpen.value = true
+  } catch (e) {
+    toast.add({ title: '孤儿对象预检失败', description: (e as Error)?.message, color: 'error' })
+  } finally {
+    auditingOrphanObjects.value = false
+  }
+}
+
+async function confirmPruneOrphanObjects() {
+  auditingOrphanObjects.value = true
+  try {
+    const data = await call<OrphanObjectResult>('/api/v1/admin/assets-proxy/maintenance/orphan-objects', {
+      method: 'POST',
+      body: {
+        olderThanDays: orphanObjectsForm.olderThanDays,
+        limit: orphanObjectsForm.limit,
+        backend: orphanObjectsForm.backend !== ALL ? orphanObjectsForm.backend : '',
+        dryRun: false
+      }
+    })
+    const failed = (data.items ?? []).reduce((sum, item) => sum + (item.errors?.length ?? 0), 0)
+    toast.add({
+      title: '孤儿对象清理完成',
+      description: `删除 ${data.deleted ?? 0} 个对象${failed ? `，${failed} 个失败` : ''}`,
+      color: failed ? 'warning' : 'success',
+      icon: failed ? 'i-tabler-alert-triangle' : 'i-tabler-check'
+    })
+    orphanObjectsOpen.value = false
+    orphanObjectsPreview.value = null
+  } catch (e) {
+    toast.add({ title: '孤儿对象清理失败', description: (e as Error)?.message, color: 'error' })
+  } finally {
+    auditingOrphanObjects.value = false
   }
 }
 
@@ -677,6 +750,15 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
                 size="xs"
                 :loading="pruningUnreferenced"
                 @click="previewPruneUnreferenced"
+              />
+              <UButton
+                icon="i-tabler-database-search"
+                label="扫描孤儿对象"
+                color="neutral"
+                variant="soft"
+                size="xs"
+                :loading="auditingOrphanObjects"
+                @click="previewOrphanObjects"
               />
             </div>
           </div>
@@ -960,6 +1042,75 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
             :loading="pruningUnreferenced"
             :disabled="!prunePreview?.items?.length"
             @click="confirmPruneUnreferenced"
+          />
+        </div>
+      </template>
+    </UModal>
+
+    <UModal v-model:open="orphanObjectsOpen" title="扫描孤儿对象">
+      <template #body>
+        <div class="space-y-4">
+          <div class="grid gap-3 sm:grid-cols-3">
+            <UFormField label="存储后端">
+              <USelectMenu
+                v-model="orphanObjectsForm.backend"
+                :items="[{ label: '全部后端', value: ALL }, ...storageBackendOptions]"
+                value-key="value"
+                class="w-full"
+              />
+            </UFormField>
+            <UFormField label="保留天数">
+              <UInput v-model.number="orphanObjectsForm.olderThanDays" type="number" min="1" />
+            </UFormField>
+            <UFormField label="返回上限">
+              <UInput v-model.number="orphanObjectsForm.limit" type="number" min="1" max="500" />
+            </UFormField>
+          </div>
+          <p class="text-sm text-muted">
+            会扫描 public/private 对象,和数据库里的原文件及当前派生图 key 对比。只处理超过 {{ orphanObjectsForm.olderThanDays }} 天的多余对象。
+          </p>
+          <div class="space-y-3">
+            <div
+              v-for="backend in orphanObjectsPreview?.items ?? []"
+              :key="backend.backend"
+              class="rounded-lg border border-default bg-default"
+            >
+              <div class="flex flex-wrap items-center justify-between gap-2 border-b border-default px-3 py-2">
+                <div class="text-sm font-medium text-highlighted">{{ backend.backend }}</div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <UBadge :label="backend.skipped ? '不支持扫描' : `扫描 ${backend.scanned}`" :color="backend.skipped ? 'neutral' : 'primary'" variant="soft" />
+                  <UBadge :label="`期望 ${backend.expected}`" color="neutral" variant="soft" />
+                  <UBadge :label="`孤儿 ${backend.orphans}`" :color="backend.orphans ? 'warning' : 'success'" variant="soft" />
+                </div>
+              </div>
+              <div v-if="backend.error" class="px-3 py-2 text-sm text-error">{{ backend.error }}</div>
+              <ManageEmpty v-else-if="!backend.items?.length" icon="i-tabler-database-check" text="没有发现可清理对象" />
+              <div v-else class="max-h-64 overflow-auto">
+                <div v-for="item in backend.items" :key="item.key" class="flex items-center gap-3 border-b border-default px-3 py-2.5 last:border-b-0">
+                  <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-elevated text-muted">
+                    <UIcon name="i-tabler-file-database" class="size-4" />
+                  </span>
+                  <div class="min-w-0 flex-1">
+                    <div class="truncate font-mono text-xs text-highlighted">{{ item.key }}</div>
+                    <div class="mt-0.5 text-xs text-muted">{{ formatBytes(item.size) }} · {{ briefDate(item.modTime || '') }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <ManageEmpty v-if="!(orphanObjectsPreview?.items?.length)" icon="i-tabler-database-search" text="还没有扫描结果" />
+          </div>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton color="neutral" variant="ghost" label="取消" :disabled="auditingOrphanObjects" @click="orphanObjectsOpen = false" />
+          <UButton
+            color="error"
+            label="确认清理"
+            icon="i-tabler-trash"
+            :loading="auditingOrphanObjects"
+            :disabled="!(orphanObjectsPreview?.orphans)"
+            @click="confirmPruneOrphanObjects"
           />
         </div>
       </template>
