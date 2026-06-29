@@ -27,6 +27,12 @@ interface Site {
   profileCount: number
   variantCount: number
 }
+interface StorageBackend {
+  name: string
+  isDefault: boolean
+  healthy: boolean
+  error?: string
+}
 interface Profile {
   siteKey: string
   profileKey: string
@@ -64,6 +70,7 @@ interface AssetItem {
   siteKey: string
   profileKey: string
   deliveryPolicy: string
+  storageBackend: string
   refCount: number
   cdnUrl?: string
   createdAt: string
@@ -100,6 +107,7 @@ const loading = ref(true)
 const tab = ref<'library' | 'profiles' | 'grants'>('library')
 const stats = ref<Stats>({ assets: 0, publicAssets: 0, privateAssets: 0, sites: 0, profiles: 0, activeGrants: 0 })
 const sites = ref<Site[]>([])
+const storageBackends = ref<StorageBackend[]>([])
 const profiles = ref<Profile[]>([])
 const variants = ref<Variant[]>([])
 const assets = ref<AssetItem[]>([])
@@ -131,6 +139,10 @@ const visibilityOptions = [
   { label: '公开', value: 'public' },
   { label: '私有', value: 'private' }
 ]
+const storageBackendOptions = computed(() => storageBackends.value.map(b => ({
+  label: b.isDefault ? `${b.name} · 默认` : b.name,
+  value: b.name
+})))
 const modeOptions = [
   { label: '等比缩放', value: 'resize' },
   { label: '填充裁剪', value: 'fill' }
@@ -158,14 +170,16 @@ watch(grantPage, fetchGrants)
 async function reloadAll() {
   loading.value = true
   try {
-    const [st, siteData, profileData, variantData] = await Promise.all([
+    const [st, siteData, backendData, profileData, variantData] = await Promise.all([
       call<Stats>('/api/v1/admin/assets-proxy/stats'),
       call<{ items: Site[] }>('/api/v1/admin/assets-proxy/sites'),
+      call<{ items: StorageBackend[], defaultName: string }>('/api/v1/admin/assets-proxy/storage-backends'),
       call<{ items: Profile[] }>('/api/v1/admin/assets-proxy/profiles'),
       call<{ items: Variant[] }>('/api/v1/admin/assets-proxy/variants')
     ])
     stats.value = st
     sites.value = siteData.items ?? []
+    storageBackends.value = backendData.items ?? []
     profiles.value = profileData.items ?? []
     variants.value = variantData.items ?? []
     await Promise.all([fetchAssets(), fetchGrants()])
@@ -247,7 +261,7 @@ function editSite(site?: Site) {
   Object.assign(siteForm, site ?? {
     siteKey: '',
     name: '',
-    defaultStorageBackend: 'local',
+    defaultStorageBackend: storageBackends.value.find(b => b.isDefault)?.name || storageBackends.value[0]?.name || 'local',
     enabled: true,
     assetCount: 0,
     profileCount: 0,
@@ -518,6 +532,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
                 <span>/ {{ asset.profileKey }}</span>
                 <span>{{ asset.mime }}</span>
                 <span>{{ formatBytes(asset.size) }}</span>
+                <span>{{ asset.storageBackend || 'local' }}</span>
                 <span v-if="asset.width && asset.height">{{ asset.width }}x{{ asset.height }}</span>
               </div>
             </div>
@@ -542,6 +557,25 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       </section>
 
       <section v-else-if="tab === 'profiles'" class="space-y-4">
+        <div class="rounded-lg border border-default bg-default p-4">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <h2 class="text-sm font-semibold text-highlighted">存储后端</h2>
+              <p class="mt-1 text-xs text-muted">站点上传会落到自己的默认后端；不存在的后端不能保存。</p>
+            </div>
+            <UBadge :label="`${storageBackends.length} 个可用`" color="neutral" variant="soft" />
+          </div>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <UBadge
+              v-for="backend in storageBackends"
+              :key="backend.name"
+              :label="`${backend.name}${backend.isDefault ? ' · 默认' : ''}${backend.healthy ? '' : ' · 异常'}`"
+              :color="backend.healthy ? (backend.isDefault ? 'primary' : 'neutral') : 'error'"
+              variant="soft"
+            />
+          </div>
+        </div>
+
         <div class="grid gap-3 lg:grid-cols-2">
           <div v-for="site in sites" :key="site.siteKey" class="rounded-lg border border-default bg-default p-4">
             <div class="flex items-start justify-between gap-3">
@@ -697,7 +731,13 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
             <UInput v-model="siteForm.name" placeholder="Blog" />
           </UFormField>
           <UFormField label="默认存储后端">
-            <UInput v-model="siteForm.defaultStorageBackend" placeholder="local" />
+            <USelectMenu
+              v-model="siteForm.defaultStorageBackend"
+              :items="storageBackendOptions"
+              value-key="value"
+              class="w-full"
+              :search-input="{ placeholder: '搜索后端…' }"
+            />
           </UFormField>
           <UFormField label="状态">
             <USwitch v-model="siteForm.enabled" label="允许上传" />
