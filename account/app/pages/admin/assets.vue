@@ -182,6 +182,11 @@ interface Grant {
   reason: string
   createdAt: string
 }
+interface CreatedGrant {
+  grantId: string
+  url: string
+  expiresAt: string
+}
 
 const mounted = ref(false)
 const loading = ref(true)
@@ -800,6 +805,18 @@ async function confirmDeleteProfile() {
 const revokeGrantTarget = ref<Grant | null>(null)
 const revokeGrantOpen = computed({ get: () => !!revokeGrantTarget.value, set: v => { if (!v) revokeGrantTarget.value = null } })
 const revokingGrant = ref(false)
+const createGrantOpen = ref(false)
+const creatingGrant = ref(false)
+const grantAsset = ref<AssetItem | null>(null)
+const createdGrant = ref<CreatedGrant | null>(null)
+const grantForm = reactive({
+  variantKey: 'original',
+  policy: 'oneTime',
+  subjectId: '',
+  expiresIn: 3600,
+  maxUses: 1,
+  reason: 'admin-issued'
+})
 async function confirmRevokeGrant() {
   if (!revokeGrantTarget.value) return
   revokingGrant.value = true
@@ -813,6 +830,43 @@ async function confirmRevokeGrant() {
   } finally {
     revokingGrant.value = false
   }
+}
+
+function openCreateGrant(asset: AssetItem) {
+  grantAsset.value = asset
+  createdGrant.value = null
+  Object.assign(grantForm, {
+    variantKey: 'original',
+    policy: asset.deliveryPolicy && asset.deliveryPolicy !== 'public' ? asset.deliveryPolicy : 'oneTime',
+    subjectId: '',
+    expiresIn: 3600,
+    maxUses: 1,
+    reason: `admin:${asset.filename || asset.id}`
+  })
+  createGrantOpen.value = true
+}
+
+async function createGrant() {
+  if (!grantAsset.value) return
+  creatingGrant.value = true
+  try {
+    createdGrant.value = await call<CreatedGrant>('/api/v1/admin/assets-proxy/grants/create', {
+      method: 'POST',
+      body: { ...grantForm, assetId: grantAsset.value.id }
+    })
+    toast.add({ title: '交付链接已生成', color: 'success', icon: 'i-tabler-check' })
+    await fetchGrants()
+  } catch (e) {
+    toast.add({ title: '生成交付链接失败', description: (e as Error)?.message, color: 'error' })
+  } finally {
+    creatingGrant.value = false
+  }
+}
+
+async function copyCreatedGrant() {
+  if (!createdGrant.value?.url) return
+  await navigator.clipboard.writeText(createdGrant.value.url)
+  toast.add({ title: '链接已复制', color: 'success', icon: 'i-tabler-copy-check' })
 }
 
 function formatBytes(n: number) {
@@ -848,6 +902,7 @@ function assetActions(asset: AssetItem): DropdownMenuItem[][] {
   return [[
     { label: '查看引用', icon: 'i-tabler-link', disabled: !asset.refCount, onSelect: () => openReferences(asset) },
     { label: '打开文件', icon: 'i-tabler-external-link', disabled: !asset.cdnUrl, onSelect: () => { if (asset.cdnUrl) window.open(asset.cdnUrl, '_blank') } },
+    { label: '签发交付链接', icon: 'i-tabler-key', onSelect: () => openCreateGrant(asset) },
     { label: '重建派生图', icon: 'i-tabler-refresh-dot', disabled: !asset.mime.startsWith('image/') || rebuildingAssetId.value === asset.id, onSelect: () => rebuildDerivatives(asset) }
   ], [
     { label: asset.refCount ? '有引用，不能删除' : '删除素材', icon: 'i-tabler-trash', color: 'error', disabled: !!asset.refCount, onSelect: () => { deleteAssetTarget.value = asset } }
@@ -1634,6 +1689,48 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
             :disabled="!batchRebuildPreview?.items?.length"
             @click="confirmBatchRebuild"
           />
+        </div>
+      </template>
+    </UModal>
+
+    <UModal v-model:open="createGrantOpen" title="签发交付链接">
+      <template #body>
+        <div class="space-y-4">
+          <p class="truncate font-mono text-xs text-dimmed">{{ grantAsset?.id }}</p>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <UFormField label="Variant">
+              <UInput v-model="grantForm.variantKey" placeholder="original / card / cover" />
+            </UFormField>
+            <UFormField label="策略">
+              <USelect v-model="grantForm.policy" :items="policyOptions" value-key="value" />
+            </UFormField>
+            <UFormField label="有效期(秒)">
+              <UInput v-model.number="grantForm.expiresIn" type="number" min="60" />
+            </UFormField>
+            <UFormField label="最大使用次数">
+              <UInput v-model.number="grantForm.maxUses" type="number" min="1" />
+            </UFormField>
+            <UFormField label="Subject ID" class="sm:col-span-2">
+              <UInput v-model="grantForm.subjectId" placeholder="留空表示不绑定用户" />
+            </UFormField>
+            <UFormField label="原因" class="sm:col-span-2">
+              <UInput v-model="grantForm.reason" />
+            </UFormField>
+          </div>
+          <div v-if="createdGrant" class="rounded-lg border border-default bg-default p-3">
+            <div class="mb-2 flex items-center justify-between gap-2">
+              <div class="text-sm font-medium text-highlighted">交付链接</div>
+              <UButton icon="i-tabler-copy" label="复制" color="neutral" variant="soft" size="xs" @click="copyCreatedGrant" />
+            </div>
+            <p class="break-all font-mono text-xs text-muted">{{ createdGrant.url }}</p>
+            <p class="mt-2 text-xs text-muted">过期 {{ briefDate(createdGrant.expiresAt) }}</p>
+          </div>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton color="neutral" variant="ghost" label="关闭" :disabled="creatingGrant" @click="createGrantOpen = false" />
+          <UButton label="生成链接" icon="i-tabler-key" :loading="creatingGrant" @click="createGrant" />
         </div>
       </template>
     </UModal>
