@@ -148,6 +148,12 @@ interface OrphanObjectResult {
   orphans: number
   deleted: number
 }
+interface StorageMigrationResult {
+  candidates: number
+  migrated: number
+  items: AssetItem[]
+  errors?: PruneError[]
+}
 interface MaintenanceTask {
   id: string
   taskType: string
@@ -495,6 +501,10 @@ const orphanObjectsOpen = ref(false)
 const auditingOrphanObjects = ref(false)
 const orphanObjectsPreview = ref<OrphanObjectResult | null>(null)
 const orphanObjectsForm = reactive({ olderThanDays: 7, limit: 100, backend: ALL })
+const storageMigrationOpen = ref(false)
+const migratingStorage = ref(false)
+const storageMigrationPreview = ref<StorageMigrationResult | null>(null)
+const storageMigrationForm = reactive({ sourceBackend: '', targetBackend: '', limit: 50 })
 const batchRebuildOpen = ref(false)
 const batchRebuilding = ref(false)
 const batchRebuildProfile = ref<Profile | null>(null)
@@ -681,6 +691,54 @@ async function confirmPruneOrphanObjects() {
   }
 }
 
+function openStorageMigration() {
+  const enabled = storageBackends.value.filter(b => b.enabled !== false)
+  storageMigrationForm.sourceBackend = enabled[0]?.name || ''
+  storageMigrationForm.targetBackend = enabled.find(b => b.name !== storageMigrationForm.sourceBackend)?.name || ''
+  storageMigrationForm.limit = 50
+  storageMigrationPreview.value = null
+  storageMigrationOpen.value = true
+}
+
+async function previewStorageMigration() {
+  migratingStorage.value = true
+  try {
+    storageMigrationPreview.value = await call<StorageMigrationResult>('/api/v1/admin/assets-proxy/maintenance/migrate-storage', {
+      method: 'POST',
+      body: { ...storageMigrationForm, dryRun: true }
+    })
+    await fetchMaintenanceTasks()
+  } catch (e) {
+    toast.add({ title: '存储迁移预检失败', description: (e as Error)?.message, color: 'error' })
+  } finally {
+    migratingStorage.value = false
+  }
+}
+
+async function confirmStorageMigration() {
+  migratingStorage.value = true
+  try {
+    const data = await call<StorageMigrationResult>('/api/v1/admin/assets-proxy/maintenance/migrate-storage', {
+      method: 'POST',
+      body: { ...storageMigrationForm, dryRun: false }
+    })
+    const failed = data.errors?.length ?? 0
+    toast.add({
+      title: '存储迁移完成',
+      description: `迁移 ${data.migrated ?? 0} 个素材${failed ? `，${failed} 个失败` : ''}`,
+      color: failed ? 'warning' : 'success',
+      icon: failed ? 'i-tabler-alert-triangle' : 'i-tabler-check'
+    })
+    storageMigrationOpen.value = false
+    storageMigrationPreview.value = null
+    await reloadAll()
+  } catch (e) {
+    toast.add({ title: '存储迁移失败', description: (e as Error)?.message, color: 'error' })
+  } finally {
+    migratingStorage.value = false
+  }
+}
+
 const referenceAsset = ref<AssetItem | null>(null)
 const referencesOpen = computed({ get: () => !!referenceAsset.value, set: v => { if (!v) referenceAsset.value = null } })
 const loadingReferences = ref(false)
@@ -813,7 +871,8 @@ function taskTypeLabel(type: string) {
     'sweep-staging': '清理暂存',
     'prune-unreferenced': '无引用素材',
     'orphan-objects': '孤儿对象',
-    'rebuild-derivatives': '重建派生图'
+    'rebuild-derivatives': '重建派生图',
+    'migrate-storage': '存储迁移'
   }
   return labels[type] || type
 }
@@ -965,6 +1024,15 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
                 size="xs"
                 :loading="auditingOrphanObjects"
                 @click="previewOrphanObjects"
+              />
+              <UButton
+                icon="i-tabler-transfer"
+                label="迁移后端"
+                color="neutral"
+                variant="soft"
+                size="xs"
+                :disabled="storageBackends.filter(b => b.enabled !== false).length < 2"
+                @click="openStorageMigration"
               />
             </div>
           </div>
@@ -1412,6 +1480,65 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
             :loading="auditingOrphanObjects"
             :disabled="!(orphanObjectsPreview?.orphans)"
             @click="confirmPruneOrphanObjects"
+          />
+        </div>
+      </template>
+    </UModal>
+
+    <UModal v-model:open="storageMigrationOpen" title="迁移存储后端">
+      <template #body>
+        <div class="space-y-4">
+          <div class="grid gap-3 sm:grid-cols-3">
+            <UFormField label="源后端">
+              <USelectMenu v-model="storageMigrationForm.sourceBackend" :items="storageBackendOptions" value-key="value" class="w-full" />
+            </UFormField>
+            <UFormField label="目标后端">
+              <USelectMenu v-model="storageMigrationForm.targetBackend" :items="storageBackendOptions" value-key="value" class="w-full" />
+            </UFormField>
+            <UFormField label="单次上限">
+              <UInput v-model.number="storageMigrationForm.limit" type="number" min="1" max="200" />
+            </UFormField>
+          </div>
+          <p class="text-sm text-muted">
+            会把源后端中的原文件和当前派生图复制到目标后端，成功后更新素材所属后端。旧后端对象不会立即删除，可再用孤儿对象扫描清理。
+          </p>
+          <div class="rounded-lg border border-default bg-default">
+            <div class="border-b border-default px-3 py-2 text-sm text-muted">
+              候选 {{ storageMigrationPreview?.candidates ?? 0 }} 个，本次最多处理 {{ storageMigrationForm.limit }} 个
+            </div>
+            <ManageEmpty v-if="!storageMigrationPreview?.items?.length" icon="i-tabler-database-off" text="还没有预检结果" />
+            <div v-else class="max-h-72 overflow-auto">
+              <div v-for="asset in storageMigrationPreview.items" :key="asset.id" class="flex items-center gap-3 border-b border-default px-3 py-2.5 last:border-b-0">
+                <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-elevated text-muted">
+                  <UIcon name="i-tabler-file-database" class="size-4" />
+                </span>
+                <div class="min-w-0 flex-1">
+                  <div class="truncate text-sm font-medium text-highlighted">{{ asset.filename || asset.id }}</div>
+                  <div class="truncate text-xs text-muted">{{ asset.storageBackend }} · {{ asset.mime }} · {{ formatBytes(asset.size) }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton color="neutral" variant="ghost" label="取消" :disabled="migratingStorage" @click="storageMigrationOpen = false" />
+          <UButton
+            color="neutral"
+            variant="soft"
+            label="预检"
+            icon="i-tabler-search"
+            :loading="migratingStorage"
+            :disabled="!storageMigrationForm.sourceBackend || !storageMigrationForm.targetBackend || storageMigrationForm.sourceBackend === storageMigrationForm.targetBackend"
+            @click="previewStorageMigration"
+          />
+          <UButton
+            label="确认迁移"
+            icon="i-tabler-transfer"
+            :loading="migratingStorage"
+            :disabled="!storageMigrationPreview?.items?.length || storageMigrationForm.sourceBackend === storageMigrationForm.targetBackend"
+            @click="confirmStorageMigration"
           />
         </div>
       </template>
