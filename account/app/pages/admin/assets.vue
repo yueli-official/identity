@@ -124,6 +124,17 @@ interface OrphanObjectResult {
   orphans: number
   deleted: number
 }
+interface MaintenanceTask {
+  id: string
+  taskType: string
+  status: string
+  dryRun: boolean
+  summary: string
+  error?: string
+  startedAt: string
+  finishedAt?: string
+  createdAt: string
+}
 interface Grant {
   id: string
   assetId: string
@@ -151,6 +162,7 @@ const variants = ref<Variant[]>([])
 const assets = ref<AssetItem[]>([])
 const references = ref<AssetReference[]>([])
 const grants = ref<Grant[]>([])
+const maintenanceTasks = ref<MaintenanceTask[]>([])
 const totalAssets = ref(0)
 const totalGrants = ref(0)
 const page = ref(1)
@@ -220,7 +232,7 @@ async function reloadAll() {
     storageBackends.value = backendData.items ?? []
     profiles.value = profileData.items ?? []
     variants.value = variantData.items ?? []
-    await Promise.all([fetchAssets(), fetchGrants()])
+    await Promise.all([fetchAssets(), fetchGrants(), fetchMaintenanceTasks()])
   } catch (e) {
     toast.add({ title: '资源后台加载失败', description: (e as Error)?.message, color: 'error' })
   } finally {
@@ -248,6 +260,13 @@ async function fetchGrants() {
   })
   grants.value = data.items ?? []
   totalGrants.value = data.total ?? 0
+}
+
+async function fetchMaintenanceTasks() {
+  const data = await call<{ items: MaintenanceTask[] }>('/api/v1/admin/assets-proxy/maintenance/tasks', {
+    params: { page: 1, size: 8 }
+  })
+  maintenanceTasks.value = data.items ?? []
 }
 
 const profileOpen = ref(false)
@@ -419,6 +438,7 @@ async function previewPruneUnreferenced() {
       method: 'POST',
       body: { ...pruneForm, dryRun: true }
     })
+    await fetchMaintenanceTasks()
     pruneOpen.value = true
   } catch (e) {
     toast.add({ title: '无引用素材预检失败', description: (e as Error)?.message, color: 'error' })
@@ -463,6 +483,7 @@ async function previewOrphanObjects() {
         dryRun: true
       }
     })
+    await fetchMaintenanceTasks()
     orphanObjectsOpen.value = true
   } catch (e) {
     toast.add({ title: '孤儿对象预检失败', description: (e as Error)?.message, color: 'error' })
@@ -492,6 +513,7 @@ async function confirmPruneOrphanObjects() {
     })
     orphanObjectsOpen.value = false
     orphanObjectsPreview.value = null
+    await fetchMaintenanceTasks()
   } catch (e) {
     toast.add({ title: '孤儿对象清理失败', description: (e as Error)?.message, color: 'error' })
   } finally {
@@ -624,6 +646,20 @@ function grantStatus(grant: Grant): { label: string, color: 'success' | 'warning
 }
 function canRevokeGrant(grant: Grant) {
   return grantStatus(grant).label === '有效'
+}
+function taskTypeLabel(type: string) {
+  const labels: Record<string, string> = {
+    'sweep-staging': '清理暂存',
+    'prune-unreferenced': '无引用素材',
+    'orphan-objects': '孤儿对象'
+  }
+  return labels[type] || type
+}
+function taskStatus(task: MaintenanceTask): { label: string, color: 'success' | 'warning' | 'error' | 'neutral' } {
+  if (task.status === 'failed') return { label: '失败', color: 'error' }
+  if (task.dryRun) return { label: '预检', color: 'warning' }
+  if (task.status === 'completed') return { label: '完成', color: 'success' }
+  return { label: task.status || '未知', color: 'neutral' }
 }
 function openExternal(url: string) {
   if (url) window.open(url, '_blank')
@@ -770,6 +806,28 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
               :color="backend.healthy ? (backend.isDefault ? 'primary' : 'neutral') : 'error'"
               variant="soft"
             />
+          </div>
+          <div class="mt-4 rounded-lg border border-default bg-elevated/30">
+            <div class="flex items-center justify-between border-b border-default px-3 py-2">
+              <h3 class="text-xs font-medium text-muted">最近维护</h3>
+              <UButton icon="i-tabler-refresh" color="neutral" variant="ghost" square size="xs" @click="fetchMaintenanceTasks" />
+            </div>
+            <ManageEmpty v-if="!maintenanceTasks.length" icon="i-tabler-history" text="还没有维护记录" />
+            <div v-else class="divide-y divide-default">
+              <div v-for="task in maintenanceTasks" :key="task.id" class="flex items-center gap-3 px-3 py-2.5">
+                <span class="grid size-8 shrink-0 place-items-center rounded-lg bg-default text-muted">
+                  <UIcon name="i-tabler-history" class="size-4" />
+                </span>
+                <div class="min-w-0 flex-1">
+                  <div class="flex min-w-0 items-center gap-2">
+                    <span class="truncate text-sm font-medium text-highlighted">{{ task.summary || taskTypeLabel(task.taskType) }}</span>
+                    <UBadge :label="taskStatus(task).label" :color="taskStatus(task).color" variant="soft" size="sm" />
+                  </div>
+                  <div class="mt-0.5 truncate text-xs text-muted">{{ taskTypeLabel(task.taskType) }} · {{ briefDate(task.createdAt) }}</div>
+                </div>
+                <div v-if="task.error" class="hidden max-w-64 truncate text-xs text-error md:block">{{ task.error }}</div>
+              </div>
+            </div>
           </div>
         </div>
 
