@@ -23,6 +23,9 @@ interface Site {
   name: string
   defaultStorageBackend: string
   enabled: boolean
+  assetCount: number
+  profileCount: number
+  variantCount: number
 }
 interface Profile {
   siteKey: string
@@ -33,6 +36,8 @@ interface Profile {
   defaultVisibility: string
   defaultDeliveryPolicy: string
   keepOriginal: boolean
+  assetCount: number
+  variantCount: number
 }
 interface Variant {
   id: string
@@ -189,7 +194,9 @@ const profileForm = reactive<Profile>({
   maxSizeBytes: 20 * 1024 * 1024,
   defaultVisibility: 'public',
   defaultDeliveryPolicy: 'public',
-  keepOriginal: true
+  keepOriginal: true,
+  assetCount: 0,
+  variantCount: 0
 })
 function editProfile(p?: Profile) {
   Object.assign(profileForm, p ?? {
@@ -200,7 +207,9 @@ function editProfile(p?: Profile) {
     maxSizeBytes: 20 * 1024 * 1024,
     defaultVisibility: 'public',
     defaultDeliveryPolicy: 'public',
-    keepOriginal: true
+    keepOriginal: true,
+    assetCount: 0,
+    variantCount: 0
   })
   profileOpen.value = true
 }
@@ -208,6 +217,35 @@ async function saveProfile() {
   await call('/api/v1/admin/assets-proxy/profiles', { method: 'POST', body: profileForm })
   toast.add({ title: 'Profile 已保存', color: 'success', icon: 'i-tabler-check' })
   profileOpen.value = false
+  await reloadAll()
+}
+
+const siteOpen = ref(false)
+const siteForm = reactive<Site>({
+  siteKey: '',
+  name: '',
+  defaultStorageBackend: 'local',
+  enabled: true,
+  assetCount: 0,
+  profileCount: 0,
+  variantCount: 0
+})
+function editSite(site?: Site) {
+  Object.assign(siteForm, site ?? {
+    siteKey: '',
+    name: '',
+    defaultStorageBackend: 'local',
+    enabled: true,
+    assetCount: 0,
+    profileCount: 0,
+    variantCount: 0
+  })
+  siteOpen.value = true
+}
+async function saveSite() {
+  await call('/api/v1/admin/assets-proxy/sites', { method: 'POST', body: siteForm })
+  toast.add({ title: '站点已保存', color: 'success', icon: 'i-tabler-check' })
+  siteOpen.value = false
   await reloadAll()
 }
 
@@ -285,6 +323,25 @@ async function confirmDeleteVariant() {
   }
 }
 
+const deleteProfileTarget = ref<Profile | null>(null)
+const deleteProfileOpen = computed({ get: () => !!deleteProfileTarget.value, set: v => { if (!v) deleteProfileTarget.value = null } })
+const deletingProfile = ref(false)
+async function confirmDeleteProfile() {
+  if (!deleteProfileTarget.value) return
+  deletingProfile.value = true
+  try {
+    const p = deleteProfileTarget.value
+    await call(`/api/v1/admin/assets-proxy/profiles/${p.siteKey}/${p.profileKey}`, { method: 'DELETE' })
+    toast.add({ title: 'Profile 已删除', color: 'success', icon: 'i-tabler-check' })
+    deleteProfileTarget.value = null
+    await reloadAll()
+  } catch (e) {
+    toast.add({ title: '删除 Profile 失败', description: (e as Error)?.message, color: 'error' })
+  } finally {
+    deletingProfile.value = false
+  }
+}
+
 const revokeGrantTarget = ref<Grant | null>(null)
 const revokeGrantOpen = computed({ get: () => !!revokeGrantTarget.value, set: v => { if (!v) revokeGrantTarget.value = null } })
 const revokingGrant = ref(false)
@@ -318,6 +375,18 @@ function variantsFor(p: Profile) {
 }
 function siteName(key: string) {
   return sites.value.find(s => s.siteKey === key)?.name || key
+}
+function siteActions(site: Site): DropdownMenuItem[][] {
+  return [[
+    { label: '编辑站点', icon: 'i-tabler-pencil', onSelect: () => editSite(site) }
+  ]]
+}
+function profileActions(profile: Profile): DropdownMenuItem[][] {
+  const inUse = profile.assetCount > 0 || profile.variantCount > 0
+  return [[
+    { label: '编辑', icon: 'i-tabler-pencil', onSelect: () => editProfile(profile) },
+    { label: '删除', icon: 'i-tabler-trash', color: 'error', disabled: inUse, onSelect: () => { deleteProfileTarget.value = profile } }
+  ]]
 }
 function assetActions(asset: AssetItem): DropdownMenuItem[][] {
   return [[
@@ -355,6 +424,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       <template #actions>
         <div class="flex items-center gap-2">
           <UButton icon="i-tabler-refresh" label="刷新" color="neutral" variant="soft" @click="reloadAll" />
+          <UButton icon="i-tabler-world-plus" label="新建站点" color="neutral" variant="soft" @click="editSite()" />
           <UButton icon="i-tabler-plus" label="新建 Profile" @click="editProfile()" />
         </div>
       </template>
@@ -380,7 +450,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
 
     <div class="mb-5 flex flex-wrap items-center gap-2">
       <UButton label="素材库" icon="i-tabler-photo" :variant="tab === 'library' ? 'solid' : 'ghost'" @click="tab = 'library'" />
-      <UButton label="规格配置" icon="i-tabler-adjustments" color="neutral" :variant="tab === 'profiles' ? 'soft' : 'ghost'" @click="tab = 'profiles'" />
+      <UButton label="站点配置" icon="i-tabler-adjustments" color="neutral" :variant="tab === 'profiles' ? 'soft' : 'ghost'" @click="tab = 'profiles'" />
       <UButton label="交付授权" icon="i-tabler-key" color="neutral" :variant="tab === 'grants' ? 'soft' : 'ghost'" @click="tab = 'grants'" />
     </div>
 
@@ -435,6 +505,50 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       </section>
 
       <section v-else-if="tab === 'profiles'" class="space-y-4">
+        <div class="grid gap-3 lg:grid-cols-2">
+          <div v-for="site in sites" :key="site.siteKey" class="rounded-lg border border-default bg-default p-4">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2">
+                  <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+                    <UIcon name="i-tabler-world" class="size-4" />
+                  </span>
+                  <div class="min-w-0">
+                    <h3 class="truncate text-sm font-semibold text-highlighted">{{ site.name }}</h3>
+                    <p class="truncate font-mono text-xs text-muted">{{ site.siteKey }}</p>
+                  </div>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <UBadge :label="site.enabled ? '启用' : '停用'" :color="site.enabled ? 'success' : 'neutral'" variant="soft" />
+                <UDropdownMenu :items="siteActions(site)">
+                  <UButton icon="i-tabler-dots-vertical" color="neutral" variant="ghost" square size="xs" />
+                </UDropdownMenu>
+              </div>
+            </div>
+            <div class="mt-4 grid grid-cols-3 gap-2 text-xs">
+              <div class="rounded-md bg-elevated/40 px-3 py-2">
+                <div class="text-muted">素材</div>
+                <div class="mt-0.5 font-semibold text-highlighted tabular-nums">{{ site.assetCount }}</div>
+              </div>
+              <div class="rounded-md bg-elevated/40 px-3 py-2">
+                <div class="text-muted">Profile</div>
+                <div class="mt-0.5 font-semibold text-highlighted tabular-nums">{{ site.profileCount }}</div>
+              </div>
+              <div class="rounded-md bg-elevated/40 px-3 py-2">
+                <div class="text-muted">Variant</div>
+                <div class="mt-0.5 font-semibold text-highlighted tabular-nums">{{ site.variantCount }}</div>
+              </div>
+            </div>
+            <div class="mt-3 text-xs text-muted">默认后端 <span class="font-mono text-default">{{ site.defaultStorageBackend }}</span></div>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between pt-2">
+          <h2 class="text-sm font-semibold text-highlighted">Profile 与派生规格</h2>
+          <UButton icon="i-tabler-plus" label="新建 Profile" size="sm" @click="editProfile()" />
+        </div>
+
         <div class="grid gap-4 lg:grid-cols-2">
           <div v-for="profile in profiles" :key="`${profile.siteKey}:${profile.profileKey}`" class="rounded-lg border border-default bg-default">
             <div class="flex items-start justify-between gap-3 border-b border-default p-4">
@@ -445,7 +559,12 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
                 </div>
                 <p class="mt-1 text-xs text-muted">{{ siteName(profile.siteKey) }} · {{ profile.purpose || '未填写用途' }}</p>
               </div>
-              <UButton icon="i-tabler-pencil" color="neutral" variant="ghost" size="xs" @click="editProfile(profile)" />
+              <div class="flex items-center gap-2">
+                <UBadge :label="`${profile.assetCount} 素材`" color="neutral" variant="soft" />
+                <UDropdownMenu :items="profileActions(profile)">
+                  <UButton icon="i-tabler-dots-vertical" color="neutral" variant="ghost" square size="xs" />
+                </UDropdownMenu>
+              </div>
             </div>
             <div class="space-y-3 p-4 text-sm">
               <div class="grid grid-cols-2 gap-3 text-xs text-muted">
@@ -455,7 +574,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
                 <div>交付 <span class="text-default">{{ profile.defaultDeliveryPolicy }}</span></div>
               </div>
               <div class="flex items-center justify-between">
-                <span class="text-xs font-medium text-muted">Variant</span>
+                <span class="text-xs font-medium text-muted">Variant · {{ profile.variantCount }}</span>
                 <UButton icon="i-tabler-plus" label="添加" color="neutral" variant="soft" size="xs" @click="editVariant(undefined, profile)" />
               </div>
               <div v-if="!variantsFor(profile).length" class="rounded-md border border-dashed border-default px-3 py-2 text-xs text-muted">还没有派生规格。</div>
@@ -531,6 +650,31 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       </template>
     </UModal>
 
+    <UModal v-model:open="siteOpen" title="站点配置">
+      <template #body>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <UFormField label="Site Key">
+            <UInput v-model="siteForm.siteKey" placeholder="blog" />
+          </UFormField>
+          <UFormField label="站点名称">
+            <UInput v-model="siteForm.name" placeholder="Blog" />
+          </UFormField>
+          <UFormField label="默认存储后端">
+            <UInput v-model="siteForm.defaultStorageBackend" placeholder="local" />
+          </UFormField>
+          <UFormField label="状态">
+            <USwitch v-model="siteForm.enabled" label="允许上传" />
+          </UFormField>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton label="取消" color="neutral" variant="ghost" @click="siteOpen = false" />
+          <UButton label="保存" icon="i-tabler-device-floppy" @click="saveSite" />
+        </div>
+      </template>
+    </UModal>
+
     <UModal v-model:open="variantOpen" title="Variant 规则">
       <template #body>
         <div class="grid gap-4 sm:grid-cols-2">
@@ -549,6 +693,20 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
         <div class="flex w-full justify-end gap-2">
           <UButton label="取消" color="neutral" variant="ghost" @click="variantOpen = false" />
           <UButton label="保存" icon="i-tabler-device-floppy" @click="saveVariant" />
+        </div>
+      </template>
+    </UModal>
+
+    <UModal v-model:open="deleteProfileOpen" title="删除 Profile?">
+      <template #body>
+        <p class="text-sm text-muted">
+          将删除 <span class="font-medium text-default">{{ deleteProfileTarget?.profileKey }}</span>。只有没有素材、没有 Variant 的 Profile 才允许删除。
+        </p>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton color="neutral" variant="ghost" label="取消" :disabled="deletingProfile" @click="deleteProfileTarget = null" />
+          <UButton color="error" label="确认删除" :loading="deletingProfile" @click="confirmDeleteProfile" />
         </div>
       </template>
     </UModal>
