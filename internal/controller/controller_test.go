@@ -114,6 +114,8 @@ func TestAuthFlow(t *testing.T) {
 						rawLower := strings.ToLower(raw)
 						t.Assert(strings.Contains(rawLower, "httponly"), true)
 						t.Assert(strings.Contains(rawLower, "samesite"), true)
+						t.Assert(strings.Contains(rawLower, "max-age"), true)
+						t.Assert(strings.Contains(rawLower, "expires"), true)
 					}
 				}
 			}

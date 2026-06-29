@@ -32,7 +32,7 @@ type Config struct {
 
 func DefaultConfig() Config {
 	return Config{
-		SessionIdleTTL:  24 * time.Hour,
+		SessionIdleTTL:  30 * 24 * time.Hour,
 		LoginMaxFails:   5,
 		LoginFailWindow: 15 * time.Minute,
 		LoginLockFor:    15 * time.Minute,

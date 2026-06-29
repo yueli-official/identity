@@ -45,9 +45,13 @@ func main() {
 	rdb := cache.NewRedis(g.Redis())
 
 	// ── Business auth ───────────────────────────────────────────────────────
-	store := repo.NewComposite(daoPG, rdb, rdb)
 	cfg := logic.DefaultConfig()
 	cfg.AccountBaseURL = accountBaseURL // base for verify-email / reset links
+	if sessionIdleTTL := g.Cfg().MustGet(ctx, "auth.sessionIdleTtl").Duration(); sessionIdleTTL > 0 {
+		cfg.SessionIdleTTL = sessionIdleTTL
+	}
+	sessionStore := repo.NewRecoveringSessionStore(rdb, daoPG)
+	store := repo.NewComposite(daoPG, sessionStore, rdb)
 
 	// PAT HMAC secret: warn at startup when falling back to the insecure dev key.
 	cfg.PATHMACSecret = g.Cfg().MustGet(ctx, "pat.hmacSecret").String()
@@ -59,7 +63,7 @@ func main() {
 	}
 
 	svc := logic.New(store, cfg)
-	authCtl := controller.New(svc, secureCookie)
+	authCtl := controller.New(svc, secureCookie, cfg.SessionIdleTTL)
 
 	// ── Bootstrap admin (RBAC) ───────────────────────────────────────────────
 	// If rbac.bootstrapAdminEmail is set and that identity already exists, grant
@@ -141,7 +145,7 @@ func main() {
 	if googleClientID != "" && googleClientSecret != "" {
 		googleProvider = oauthlogin.NewGoogle(googleClientID, googleClientSecret, googleRedirectURL)
 	}
-	oauthCtl := controller.NewOAuth(svc, googleProvider, secureCookie, []byte(globalSecret), loginURL)
+	oauthCtl := controller.NewOAuth(svc, googleProvider, secureCookie, []byte(globalSecret), loginURL, cfg.SessionIdleTTL)
 
 	// Avatar/cover upload proxy: the IdP drives the asset upload server-side on
 	// behalf of the cookie-authenticated caller (mints a short-lived user token).

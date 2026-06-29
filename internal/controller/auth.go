@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/gogf/gf/v2/net/ghttp"
 
@@ -16,12 +17,17 @@ const sessionCookie = "id_session"
 type Controller struct {
 	svc          *logic.Service
 	secureCookie bool
+	sessionTTL   time.Duration
 }
 
 // New builds the controller. secureCookie should be true in production (HTTPS);
 // tests/local HTTP use false so the session cookie round-trips over plain HTTP.
-func New(svc *logic.Service, secureCookie bool) *Controller {
-	return &Controller{svc: svc, secureCookie: secureCookie}
+func New(svc *logic.Service, secureCookie bool, sessionTTL ...time.Duration) *Controller {
+	ttl := logic.DefaultConfig().SessionIdleTTL
+	if len(sessionTTL) > 0 {
+		ttl = sessionTTL[0]
+	}
+	return &Controller{svc: svc, secureCookie: secureCookie, sessionTTL: ttl}
 }
 
 func (c *Controller) Register(ctx context.Context, req *v1.RegisterReq) (*v1.RegisterRes, error) {
@@ -100,8 +106,13 @@ func (c *Controller) PasswordReset(ctx context.Context, req *v1.PasswordResetReq
 }
 
 func (c *Controller) setSessionCookie(r *ghttp.Request, sid string) {
-	r.Cookie.SetHttpCookie(&http.Cookie{
+	cookie := &http.Cookie{
 		Name: sessionCookie, Value: sid, Path: "/",
 		HttpOnly: true, Secure: c.secureCookie, SameSite: http.SameSiteLaxMode,
-	})
+	}
+	if c.sessionTTL > 0 {
+		cookie.MaxAge = int(c.sessionTTL.Seconds())
+		cookie.Expires = time.Now().Add(c.sessionTTL)
+	}
+	r.Cookie.SetHttpCookie(cookie)
 }

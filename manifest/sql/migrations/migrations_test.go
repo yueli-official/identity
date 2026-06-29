@@ -67,3 +67,23 @@ func TestOIDCSessionMigrationHasCoreTables(t *testing.T) {
 		t.Errorf("0003 down missing: %v", err)
 	}
 }
+
+func TestIdentitySessionMigrationHasDurableLoginSessions(t *testing.T) {
+	up, err := os.ReadFile("0011_identity_sessions.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(up)
+	for _, want := range []string{
+		"CREATE TABLE identity_sessions",
+		"identity_id",
+		"expires_at",
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("0011 up missing %q", want)
+		}
+	}
+	if _, err := os.Stat("0011_identity_sessions.down.sql"); err != nil {
+		t.Errorf("0011 down missing: %v", err)
+	}
+}

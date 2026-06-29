@@ -49,4 +49,5 @@ type Session struct {
 	UserAgent  string
 	IP         string
 	Device     string
+	ExpiresAt  time.Time
 }

@@ -24,14 +24,19 @@ type OAuthController struct {
 	svc          *logic.Service
 	google       oauthlogin.Provider // nil when unconfigured
 	secureCookie bool
+	sessionTTL   time.Duration
 	stateSecret  []byte
 	loginURL     string
 }
 
 // NewOAuth builds the OAuth controller. google may be nil when no credentials are
 // configured, in which case the endpoints redirect to the login page with an error.
-func NewOAuth(svc *logic.Service, google oauthlogin.Provider, secureCookie bool, stateSecret []byte, loginURL string) *OAuthController {
-	return &OAuthController{svc: svc, google: google, secureCookie: secureCookie, stateSecret: stateSecret, loginURL: loginURL}
+func NewOAuth(svc *logic.Service, google oauthlogin.Provider, secureCookie bool, stateSecret []byte, loginURL string, sessionTTL ...time.Duration) *OAuthController {
+	ttl := logic.DefaultConfig().SessionIdleTTL
+	if len(sessionTTL) > 0 {
+		ttl = sessionTTL[0]
+	}
+	return &OAuthController{svc: svc, google: google, secureCookie: secureCookie, sessionTTL: ttl, stateSecret: stateSecret, loginURL: loginURL}
 }
 
 // GoogleStart handles GET /api/v1/auth/oauth/google/start.
@@ -115,10 +120,15 @@ func (c *OAuthController) GoogleCallback(r *ghttp.Request) {
 		r.Response.RedirectTo(c.loginURL + "?error=oauth_login")
 		return
 	}
-	r.Cookie.SetHttpCookie(&http.Cookie{
+	cookie := &http.Cookie{
 		Name: sessionCookie, Value: out.SessionID, Path: "/",
 		HttpOnly: true, Secure: c.secureCookie, SameSite: http.SameSiteLaxMode,
-	})
+	}
+	if c.sessionTTL > 0 {
+		cookie.MaxAge = int(c.sessionTTL.Seconds())
+		cookie.Expires = time.Now().Add(c.sessionTTL)
+	}
+	r.Cookie.SetHttpCookie(cookie)
 	r.Response.RedirectTo(returnTo)
 }
 

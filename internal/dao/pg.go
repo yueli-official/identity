@@ -191,3 +191,4 @@ func isUniqueViolation(err error) bool {
 
 // Compile-time interface assertion.
 var _ repo.IdentityRepo = (*PG)(nil)
+var _ repo.SessionStore = (*PG)(nil)

@@ -24,6 +24,8 @@ redis:
   default:
     address: ""  # override via GF_REDIS_DEFAULT_ADDRESS env var at runtime
     db: 0
+auth:
+  sessionIdleTtl: "720h"  # 30 days; Redis is a cache, PG remains the durable session source
 oidc:
   issuer: "http://localhost:8081"
   refreshTtl: "720h"      # 30 days; access/id tokens stay 10m (set in code)
