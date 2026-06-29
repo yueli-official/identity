@@ -31,8 +31,9 @@ type InitInput struct {
 }
 
 type initOutput struct {
-	UploadURL   string
-	UploadToken string
+	UploadURL     string
+	UploadToken   string
+	UploadHeaders map[string]string
 }
 
 type View struct {
@@ -59,15 +60,28 @@ func (c *Client) post(ctx context.Context, bearer, path string, body g.Map) (*gj
 func (c *Client) uploadInit(ctx context.Context, bearer string, in InitInput) (initOutput, error) {
 	j, err := c.post(ctx, bearer, "/api/v1/assets/upload-init", g.Map{
 		"filename": in.Filename, "mime": in.Mime, "size": in.Size,
-		"category": in.Category, "visibility": in.Visibility,
+		"category": in.Category, "siteKey": "account", "profileKey": in.Category,
+		"visibility": in.Visibility,
 	})
 	if err != nil {
 		return initOutput{}, err
 	}
 	return initOutput{
-		UploadURL:   j.Get("data.uploadUrl").String(),
-		UploadToken: j.Get("data.uploadToken").String(),
+		UploadURL:     j.Get("data.uploadUrl").String(),
+		UploadToken:   j.Get("data.uploadToken").String(),
+		UploadHeaders: stringMap(j.Get("data.uploadHeaders").Map()),
 	}, nil
+}
+
+func stringMap(raw map[string]any) map[string]string {
+	if len(raw) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(raw))
+	for k, v := range raw {
+		out[k] = g.NewVar(v).String()
+	}
+	return out
 }
 
 func (c *Client) finalize(ctx context.Context, bearer, token string) (View, error) {
@@ -83,9 +97,12 @@ func (c *Client) finalize(ctx context.Context, bearer, token string) (View, erro
 
 // putBlob streams the bytes to the presigned, token-validated blob URL. The blob
 // endpoint authenticates by the URL token (not a bearer), so no auth header here.
-func (c *Client) putBlob(ctx context.Context, uploadURL, mime string, data []byte) error {
+func (c *Client) putBlob(ctx context.Context, uploadURL, mime string, headers map[string]string, data []byte) error {
 	cli := g.Client()
 	cli.SetHeader("Content-Type", mime)
+	for k, v := range headers {
+		cli.SetHeader(k, v)
+	}
 	resp, err := cli.Put(ctx, uploadURL, data)
 	if err != nil {
 		return fmt.Errorf("asset blob upload failed: %w", err)
@@ -120,7 +137,7 @@ func (c *Client) Upload(ctx context.Context, bearer string, in InitInput, data [
 	if err != nil {
 		return View{}, err
 	}
-	if err := c.putBlob(ctx, out.UploadURL, in.Mime, data); err != nil {
+	if err := c.putBlob(ctx, out.UploadURL, in.Mime, out.UploadHeaders, data); err != nil {
 		return View{}, err
 	}
 	return c.finalize(ctx, bearer, out.UploadToken)
