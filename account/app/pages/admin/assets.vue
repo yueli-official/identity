@@ -86,6 +86,12 @@ interface AssetReference {
   createdByService: string
   createdAt: string
 }
+interface SweepResult {
+  backend: string
+  removed: number
+  skipped: boolean
+  error?: string
+}
 interface Grant {
   id: string
   assetId: string
@@ -317,6 +323,8 @@ async function saveVariant() {
 const deleteAssetTarget = ref<AssetItem | null>(null)
 const deleteAssetOpen = computed({ get: () => !!deleteAssetTarget.value, set: v => { if (!v) deleteAssetTarget.value = null } })
 const deletingAsset = ref(false)
+const rebuildingAssetId = ref('')
+const sweepingStaging = ref(false)
 async function confirmDeleteAsset() {
   if (!deleteAssetTarget.value) return
   deletingAsset.value = true
@@ -329,6 +337,38 @@ async function confirmDeleteAsset() {
     toast.add({ title: '删除素材失败', description: (e as Error)?.message, color: 'error' })
   } finally {
     deletingAsset.value = false
+  }
+}
+
+async function rebuildDerivatives(asset: AssetItem) {
+  rebuildingAssetId.value = asset.id
+  try {
+    const data = await call<{ generated: number }>(`/api/v1/admin/assets-proxy/library/${asset.id}/derivatives/rebuild`, { method: 'POST' })
+    toast.add({ title: '派生图已重建', description: `生成 ${data.generated ?? 0} 个 Variant`, color: 'success', icon: 'i-tabler-check' })
+  } catch (e) {
+    toast.add({ title: '重建派生图失败', description: (e as Error)?.message, color: 'error' })
+  } finally {
+    rebuildingAssetId.value = ''
+  }
+}
+
+async function sweepStaging() {
+  sweepingStaging.value = true
+  try {
+    const data = await call<{ items: SweepResult[], removed: number }>('/api/v1/admin/assets-proxy/maintenance/sweep-staging', { method: 'POST' })
+    const skipped = (data.items ?? []).filter(i => i.skipped).length
+    const failed = (data.items ?? []).filter(i => i.error).length
+    toast.add({
+      title: '暂存清理完成',
+      description: `删除 ${data.removed ?? 0} 个对象${skipped ? `，跳过 ${skipped} 个后端` : ''}${failed ? `，${failed} 个异常` : ''}`,
+      color: failed ? 'warning' : 'success',
+      icon: failed ? 'i-tabler-alert-triangle' : 'i-tabler-check'
+    })
+    await reloadAll()
+  } catch (e) {
+    toast.add({ title: '暂存清理失败', description: (e as Error)?.message, color: 'error' })
+  } finally {
+    sweepingStaging.value = false
   }
 }
 
@@ -437,7 +477,8 @@ function profileActions(profile: Profile): DropdownMenuItem[][] {
 function assetActions(asset: AssetItem): DropdownMenuItem[][] {
   return [[
     { label: '查看引用', icon: 'i-tabler-link', disabled: !asset.refCount, onSelect: () => openReferences(asset) },
-    { label: '打开文件', icon: 'i-tabler-external-link', disabled: !asset.cdnUrl, onSelect: () => { if (asset.cdnUrl) window.open(asset.cdnUrl, '_blank') } }
+    { label: '打开文件', icon: 'i-tabler-external-link', disabled: !asset.cdnUrl, onSelect: () => { if (asset.cdnUrl) window.open(asset.cdnUrl, '_blank') } },
+    { label: '重建派生图', icon: 'i-tabler-refresh-dot', disabled: !asset.mime.startsWith('image/') || rebuildingAssetId.value === asset.id, onSelect: () => rebuildDerivatives(asset) }
   ], [
     { label: asset.refCount ? '有引用，不能删除' : '删除素材', icon: 'i-tabler-trash', color: 'error', disabled: !!asset.refCount, onSelect: () => { deleteAssetTarget.value = asset } }
   ]]
@@ -563,7 +604,18 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
               <h2 class="text-sm font-semibold text-highlighted">存储后端</h2>
               <p class="mt-1 text-xs text-muted">站点上传会落到自己的默认后端；不存在的后端不能保存。</p>
             </div>
-            <UBadge :label="`${storageBackends.length} 个可用`" color="neutral" variant="soft" />
+            <div class="flex items-center gap-2">
+              <UBadge :label="`${storageBackends.length} 个可用`" color="neutral" variant="soft" />
+              <UButton
+                icon="i-tabler-broom"
+                label="清理暂存"
+                color="neutral"
+                variant="soft"
+                size="xs"
+                :loading="sweepingStaging"
+                @click="sweepStaging"
+              />
+            </div>
           </div>
           <div class="mt-3 flex flex-wrap gap-2">
             <UBadge
