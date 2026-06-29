@@ -150,6 +150,7 @@ func main() {
 	// Avatar/cover upload proxy: the IdP drives the asset upload server-side on
 	// behalf of the cookie-authenticated caller (mints a short-lived user token).
 	avatarCtl := controller.NewAvatar(svc, mgr, assetclient.New(assetBaseURL), issuer)
+	assetAdminProxy := controller.NewAssetAdminProxy(authCtl, mgr, issuer, assetBaseURL)
 
 	// ── Routing ─────────────────────────────────────────────────────────────
 	s := g.Server()
@@ -165,6 +166,7 @@ func main() {
 		grp.GET("/healthz", controller.Healthz)
 		grp.Bind(authCtl)
 		grp.Bind(avatarCtl)
+		grp.ALL("/api/v1/admin/assets-proxy/*", assetAdminProxy.Forward)
 	})
 
 	// OIDC standard endpoints: raw RFC responses — NO envelope middleware.
