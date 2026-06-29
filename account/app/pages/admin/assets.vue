@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { DropdownMenuItem } from '@nuxt/ui'
 import { ManageHeader, ManageEmpty, SkeletonList } from '@platform/ui/components'
 import { useMinLoading } from '@platform/ui/use-min-loading'
 
@@ -71,6 +72,7 @@ interface Grant {
   expiresAt: string
   maxUses: number
   usedCount: number
+  revokedAt?: string
   createdByService: string
   reason: string
   createdAt: string
@@ -246,10 +248,59 @@ async function saveVariant() {
   variantOpen.value = false
   await reloadAll()
 }
-async function deleteVariant(v: Variant) {
-  await call(`/api/v1/admin/assets-proxy/variants/${v.id}`, { method: 'DELETE' })
-  toast.add({ title: 'Variant 已删除', color: 'success', icon: 'i-tabler-trash' })
-  await reloadAll()
+
+const deleteAssetTarget = ref<AssetItem | null>(null)
+const deleteAssetOpen = computed({ get: () => !!deleteAssetTarget.value, set: v => { if (!v) deleteAssetTarget.value = null } })
+const deletingAsset = ref(false)
+async function confirmDeleteAsset() {
+  if (!deleteAssetTarget.value) return
+  deletingAsset.value = true
+  try {
+    await call(`/api/v1/admin/assets-proxy/library/${deleteAssetTarget.value.id}`, { method: 'DELETE' })
+    toast.add({ title: '素材已删除', color: 'success', icon: 'i-tabler-check' })
+    deleteAssetTarget.value = null
+    await reloadAll()
+  } catch (e) {
+    toast.add({ title: '删除素材失败', description: (e as Error)?.message, color: 'error' })
+  } finally {
+    deletingAsset.value = false
+  }
+}
+
+const deleteVariantTarget = ref<Variant | null>(null)
+const deleteVariantOpen = computed({ get: () => !!deleteVariantTarget.value, set: v => { if (!v) deleteVariantTarget.value = null } })
+const deletingVariant = ref(false)
+async function confirmDeleteVariant() {
+  if (!deleteVariantTarget.value) return
+  deletingVariant.value = true
+  try {
+    await call(`/api/v1/admin/assets-proxy/variants/${deleteVariantTarget.value.id}`, { method: 'DELETE' })
+    toast.add({ title: 'Variant 已删除', color: 'success', icon: 'i-tabler-check' })
+    deleteVariantTarget.value = null
+    await reloadAll()
+  } catch (e) {
+    toast.add({ title: '删除 Variant 失败', description: (e as Error)?.message, color: 'error' })
+  } finally {
+    deletingVariant.value = false
+  }
+}
+
+const revokeGrantTarget = ref<Grant | null>(null)
+const revokeGrantOpen = computed({ get: () => !!revokeGrantTarget.value, set: v => { if (!v) revokeGrantTarget.value = null } })
+const revokingGrant = ref(false)
+async function confirmRevokeGrant() {
+  if (!revokeGrantTarget.value) return
+  revokingGrant.value = true
+  try {
+    await call(`/api/v1/admin/assets-proxy/grants/${revokeGrantTarget.value.id}/revoke`, { method: 'POST' })
+    toast.add({ title: '授权已撤销', color: 'success', icon: 'i-tabler-check' })
+    revokeGrantTarget.value = null
+    await reloadAll()
+  } catch (e) {
+    toast.add({ title: '撤销授权失败', description: (e as Error)?.message, color: 'error' })
+  } finally {
+    revokingGrant.value = false
+  }
 }
 
 function formatBytes(n: number) {
@@ -267,6 +318,33 @@ function variantsFor(p: Profile) {
 }
 function siteName(key: string) {
   return sites.value.find(s => s.siteKey === key)?.name || key
+}
+function assetActions(asset: AssetItem): DropdownMenuItem[][] {
+  return [[
+    { label: '打开文件', icon: 'i-tabler-external-link', disabled: !asset.cdnUrl, onSelect: () => { if (asset.cdnUrl) window.open(asset.cdnUrl, '_blank') } }
+  ], [
+    { label: '删除素材', icon: 'i-tabler-trash', color: 'error', onSelect: () => { deleteAssetTarget.value = asset } }
+  ]]
+}
+function variantActions(variant: Variant): DropdownMenuItem[][] {
+  return [[
+    { label: '编辑', icon: 'i-tabler-pencil', onSelect: () => editVariant(variant) },
+    { label: '删除', icon: 'i-tabler-trash', color: 'error', onSelect: () => { deleteVariantTarget.value = variant } }
+  ]]
+}
+function grantStatus(grant: Grant): { label: string, color: 'success' | 'warning' | 'error' | 'neutral' } {
+  if (grant.revokedAt) return { label: '已撤销', color: 'neutral' }
+  if (grant.expiresAt && new Date(grant.expiresAt).getTime() <= Date.now()) return { label: '已过期', color: 'warning' }
+  if (grant.maxUses > 0 && grant.usedCount >= grant.maxUses) return { label: '已用完', color: 'warning' }
+  return { label: '有效', color: 'success' }
+}
+function canRevokeGrant(grant: Grant) {
+  return grantStatus(grant).label === '有效'
+}
+function grantActions(grant: Grant): DropdownMenuItem[][] {
+  return [[
+    { label: '撤销授权', icon: 'i-tabler-ban', color: 'error', disabled: !canRevokeGrant(grant), onSelect: () => { revokeGrantTarget.value = grant } }
+  ]]
 }
 </script>
 
@@ -341,6 +419,9 @@ function siteName(key: string) {
               <UBadge :label="asset.visibility" :color="asset.visibility === 'public' ? 'success' : 'warning'" variant="soft" />
               <UBadge :label="asset.deliveryPolicy || 'public'" color="neutral" variant="soft" />
             </div>
+            <UDropdownMenu :items="assetActions(asset)">
+              <UButton icon="i-tabler-dots-vertical" color="neutral" variant="ghost" square size="xs" />
+            </UDropdownMenu>
           </div>
         </div>
         <div class="flex items-center justify-between text-sm text-muted">
@@ -386,7 +467,7 @@ function siteName(key: string) {
                 >
                   <span class="font-medium text-default">{{ variant.variantKey }}</span>
                   <span class="text-muted">{{ variant.width }}x{{ variant.height }} · {{ variant.mode }} · v{{ variant.version }}</span>
-                  <UDropdownMenu :items="[[{ label: '编辑', icon: 'i-tabler-pencil', onSelect: () => editVariant(variant) }, { label: '删除', icon: 'i-tabler-trash', color: 'error', onSelect: () => deleteVariant(variant) }]]">
+                  <UDropdownMenu :items="variantActions(variant)">
                     <UButton icon="i-tabler-dots" color="neutral" variant="ghost" size="xs" />
                   </UDropdownMenu>
                 </div>
@@ -411,7 +492,11 @@ function siteName(key: string) {
               <div>{{ grant.usedCount }} / {{ grant.maxUses }}</div>
               <div>过期 {{ briefDate(grant.expiresAt) }}</div>
             </div>
+            <UBadge :label="grantStatus(grant).label" :color="grantStatus(grant).color" variant="soft" />
             <UBadge :label="grant.policy" color="neutral" variant="soft" />
+            <UDropdownMenu :items="grantActions(grant)">
+              <UButton icon="i-tabler-dots-vertical" color="neutral" variant="ghost" square size="xs" />
+            </UDropdownMenu>
           </div>
         </div>
         <div class="flex items-center justify-between text-sm text-muted">
@@ -464,6 +549,49 @@ function siteName(key: string) {
         <div class="flex w-full justify-end gap-2">
           <UButton label="取消" color="neutral" variant="ghost" @click="variantOpen = false" />
           <UButton label="保存" icon="i-tabler-device-floppy" @click="saveVariant" />
+        </div>
+      </template>
+    </UModal>
+
+    <UModal v-model:open="deleteAssetOpen" title="删除素材?">
+      <template #body>
+        <p class="text-sm text-muted">
+          将删除 <span class="font-medium text-default">{{ deleteAssetTarget?.filename || deleteAssetTarget?.id }}</span>。原文件、派生图和相关交付授权会一并失效。
+        </p>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton color="neutral" variant="ghost" label="取消" :disabled="deletingAsset" @click="deleteAssetTarget = null" />
+          <UButton color="error" label="确认删除" :loading="deletingAsset" @click="confirmDeleteAsset" />
+        </div>
+      </template>
+    </UModal>
+
+    <UModal v-model:open="deleteVariantOpen" title="删除 Variant?">
+      <template #body>
+        <p class="text-sm text-muted">
+          将删除 <span class="font-medium text-default">{{ deleteVariantTarget?.variantKey }}</span>。已有文件不会被删除，但之后不会再生成这个派生规格。
+        </p>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton color="neutral" variant="ghost" label="取消" :disabled="deletingVariant" @click="deleteVariantTarget = null" />
+          <UButton color="error" label="确认删除" :loading="deletingVariant" @click="confirmDeleteVariant" />
+        </div>
+      </template>
+    </UModal>
+
+    <UModal v-model:open="revokeGrantOpen" title="撤销授权?">
+      <template #body>
+        <p class="text-sm text-muted">
+          将撤销这条交付授权。撤销后，已发出去的一次性或门禁链接会立即失效。
+        </p>
+        <p class="mt-2 truncate font-mono text-xs text-dimmed">{{ revokeGrantTarget?.assetId }}</p>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton color="neutral" variant="ghost" label="取消" :disabled="revokingGrant" @click="revokeGrantTarget = null" />
+          <UButton color="error" label="确认撤销" :loading="revokingGrant" @click="confirmRevokeGrant" />
         </div>
       </template>
     </UModal>
