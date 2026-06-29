@@ -59,7 +59,8 @@ func (c *Client) post(ctx context.Context, bearer, path string, body g.Map) (*gj
 func (c *Client) uploadInit(ctx context.Context, bearer string, in InitInput) (initOutput, error) {
 	j, err := c.post(ctx, bearer, "/api/v1/assets/upload-init", g.Map{
 		"filename": in.Filename, "mime": in.Mime, "size": in.Size,
-		"category": in.Category, "visibility": in.Visibility,
+		"category": in.Category, "siteKey": "account", "profileKey": in.Category,
+		"visibility": in.Visibility,
 	})
 	if err != nil {
 		return initOutput{}, err
