@@ -64,7 +64,19 @@ interface AssetItem {
   siteKey: string
   profileKey: string
   deliveryPolicy: string
+  refCount: number
   cdnUrl?: string
+  createdAt: string
+}
+interface AssetReference {
+  id: string
+  assetId: string
+  siteKey: string
+  refType: string
+  refId: string
+  refLabel: string
+  refUrl: string
+  createdByService: string
   createdAt: string
 }
 interface Grant {
@@ -91,6 +103,7 @@ const sites = ref<Site[]>([])
 const profiles = ref<Profile[]>([])
 const variants = ref<Variant[]>([])
 const assets = ref<AssetItem[]>([])
+const references = ref<AssetReference[]>([])
 const grants = ref<Grant[]>([])
 const totalAssets = ref(0)
 const totalGrants = ref(0)
@@ -305,6 +318,25 @@ async function confirmDeleteAsset() {
   }
 }
 
+const referenceAsset = ref<AssetItem | null>(null)
+const referencesOpen = computed({ get: () => !!referenceAsset.value, set: v => { if (!v) referenceAsset.value = null } })
+const loadingReferences = ref(false)
+async function openReferences(asset: AssetItem) {
+  referenceAsset.value = asset
+  references.value = []
+  loadingReferences.value = true
+  try {
+    const data = await call<{ items: AssetReference[] }>('/api/v1/admin/assets-proxy/references', {
+      params: { assetId: asset.id, page: 1, size: 50 }
+    })
+    references.value = data.items ?? []
+  } catch (e) {
+    toast.add({ title: '加载引用失败', description: (e as Error)?.message, color: 'error' })
+  } finally {
+    loadingReferences.value = false
+  }
+}
+
 const deleteVariantTarget = ref<Variant | null>(null)
 const deleteVariantOpen = computed({ get: () => !!deleteVariantTarget.value, set: v => { if (!v) deleteVariantTarget.value = null } })
 const deletingVariant = ref(false)
@@ -390,9 +422,10 @@ function profileActions(profile: Profile): DropdownMenuItem[][] {
 }
 function assetActions(asset: AssetItem): DropdownMenuItem[][] {
   return [[
+    { label: '查看引用', icon: 'i-tabler-link', disabled: !asset.refCount, onSelect: () => openReferences(asset) },
     { label: '打开文件', icon: 'i-tabler-external-link', disabled: !asset.cdnUrl, onSelect: () => { if (asset.cdnUrl) window.open(asset.cdnUrl, '_blank') } }
   ], [
-    { label: '删除素材', icon: 'i-tabler-trash', color: 'error', onSelect: () => { deleteAssetTarget.value = asset } }
+    { label: asset.refCount ? '有引用，不能删除' : '删除素材', icon: 'i-tabler-trash', color: 'error', disabled: !!asset.refCount, onSelect: () => { deleteAssetTarget.value = asset } }
   ]]
 }
 function variantActions(variant: Variant): DropdownMenuItem[][] {
@@ -409,6 +442,9 @@ function grantStatus(grant: Grant): { label: string, color: 'success' | 'warning
 }
 function canRevokeGrant(grant: Grant) {
   return grantStatus(grant).label === '有效'
+}
+function openExternal(url: string) {
+  if (url) window.open(url, '_blank')
 }
 function grantActions(grant: Grant): DropdownMenuItem[][] {
   return [[
@@ -486,6 +522,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
               </div>
             </div>
             <div class="hidden items-center gap-2 sm:flex">
+              <UBadge v-if="asset.refCount" :label="`${asset.refCount} 引用`" color="warning" variant="soft" />
               <UBadge :label="asset.visibility" :color="asset.visibility === 'public' ? 'success' : 'warning'" variant="soft" />
               <UBadge :label="asset.deliveryPolicy || 'public'" color="neutral" variant="soft" />
             </div>
@@ -721,6 +758,36 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
         <div class="flex w-full justify-end gap-2">
           <UButton color="neutral" variant="ghost" label="取消" :disabled="deletingAsset" @click="deleteAssetTarget = null" />
           <UButton color="error" label="确认删除" :loading="deletingAsset" @click="confirmDeleteAsset" />
+        </div>
+      </template>
+    </UModal>
+
+    <UModal v-model:open="referencesOpen" title="素材引用">
+      <template #body>
+        <div class="space-y-3">
+          <p class="truncate font-mono text-xs text-dimmed">{{ referenceAsset?.id }}</p>
+          <SkeletonList v-if="loadingReferences" :rows="3" />
+          <ManageEmpty v-else-if="!references.length" icon="i-tabler-link-off" text="还没有引用记录" />
+          <div v-else class="overflow-hidden rounded-lg border border-default bg-default">
+            <div v-for="ref in references" :key="ref.id" class="flex items-center gap-3 border-b border-default px-3 py-2.5 last:border-b-0">
+              <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+                <UIcon name="i-tabler-link" class="size-4" />
+              </span>
+              <div class="min-w-0 flex-1">
+                <div class="truncate text-sm font-medium text-highlighted">{{ ref.refLabel || ref.refId }}</div>
+                <div class="truncate text-xs text-muted">{{ ref.siteKey }} · {{ ref.refType }} · {{ ref.refId }}</div>
+              </div>
+              <UButton
+                v-if="ref.refUrl"
+                icon="i-tabler-external-link"
+                color="neutral"
+                variant="ghost"
+                square
+                size="xs"
+                @click="openExternal(ref.refUrl)"
+              />
+            </div>
+          </div>
         </div>
       </template>
     </UModal>
