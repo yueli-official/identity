@@ -92,6 +92,17 @@ interface SweepResult {
   skipped: boolean
   error?: string
 }
+interface PruneError {
+  id: string
+  filename: string
+  error: string
+}
+interface PruneResult {
+  candidates: number
+  deleted: number
+  items: AssetItem[]
+  errors?: PruneError[]
+}
 interface Grant {
   id: string
   assetId: string
@@ -325,6 +336,10 @@ const deleteAssetOpen = computed({ get: () => !!deleteAssetTarget.value, set: v 
 const deletingAsset = ref(false)
 const rebuildingAssetId = ref('')
 const sweepingStaging = ref(false)
+const pruneOpen = ref(false)
+const pruningUnreferenced = ref(false)
+const prunePreview = ref<PruneResult | null>(null)
+const pruneForm = reactive({ olderThanDays: 30, limit: 50 })
 async function confirmDeleteAsset() {
   if (!deleteAssetTarget.value) return
   deletingAsset.value = true
@@ -369,6 +384,45 @@ async function sweepStaging() {
     toast.add({ title: '暂存清理失败', description: (e as Error)?.message, color: 'error' })
   } finally {
     sweepingStaging.value = false
+  }
+}
+
+async function previewPruneUnreferenced() {
+  pruningUnreferenced.value = true
+  try {
+    prunePreview.value = await call<PruneResult>('/api/v1/admin/assets-proxy/maintenance/prune-unreferenced', {
+      method: 'POST',
+      body: { ...pruneForm, dryRun: true }
+    })
+    pruneOpen.value = true
+  } catch (e) {
+    toast.add({ title: '无引用素材预检失败', description: (e as Error)?.message, color: 'error' })
+  } finally {
+    pruningUnreferenced.value = false
+  }
+}
+
+async function confirmPruneUnreferenced() {
+  pruningUnreferenced.value = true
+  try {
+    const data = await call<PruneResult>('/api/v1/admin/assets-proxy/maintenance/prune-unreferenced', {
+      method: 'POST',
+      body: { ...pruneForm, dryRun: false }
+    })
+    const failed = data.errors?.length ?? 0
+    toast.add({
+      title: '无引用素材清理完成',
+      description: `删除 ${data.deleted ?? 0} 个素材${failed ? `，${failed} 个失败` : ''}`,
+      color: failed ? 'warning' : 'success',
+      icon: failed ? 'i-tabler-alert-triangle' : 'i-tabler-check'
+    })
+    pruneOpen.value = false
+    prunePreview.value = null
+    await reloadAll()
+  } catch (e) {
+    toast.add({ title: '无引用素材清理失败', description: (e as Error)?.message, color: 'error' })
+  } finally {
+    pruningUnreferenced.value = false
   }
 }
 
@@ -615,6 +669,15 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
                 :loading="sweepingStaging"
                 @click="sweepStaging"
               />
+              <UButton
+                icon="i-tabler-unlink"
+                label="清理无引用"
+                color="neutral"
+                variant="soft"
+                size="xs"
+                :loading="pruningUnreferenced"
+                @click="previewPruneUnreferenced"
+              />
             </div>
           </div>
           <div class="mt-3 flex flex-wrap gap-2">
@@ -850,6 +913,54 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
         <div class="flex w-full justify-end gap-2">
           <UButton color="neutral" variant="ghost" label="取消" :disabled="deletingAsset" @click="deleteAssetTarget = null" />
           <UButton color="error" label="确认删除" :loading="deletingAsset" @click="confirmDeleteAsset" />
+        </div>
+      </template>
+    </UModal>
+
+    <UModal v-model:open="pruneOpen" title="清理无引用素材">
+      <template #body>
+        <div class="space-y-4">
+          <div class="grid gap-3 sm:grid-cols-2">
+            <UFormField label="保留天数">
+              <UInput v-model.number="pruneForm.olderThanDays" type="number" min="1" />
+            </UFormField>
+            <UFormField label="单次上限">
+              <UInput v-model.number="pruneForm.limit" type="number" min="1" max="200" />
+            </UFormField>
+          </div>
+          <p class="text-sm text-muted">
+            将只处理超过 {{ pruneForm.olderThanDays }} 天、且没有任何业务引用的素材。删除前后端仍会再次检查引用。
+          </p>
+          <div class="rounded-lg border border-default bg-default">
+            <div class="border-b border-default px-3 py-2 text-sm text-muted">
+              候选 {{ prunePreview?.candidates ?? 0 }} 个，本次最多处理 {{ pruneForm.limit }} 个
+            </div>
+            <ManageEmpty v-if="!prunePreview?.items?.length" icon="i-tabler-unlink" text="没有可清理的无引用素材" />
+            <div v-else class="max-h-72 overflow-auto">
+              <div v-for="asset in prunePreview.items" :key="asset.id" class="flex items-center gap-3 border-b border-default px-3 py-2.5 last:border-b-0">
+                <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-elevated text-muted">
+                  <UIcon name="i-tabler-file" class="size-4" />
+                </span>
+                <div class="min-w-0 flex-1">
+                  <div class="truncate text-sm font-medium text-highlighted">{{ asset.filename || asset.id }}</div>
+                  <div class="truncate text-xs text-muted">{{ asset.siteKey }} / {{ asset.profileKey }} · {{ formatBytes(asset.size) }} · {{ briefDate(asset.createdAt) }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton color="neutral" variant="ghost" label="取消" :disabled="pruningUnreferenced" @click="pruneOpen = false" />
+          <UButton
+            color="error"
+            label="确认清理"
+            icon="i-tabler-trash"
+            :loading="pruningUnreferenced"
+            :disabled="!prunePreview?.items?.length"
+            @click="confirmPruneUnreferenced"
+          />
         </div>
       </template>
     </UModal>
