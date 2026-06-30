@@ -225,7 +225,8 @@ interface CreatedGrant {
 
 const mounted = ref(false)
 const loading = ref(true)
-const tab = ref<'library' | 'profiles' | 'grants'>('library')
+type AssetAdminSection = 'library' | 'sites' | 'profiles' | 'storage' | 'maintenance' | 'grants'
+const tab = ref<AssetAdminSection>('library')
 const stats = ref<Stats>({ assets: 0, publicAssets: 0, privateAssets: 0, sites: 0, profiles: 0, activeGrants: 0 })
 const sites = ref<Site[]>([])
 const storageBackends = ref<StorageBackend[]>([])
@@ -246,6 +247,18 @@ const siteKey = ref(ALL)
 const profileKey = ref(ALL)
 const visibility = ref(ALL)
 const showSkeleton = useMinLoading(computed(() => !mounted.value || loading.value))
+const enabledStorageBackends = computed(() => storageBackends.value.filter(b => b.enabled !== false))
+const activeMaintenanceCount = computed(() => maintenanceTasks.value.filter(task =>
+  task.status === 'queued' || task.status === 'running' || task.status === 'retrying'
+).length)
+const sectionItems = computed<Array<{ label: string, icon: string, value: AssetAdminSection, count: number }>>(() => [
+  { label: '素材库', icon: 'i-tabler-photo', value: 'library', count: stats.value.assets },
+  { label: '站点', icon: 'i-tabler-world', value: 'sites', count: stats.value.sites },
+  { label: 'Profile', icon: 'i-tabler-folder-cog', value: 'profiles', count: stats.value.profiles },
+  { label: '存储', icon: 'i-tabler-database', value: 'storage', count: storageBackends.value.length },
+  { label: '维护', icon: 'i-tabler-tool', value: 'maintenance', count: activeMaintenanceCount.value || maintenanceTasks.value.length },
+  { label: '授权', icon: 'i-tabler-key', value: 'grants', count: stats.value.activeGrants }
+])
 
 const siteOptions = computed(() => [
   { label: '全部站点', value: ALL },
@@ -1215,8 +1228,16 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       <template #actions>
         <div class="flex items-center gap-2">
           <UButton icon="i-tabler-refresh" label="刷新" color="neutral" variant="soft" @click="reloadAll" />
-          <UButton icon="i-tabler-world-plus" label="新建站点" color="neutral" variant="soft" @click="editSite()" />
-          <UButton icon="i-tabler-plus" label="新建 Profile" @click="editProfile()" />
+          <UButton v-if="tab === 'sites'" icon="i-tabler-world-plus" label="新建站点" @click="editSite()" />
+          <UButton v-else-if="tab === 'profiles'" icon="i-tabler-plus" label="新建 Profile" @click="editProfile()" />
+          <UButton v-else-if="tab === 'storage'" icon="i-tabler-database-plus" label="新建后端" @click="editStorageBackend()" />
+          <UButton
+            v-else-if="tab === 'maintenance'"
+            icon="i-tabler-transfer"
+            label="迁移后端"
+            :disabled="enabledStorageBackends.length < 2"
+            @click="openStorageMigration"
+          />
         </div>
       </template>
     </ManageHeader>
@@ -1240,9 +1261,15 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
     </div>
 
     <div class="mb-5 flex flex-wrap items-center gap-2">
-      <UButton label="素材库" icon="i-tabler-photo" :variant="tab === 'library' ? 'solid' : 'ghost'" @click="tab = 'library'" />
-      <UButton label="站点配置" icon="i-tabler-adjustments" color="neutral" :variant="tab === 'profiles' ? 'soft' : 'ghost'" @click="tab = 'profiles'" />
-      <UButton label="交付授权" icon="i-tabler-key" color="neutral" :variant="tab === 'grants' ? 'soft' : 'ghost'" @click="tab = 'grants'" />
+      <UButton
+        v-for="item in sectionItems"
+        :key="item.value"
+        :label="`${item.label} · ${item.count}`"
+        :icon="item.icon"
+        :color="tab === item.value ? 'primary' : 'neutral'"
+        :variant="tab === item.value ? 'solid' : 'ghost'"
+        @click="tab = item.value"
+      />
     </div>
 
     <SkeletonList v-if="showSkeleton" :rows="8" />
@@ -1297,7 +1324,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
         </div>
       </section>
 
-      <section v-else-if="tab === 'profiles'" class="space-y-4">
+      <section v-else-if="tab === 'storage'" class="space-y-4">
         <div class="rounded-lg border border-default bg-default p-4">
           <div class="flex items-center justify-between gap-3">
             <div>
@@ -1306,14 +1333,32 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
             </div>
             <div class="flex items-center gap-2">
               <UBadge :label="`${storageBackends.length} 个可用`" color="neutral" variant="soft" />
-              <UButton
-                icon="i-tabler-database-plus"
-                label="新建后端"
-                color="neutral"
-                variant="soft"
-                size="xs"
-                @click="editStorageBackend()"
-              />
+            </div>
+          </div>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <UButton
+              v-for="backend in storageBackends"
+              :key="backend.name"
+              :label="`${backend.name}${backend.type ? ` · ${backend.type}` : ''}${backend.isDefault ? ' · 默认' : ''}${backend.enabled === false ? ' · 停用' : ''} · ${backend.assetCount || 0} 素材 / ${backend.siteCount || 0} 站点${backend.healthy ? '' : ' · 异常'}`"
+              :color="backend.enabled === false ? 'neutral' : (backend.healthy ? (backend.isDefault ? 'primary' : 'neutral') : 'error')"
+              :icon="backend.managed ? 'i-tabler-pencil' : 'i-tabler-database'"
+              variant="soft"
+              size="xs"
+              :disabled="!backend.managed"
+              @click="editStorageBackend(backend)"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section v-else-if="tab === 'maintenance'" class="space-y-4">
+        <div class="rounded-lg border border-default bg-default p-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 class="text-sm font-semibold text-highlighted">维护任务</h2>
+              <p class="mt-1 text-xs text-muted">低频清理、扫描和迁移操作集中在这里执行。</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
               <UButton
                 icon="i-tabler-broom"
                 label="清理暂存"
@@ -1341,29 +1386,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
                 :loading="auditingOrphanObjects"
                 @click="previewOrphanObjects"
               />
-              <UButton
-                icon="i-tabler-transfer"
-                label="迁移后端"
-                color="neutral"
-                variant="soft"
-                size="xs"
-                :disabled="storageBackends.filter(b => b.enabled !== false).length < 2"
-                @click="openStorageMigration"
-              />
             </div>
-          </div>
-          <div class="mt-3 flex flex-wrap gap-2">
-            <UButton
-              v-for="backend in storageBackends"
-              :key="backend.name"
-              :label="`${backend.name}${backend.type ? ` · ${backend.type}` : ''}${backend.isDefault ? ' · 默认' : ''}${backend.enabled === false ? ' · 停用' : ''} · ${backend.assetCount || 0} 素材 / ${backend.siteCount || 0} 站点${backend.healthy ? '' : ' · 异常'}`"
-              :color="backend.enabled === false ? 'neutral' : (backend.healthy ? (backend.isDefault ? 'primary' : 'neutral') : 'error')"
-              :icon="backend.managed ? 'i-tabler-pencil' : 'i-tabler-database'"
-              variant="soft"
-              size="xs"
-              :disabled="!backend.managed"
-              @click="editStorageBackend(backend)"
-            />
           </div>
           <div class="mt-4 rounded-lg border border-default bg-elevated/30">
             <div class="flex items-center justify-between border-b border-default px-3 py-2">
@@ -1422,6 +1445,9 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
           </div>
         </div>
 
+      </section>
+
+      <section v-else-if="tab === 'sites'" class="space-y-4">
         <div class="grid gap-3 lg:grid-cols-2">
           <div v-for="site in sites" :key="site.siteKey" class="rounded-lg border border-default bg-default p-4">
             <div class="flex items-start justify-between gap-3">
@@ -1461,9 +1487,11 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
           </div>
         </div>
 
+      </section>
+
+      <section v-else-if="tab === 'profiles'" class="space-y-4">
         <div class="flex items-center justify-between pt-2">
           <h2 class="text-sm font-semibold text-highlighted">Profile 与派生规格</h2>
-          <UButton icon="i-tabler-plus" label="新建 Profile" size="sm" @click="editProfile()" />
         </div>
 
         <div class="grid gap-4 lg:grid-cols-2">
@@ -1513,7 +1541,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
         </div>
       </section>
 
-      <section v-else class="space-y-4">
+      <section v-else-if="tab === 'grants'" class="space-y-4">
         <ManageEmpty v-if="!grants.length" icon="i-tabler-key-off" text="还没有交付授权" />
         <div v-else class="overflow-hidden rounded-lg border border-default bg-default">
           <div v-for="grant in grants" :key="grant.id" class="flex items-center gap-4 border-b border-default px-4 py-3 last:border-b-0">
