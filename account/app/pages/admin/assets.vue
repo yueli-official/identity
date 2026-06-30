@@ -183,10 +183,11 @@ interface StorageMigrationResult {
 interface MaintenanceTask {
   id: string
   taskType: string
-  status: 'queued' | 'running' | 'retrying' | 'completed' | 'failed' | 'cancelled'
+  status: 'queued' | 'running' | 'retrying' | 'paused' | 'completed' | 'failed' | 'cancelled'
   dryRun: boolean
   summary: string
   payload?: string
+  result?: string
   attempts: number
   maxAttempts: number
   error?: string
@@ -230,6 +231,7 @@ const assets = ref<AssetItem[]>([])
 const references = ref<AssetReference[]>([])
 const grants = ref<Grant[]>([])
 const maintenanceTasks = ref<MaintenanceTask[]>([])
+const controllingMaintenanceTaskId = ref('')
 const totalAssets = ref(0)
 const totalGrants = ref(0)
 const page = ref(1)
@@ -407,6 +409,35 @@ function showQueuedMaintenanceTask(title: string, task: MaintenanceTask) {
     color: 'success',
     icon: 'i-tabler-clock-check'
   })
+}
+
+function canPauseTask(task: MaintenanceTask) {
+  return task.status === 'queued' || task.status === 'running' || task.status === 'retrying'
+}
+
+function canResumeTask(task: MaintenanceTask) {
+  return task.status === 'paused'
+}
+
+function canCancelTask(task: MaintenanceTask) {
+  return task.status === 'queued' || task.status === 'running' || task.status === 'retrying' || task.status === 'paused'
+}
+
+async function controlMaintenanceTask(task: MaintenanceTask, action: 'pause' | 'resume' | 'cancel') {
+  controllingMaintenanceTaskId.value = `${task.id}:${action}`
+  try {
+    await call(`/api/v1/admin/assets-proxy/maintenance/tasks/${task.id}/${action}`, { method: 'POST' })
+    toast.add({
+      title: action === 'pause' ? '维护任务已暂停' : action === 'resume' ? '维护任务已恢复' : '维护任务已取消',
+      color: action === 'cancel' ? 'warning' : 'success',
+      icon: action === 'pause' ? 'i-tabler-player-pause' : action === 'resume' ? 'i-tabler-player-play' : 'i-tabler-ban'
+    })
+    await fetchMaintenanceTasks()
+  } catch (e) {
+    toast.add({ title: '维护任务操作失败', description: (e as Error)?.message, color: 'error' })
+  } finally {
+    controllingMaintenanceTaskId.value = ''
+  }
 }
 
 const profileOpen = ref(false)
@@ -1128,6 +1159,7 @@ function taskStatus(task: MaintenanceTask): { label: string, color: 'success' | 
   if (task.status === 'queued') return { label: '排队中', color: 'neutral' }
   if (task.status === 'running') return { label: '执行中', color: 'warning' }
   if (task.status === 'retrying') return { label: '重试中', color: 'warning' }
+  if (task.status === 'paused') return { label: '已暂停', color: 'neutral' }
   if (task.status === 'completed') return { label: '完成', color: 'success' }
   if (task.status === 'cancelled') return { label: '已取消', color: 'neutral' }
   return { label: '未知', color: 'neutral' }
@@ -1336,8 +1368,41 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
                     <UBadge :label="taskStatus(task).label" :color="taskStatus(task).color" variant="soft" size="sm" />
                   </div>
                   <div class="mt-0.5 truncate text-xs text-muted">{{ taskTypeLabel(task.taskType) }} · {{ briefDate(task.createdAt) }}</div>
+                  <div v-if="task.result && task.result !== '{}'" class="mt-0.5 truncate text-xs text-muted">{{ task.result }}</div>
                 </div>
                 <div v-if="task.error" class="hidden max-w-64 truncate text-xs text-error md:block">{{ task.error }}</div>
+                <div class="flex shrink-0 items-center gap-1">
+                  <UButton
+                    v-if="canPauseTask(task)"
+                    icon="i-tabler-player-pause"
+                    color="neutral"
+                    variant="ghost"
+                    square
+                    size="xs"
+                    :loading="controllingMaintenanceTaskId === `${task.id}:pause`"
+                    @click.stop="controlMaintenanceTask(task, 'pause')"
+                  />
+                  <UButton
+                    v-if="canResumeTask(task)"
+                    icon="i-tabler-player-play"
+                    color="neutral"
+                    variant="ghost"
+                    square
+                    size="xs"
+                    :loading="controllingMaintenanceTaskId === `${task.id}:resume`"
+                    @click.stop="controlMaintenanceTask(task, 'resume')"
+                  />
+                  <UButton
+                    v-if="canCancelTask(task)"
+                    icon="i-tabler-ban"
+                    color="error"
+                    variant="ghost"
+                    square
+                    size="xs"
+                    :loading="controllingMaintenanceTaskId === `${task.id}:cancel`"
+                    @click.stop="controlMaintenanceTask(task, 'cancel')"
+                  />
+                </div>
               </div>
             </div>
           </div>
