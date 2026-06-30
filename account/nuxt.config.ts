@@ -31,5 +31,6 @@ export default defineNuxtConfig({
       '/.well-known': { target: 'http://127.0.0.1:8081/.well-known', changeOrigin: true }
     }
   },
+  fonts: { providers: { google: false, googleicons: false, bunny: false, fontshare: false } },
   devtools: { enabled: true }
 })
