@@ -1335,7 +1335,8 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
               <UBadge :label="`${storageBackends.length} 个可用`" color="neutral" variant="soft" />
             </div>
           </div>
-          <div class="mt-3 flex flex-wrap gap-2">
+          <ManageEmpty v-if="!storageBackends.length" icon="i-tabler-database-off" text="还没有存储后端" />
+          <div v-else class="mt-3 flex flex-wrap gap-2">
             <UButton
               v-for="backend in storageBackends"
               :key="backend.name"
@@ -1448,7 +1449,12 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       </section>
 
       <section v-else-if="tab === 'sites'" class="space-y-4">
-        <div class="grid gap-3 lg:grid-cols-2">
+        <div>
+          <h2 class="text-sm font-semibold text-highlighted">站点</h2>
+          <p class="mt-1 text-xs text-muted">每个站点拥有自己的默认存储后端和 Profile/Variant 计数。</p>
+        </div>
+        <ManageEmpty v-if="!sites.length" icon="i-tabler-world-off" text="还没有站点配置" />
+        <div v-else class="grid gap-3 lg:grid-cols-2">
           <div v-for="site in sites" :key="site.siteKey" class="rounded-lg border border-default bg-default p-4">
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
@@ -1490,11 +1496,13 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       </section>
 
       <section v-else-if="tab === 'profiles'" class="space-y-4">
-        <div class="flex items-center justify-between pt-2">
+        <div>
           <h2 class="text-sm font-semibold text-highlighted">Profile 与派生规格</h2>
+          <p class="mt-1 text-xs text-muted">按站点管理上传用途、文件限制、交付策略和命名派生规格。</p>
         </div>
 
-        <div class="grid gap-4 lg:grid-cols-2">
+        <ManageEmpty v-if="!profiles.length" icon="i-tabler-folder-off" text="还没有 Profile" />
+        <div v-else class="grid gap-4 lg:grid-cols-2">
           <div v-for="profile in profiles" :key="`${profile.siteKey}:${profile.profileKey}`" class="rounded-lg border border-default bg-default">
             <div class="flex items-start justify-between gap-3 border-b border-default p-4">
               <div class="min-w-0">
