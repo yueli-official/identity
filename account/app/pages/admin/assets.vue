@@ -121,6 +121,7 @@ interface PruneResult {
   deleted: number
   items: AssetItem[]
   errors?: PruneError[]
+  task?: MaintenanceTask
 }
 interface BatchRebuildResult {
   candidates: number
@@ -128,6 +129,7 @@ interface BatchRebuildResult {
   generated: number
   items: AssetItem[]
   errors?: PruneError[]
+  task?: MaintenanceTask
 }
 interface OrphanObjectItem {
   key: string
@@ -149,21 +151,29 @@ interface OrphanObjectResult {
   items: OrphanObjectBackend[]
   orphans: number
   deleted: number
+  task?: MaintenanceTask
 }
 interface StorageMigrationResult {
   candidates: number
   migrated: number
   items: AssetItem[]
   errors?: PruneError[]
+  task?: MaintenanceTask
 }
 interface MaintenanceTask {
   id: string
   taskType: string
-  status: string
+  status: 'queued' | 'running' | 'retrying' | 'completed' | 'failed' | 'cancelled'
   dryRun: boolean
   summary: string
+  payload?: Record<string, unknown>
+  attempts: number
+  maxAttempts: number
   error?: string
-  startedAt: string
+  nextRunAt?: string
+  lockedAt?: string
+  lockedBy?: string
+  startedAt?: string
   finishedAt?: string
   createdAt: string
 }
@@ -243,6 +253,10 @@ const policyOptions = [
   { label: '付费', value: 'paid' },
   { label: '门禁', value: 'gated' }
 ]
+const hasActiveMaintenanceTask = computed(() => maintenanceTasks.value.some(task =>
+  task.status === 'queued' || task.status === 'running' || task.status === 'retrying'
+))
+let maintenanceTasksPollTimer: ReturnType<typeof setInterval> | undefined
 
 onMounted(async () => {
   mounted.value = true
@@ -255,6 +269,23 @@ watch([siteKey, profileKey, visibility], async () => {
 })
 watch(page, fetchAssets)
 watch(grantPage, fetchGrants)
+watch(hasActiveMaintenanceTask, (active) => {
+  if (active && !maintenanceTasksPollTimer) {
+    maintenanceTasksPollTimer = setInterval(fetchMaintenanceTasks, 5000)
+    return
+  }
+  if (!active && maintenanceTasksPollTimer) {
+    clearInterval(maintenanceTasksPollTimer)
+    maintenanceTasksPollTimer = undefined
+  }
+}, { immediate: true })
+
+onBeforeUnmount(() => {
+  if (maintenanceTasksPollTimer) {
+    clearInterval(maintenanceTasksPollTimer)
+    maintenanceTasksPollTimer = undefined
+  }
+})
 
 async function reloadAll() {
   loading.value = true
@@ -306,6 +337,15 @@ async function fetchMaintenanceTasks() {
     params: { page: 1, size: 8 }
   })
   maintenanceTasks.value = data.items ?? []
+}
+
+function showQueuedMaintenanceTask(title: string, task: MaintenanceTask) {
+  toast.add({
+    title,
+    description: `任务 ${task.id.slice(0, 8)} 已进入队列`,
+    color: 'success',
+    icon: 'i-tabler-clock-check'
+  })
 }
 
 const profileOpen = ref(false)
@@ -571,6 +611,13 @@ async function confirmBatchRebuild() {
       method: 'POST',
       body: { siteKey: profile.siteKey, profileKey: profile.profileKey, limit: batchRebuildLimit.value, dryRun: false }
     })
+    if (data.task) {
+      showQueuedMaintenanceTask('批量派生图重建已排队', data.task)
+      batchRebuildOpen.value = false
+      batchRebuildPreview.value = null
+      await fetchMaintenanceTasks()
+      return
+    }
     const failed = data.errors?.length ?? 0
     toast.add({
       title: '批量派生图重建完成',
@@ -631,6 +678,13 @@ async function confirmPruneUnreferenced() {
       method: 'POST',
       body: { ...pruneForm, dryRun: false }
     })
+    if (data.task) {
+      showQueuedMaintenanceTask('无引用素材清理已排队', data.task)
+      pruneOpen.value = false
+      prunePreview.value = null
+      await fetchMaintenanceTasks()
+      return
+    }
     const failed = data.errors?.length ?? 0
     toast.add({
       title: '无引用素材清理完成',
@@ -681,6 +735,13 @@ async function confirmPruneOrphanObjects() {
         dryRun: false
       }
     })
+    if (data.task) {
+      showQueuedMaintenanceTask('孤儿对象清理已排队', data.task)
+      orphanObjectsOpen.value = false
+      orphanObjectsPreview.value = null
+      await fetchMaintenanceTasks()
+      return
+    }
     const failed = (data.items ?? []).reduce((sum, item) => sum + (item.errors?.length ?? 0), 0)
     toast.add({
       title: '孤儿对象清理完成',
@@ -729,6 +790,13 @@ async function confirmStorageMigration() {
       method: 'POST',
       body: { ...storageMigrationForm, dryRun: false }
     })
+    if (data.task) {
+      showQueuedMaintenanceTask('存储迁移已排队', data.task)
+      storageMigrationOpen.value = false
+      storageMigrationPreview.value = null
+      await fetchMaintenanceTasks()
+      return
+    }
     const failed = data.errors?.length ?? 0
     toast.add({
       title: '存储迁移完成',
@@ -936,8 +1004,12 @@ function taskTypeLabel(type: string) {
 function taskStatus(task: MaintenanceTask): { label: string, color: 'success' | 'warning' | 'error' | 'neutral' } {
   if (task.status === 'failed') return { label: '失败', color: 'error' }
   if (task.dryRun) return { label: '预检', color: 'warning' }
+  if (task.status === 'queued') return { label: '排队中', color: 'neutral' }
+  if (task.status === 'running') return { label: '执行中', color: 'warning' }
+  if (task.status === 'retrying') return { label: '重试中', color: 'warning' }
   if (task.status === 'completed') return { label: '完成', color: 'success' }
-  return { label: task.status || '未知', color: 'neutral' }
+  if (task.status === 'cancelled') return { label: '已取消', color: 'neutral' }
+  return { label: '未知', color: 'neutral' }
 }
 function openExternal(url: string) {
   if (url) window.open(url, '_blank')
