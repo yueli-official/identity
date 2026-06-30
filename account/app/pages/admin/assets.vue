@@ -205,10 +205,14 @@ interface Grant {
   siteKey: string
   subjectId: string
   policy: string
+  purpose: string
   expiresAt: string
   maxUses: number
   usedCount: number
+  firstUsedAt?: string
+  lastUsedAt?: string
   revokedAt?: string
+  revokedBy?: string
   createdByService: string
   reason: string
   createdAt: string
@@ -1140,6 +1144,16 @@ function grantStatus(grant: Grant): { label: string, color: 'success' | 'warning
   if (grant.maxUses > 0 && grant.usedCount >= grant.maxUses) return { label: '已用完', color: 'warning' }
   return { label: '有效', color: 'success' }
 }
+function grantPurposeLabel(grant: Grant) {
+  return grant.purpose || 'delivery'
+}
+function grantLastUsedText(grant: Grant) {
+  return grant.lastUsedAt ? `最近 ${briefDate(grant.lastUsedAt)}` : '尚未使用'
+}
+function grantAuditText(grant: Grant) {
+  if (grant.revokedBy) return `撤销 ${grant.revokedBy}`
+  return grant.createdByService ? `签发 ${grant.createdByService}` : '系统签发'
+}
 function canRevokeGrant(grant: Grant) {
   return grantStatus(grant).label === '有效'
 }
@@ -1513,8 +1527,11 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
             <div class="hidden text-right text-xs text-muted sm:block">
               <div>{{ grant.usedCount }} / {{ grant.maxUses }}</div>
               <div>过期 {{ briefDate(grant.expiresAt) }}</div>
+              <div>{{ grantLastUsedText(grant) }}</div>
+              <div class="truncate">{{ grantAuditText(grant) }}</div>
             </div>
             <UBadge :label="grantStatus(grant).label" :color="grantStatus(grant).color" variant="soft" />
+            <UBadge :label="grantPurposeLabel(grant)" color="info" variant="soft" />
             <UBadge :label="grant.policy" color="neutral" variant="soft" />
             <UDropdownMenu :items="grantActions(grant)">
               <UButton icon="i-tabler-dots-vertical" color="neutral" variant="ghost" square size="xs" />
@@ -2055,6 +2072,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
               <UInput v-model="grantForm.reason" />
             </UFormField>
           </div>
+          <p class="text-xs text-muted">有效期最多 24 小时，最大使用次数最多 100 次；服务端会自动收紧超出的值。</p>
           <div v-if="createdGrant" class="rounded-lg border border-default bg-default p-3">
             <div class="mb-2 flex items-center justify-between gap-2">
               <div class="text-sm font-medium text-highlighted">交付链接</div>
