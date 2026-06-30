@@ -166,7 +166,7 @@ interface MaintenanceTask {
   status: 'queued' | 'running' | 'retrying' | 'completed' | 'failed' | 'cancelled'
   dryRun: boolean
   summary: string
-  payload?: Record<string, unknown>
+  payload?: string
   attempts: number
   maxAttempts: number
   error?: string
@@ -257,6 +257,8 @@ const hasActiveMaintenanceTask = computed(() => maintenanceTasks.value.some(task
   task.status === 'queued' || task.status === 'running' || task.status === 'retrying'
 ))
 let maintenanceTasksPollTimer: ReturnType<typeof setInterval> | undefined
+let maintenanceTasksPollInFlight = false
+let maintenanceTasksPollErrorShown = false
 
 onMounted(async () => {
   mounted.value = true
@@ -271,7 +273,7 @@ watch(page, fetchAssets)
 watch(grantPage, fetchGrants)
 watch(hasActiveMaintenanceTask, (active) => {
   if (active && !maintenanceTasksPollTimer) {
-    maintenanceTasksPollTimer = setInterval(fetchMaintenanceTasks, 5000)
+    maintenanceTasksPollTimer = setInterval(() => { void pollMaintenanceTasks() }, 5000)
     return
   }
   if (!active && maintenanceTasksPollTimer) {
@@ -332,11 +334,45 @@ async function fetchGrants() {
   totalGrants.value = data.total ?? 0
 }
 
+async function refreshAfterMaintenanceTasksSettled() {
+  const [st, siteData, profileData, variantData] = await Promise.all([
+    call<Stats>('/api/v1/admin/assets-proxy/stats'),
+    call<{ items: Site[] }>('/api/v1/admin/assets-proxy/sites'),
+    call<{ items: Profile[] }>('/api/v1/admin/assets-proxy/profiles'),
+    call<{ items: Variant[] }>('/api/v1/admin/assets-proxy/variants')
+  ])
+  stats.value = st
+  sites.value = siteData.items ?? []
+  profiles.value = profileData.items ?? []
+  variants.value = variantData.items ?? []
+  await fetchAssets()
+}
+
 async function fetchMaintenanceTasks() {
   const data = await call<{ items: MaintenanceTask[] }>('/api/v1/admin/assets-proxy/maintenance/tasks', {
     params: { page: 1, size: 8 }
   })
   maintenanceTasks.value = data.items ?? []
+}
+
+async function pollMaintenanceTasks() {
+  if (maintenanceTasksPollInFlight) return
+  maintenanceTasksPollInFlight = true
+  const hadActiveTask = hasActiveMaintenanceTask.value
+  try {
+    await fetchMaintenanceTasks()
+    if (hadActiveTask && !hasActiveMaintenanceTask.value) {
+      await refreshAfterMaintenanceTasksSettled()
+    }
+    maintenanceTasksPollErrorShown = false
+  } catch (e) {
+    if (!maintenanceTasksPollErrorShown) {
+      toast.add({ title: '维护任务状态刷新失败', description: (e as Error)?.message, color: 'warning' })
+      maintenanceTasksPollErrorShown = true
+    }
+  } finally {
+    maintenanceTasksPollInFlight = false
+  }
 }
 
 function showQueuedMaintenanceTask(title: string, task: MaintenanceTask) {
