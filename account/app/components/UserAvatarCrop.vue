@@ -195,7 +195,7 @@ async function confirmCrop() {
     </template>
     <template #footer>
       <div class="flex w-full justify-end gap-2">
-        <UButton color="neutral" variant="ghost" label="取消" :disabled="uploading" @click="cropModalOpen = false" />
+        <UButton color="neutral" variant="ghost" label="取消" :disabled="uploading" @click="() => { cropModalOpen = false }" />
         <UButton color="primary" label="确认" :loading="uploading" @click="confirmCrop" />
       </div>
     </template>

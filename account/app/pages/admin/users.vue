@@ -406,7 +406,7 @@ function initialOf(u: AdminUser) { return (u.displayName || u.email || '?').char
       </template>
       <template #footer>
         <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="取消" :disabled="resetting" @click="resetTarget = null" />
+          <UButton color="neutral" variant="ghost" label="取消" :disabled="resetting" @click="() => { resetTarget = null }" />
           <UButton color="primary" label="重置密码" :loading="resetting" :disabled="newPw.length < 8" @click="confirmReset" />
         </div>
       </template>
@@ -421,7 +421,7 @@ function initialOf(u: AdminUser) { return (u.displayName || u.email || '?').char
       </template>
       <template #footer>
         <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="取消" :disabled="deleting" @click="deleteTarget = null" />
+          <UButton color="neutral" variant="ghost" label="取消" :disabled="deleting" @click="() => { deleteTarget = null }" />
           <UButton color="error" label="确认删除" :loading="deleting" @click="confirmDelete" />
         </div>
       </template>
@@ -445,7 +445,7 @@ function initialOf(u: AdminUser) { return (u.displayName || u.email || '?').char
       </template>
       <template #footer>
         <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="取消" :disabled="creating" @click="createOpen = false" />
+          <UButton color="neutral" variant="ghost" label="取消" :disabled="creating" @click="() => { createOpen = false }" />
           <UButton color="primary" label="创建" :loading="creating" @click="confirmCreate" />
         </div>
       </template>

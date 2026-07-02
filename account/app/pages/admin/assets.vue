@@ -41,6 +41,7 @@ interface StorageBackend {
   lastHealthCheckedAt?: string
   assetCount: number
   siteCount: number
+  profileCount: number
   error?: string
 }
 interface StorageBackendDetail {
@@ -76,6 +77,7 @@ interface Profile {
   siteKey: string
   profileKey: string
   purpose: string
+  storageBackend: string
   allowedExt: string
   maxSizeBytes: number
   defaultVisibility: string
@@ -281,6 +283,10 @@ const storageBackendOptions = computed(() => storageBackends.value
     label: b.isDefault ? `${b.name} · 默认` : b.name,
     value: b.name
   })))
+const profileStorageBackendOptions = computed(() => [
+  { label: `继承站点默认 (${siteDefaultBackend(profileForm.siteKey)})`, value: '' },
+  ...storageBackendOptions.value
+])
 const modeOptions = [
   { label: '等比缩放', value: 'resize' },
   { label: '填充裁剪', value: 'fill' }
@@ -462,6 +468,7 @@ const profileForm = reactive<Profile>({
   siteKey: 'platform',
   profileKey: '',
   purpose: '',
+  storageBackend: '',
   allowedExt: 'jpg,jpeg,png,webp',
   maxSizeBytes: 20 * 1024 * 1024,
   defaultVisibility: 'public',
@@ -475,6 +482,7 @@ function editProfile(p?: Profile) {
     siteKey: sites.value[0]?.siteKey || 'platform',
     profileKey: '',
     purpose: '',
+    storageBackend: '',
     allowedExt: 'jpg,jpeg,png,webp',
     maxSizeBytes: 20 * 1024 * 1024,
     defaultVisibility: 'public',
@@ -490,6 +498,17 @@ async function saveProfile() {
   toast.add({ title: 'Profile 已保存', color: 'success', icon: 'i-tabler-check' })
   profileOpen.value = false
   await reloadAll()
+}
+
+function siteDefaultBackend(key: string) {
+  return sites.value.find(s => s.siteKey === key)?.defaultStorageBackend
+    || storageBackends.value.find(b => b.isDefault)?.name
+    || storageBackends.value[0]?.name
+    || 'local'
+}
+
+function profileStorageText(profile: Profile) {
+  return profile.storageBackend || `继承 ${siteDefaultBackend(profile.siteKey)}`
 }
 
 const siteOpen = ref(false)
@@ -1268,7 +1287,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
         :icon="item.icon"
         :color="tab === item.value ? 'primary' : 'neutral'"
         :variant="tab === item.value ? 'solid' : 'ghost'"
-        @click="tab = item.value"
+        @click="() => { tab = item.value }"
       />
     </div>
 
@@ -1317,9 +1336,9 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
         <div class="flex items-center justify-between text-sm text-muted">
           <span>共 {{ totalAssets }} 个资源</span>
           <div class="flex items-center gap-2">
-            <UButton icon="i-tabler-chevron-left" color="neutral" variant="ghost" :disabled="page <= 1" @click="page--" />
+            <UButton icon="i-tabler-chevron-left" color="neutral" variant="ghost" :disabled="page <= 1" @click="() => { page-- }" />
             <span>{{ page }}</span>
-            <UButton icon="i-tabler-chevron-right" color="neutral" variant="ghost" :disabled="page * SIZE >= totalAssets" @click="page++" />
+            <UButton icon="i-tabler-chevron-right" color="neutral" variant="ghost" :disabled="page * SIZE >= totalAssets" @click="() => { page++ }" />
           </div>
         </div>
       </section>
@@ -1340,7 +1359,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
             <UButton
               v-for="backend in storageBackends"
               :key="backend.name"
-              :label="`${backend.name}${backend.type ? ` · ${backend.type}` : ''}${backend.isDefault ? ' · 默认' : ''}${backend.enabled === false ? ' · 停用' : ''} · ${backend.assetCount || 0} 素材 / ${backend.siteCount || 0} 站点${backend.healthy ? '' : ' · 异常'}`"
+              :label="`${backend.name}${backend.type ? ` · ${backend.type}` : ''}${backend.isDefault ? ' · 默认' : ''}${backend.enabled === false ? ' · 停用' : ''} · ${backend.assetCount || 0} 素材 / ${backend.siteCount || 0} 站点 / ${backend.profileCount || 0} Profile${backend.healthy ? '' : ' · 异常'}`"
               :color="backend.enabled === false ? 'neutral' : (backend.healthy ? (backend.isDefault ? 'primary' : 'neutral') : 'error')"
               :icon="backend.managed ? 'i-tabler-pencil' : 'i-tabler-database'"
               variant="soft"
@@ -1523,6 +1542,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
               <div class="grid grid-cols-2 gap-3 text-xs text-muted">
                 <div>类型 <span class="text-default">{{ profile.allowedExt }}</span></div>
                 <div>上限 <span class="text-default">{{ formatBytes(profile.maxSizeBytes) }}</span></div>
+                <div>后端 <span class="text-default">{{ profileStorageText(profile) }}</span></div>
                 <div>可见性 <span class="text-default">{{ profile.defaultVisibility }}</span></div>
                 <div>交付 <span class="text-default">{{ profile.defaultDeliveryPolicy }}</span></div>
               </div>
@@ -1577,9 +1597,9 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
         <div class="flex items-center justify-between text-sm text-muted">
           <span>共 {{ totalGrants }} 条授权</span>
           <div class="flex items-center gap-2">
-            <UButton icon="i-tabler-chevron-left" color="neutral" variant="ghost" :disabled="grantPage <= 1" @click="grantPage--" />
+            <UButton icon="i-tabler-chevron-left" color="neutral" variant="ghost" :disabled="grantPage <= 1" @click="() => { grantPage-- }" />
             <span>{{ grantPage }}</span>
-            <UButton icon="i-tabler-chevron-right" color="neutral" variant="ghost" :disabled="grantPage * SIZE >= totalGrants" @click="grantPage++" />
+            <UButton icon="i-tabler-chevron-right" color="neutral" variant="ghost" :disabled="grantPage * SIZE >= totalGrants" @click="() => { grantPage++ }" />
           </div>
         </div>
       </section>
@@ -1591,6 +1611,15 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
           <UFormField label="站点"><USelectMenu v-model="profileForm.siteKey" :items="siteOptions.filter(i => i.value !== ALL)" value-key="value" class="w-full" /></UFormField>
           <UFormField label="Profile Key"><UInput v-model="profileForm.profileKey" placeholder="blog-cover" /></UFormField>
           <UFormField label="用途" class="sm:col-span-2"><UInput v-model="profileForm.purpose" placeholder="文章封面 / 正文图片 / 付费资源" /></UFormField>
+          <UFormField label="存储后端" class="sm:col-span-2">
+            <USelectMenu
+              v-model="profileForm.storageBackend"
+              :items="profileStorageBackendOptions"
+              value-key="value"
+              class="w-full"
+              :search-input="{ placeholder: '搜索后端…' }"
+            />
+          </UFormField>
           <UFormField label="允许后缀"><UInput v-model="profileForm.allowedExt" placeholder="jpg,jpeg,png,webp" /></UFormField>
           <UFormField label="大小上限(bytes)"><UInput v-model.number="profileForm.maxSizeBytes" type="number" /></UFormField>
           <UFormField label="默认可见性"><USelect v-model="profileForm.defaultVisibility" :items="[{ label: '公开', value: 'public' }, { label: '私有', value: 'private' }]" value-key="value" /></UFormField>
@@ -1600,7 +1629,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       </template>
       <template #footer>
         <div class="flex w-full justify-end gap-2">
-          <UButton label="取消" color="neutral" variant="ghost" @click="profileOpen = false" />
+          <UButton label="取消" color="neutral" variant="ghost" @click="() => { profileOpen = false }" />
           <UButton label="保存" icon="i-tabler-device-floppy" @click="saveProfile" />
         </div>
       </template>
@@ -1631,7 +1660,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       </template>
       <template #footer>
         <div class="flex w-full justify-end gap-2">
-          <UButton label="取消" color="neutral" variant="ghost" @click="siteOpen = false" />
+          <UButton label="取消" color="neutral" variant="ghost" @click="() => { siteOpen = false }" />
           <UButton label="保存" icon="i-tabler-device-floppy" @click="saveSite" />
         </div>
       </template>
@@ -1656,7 +1685,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
               </div>
               <div class="flex shrink-0 items-center gap-2">
                 <UButton icon="i-tabler-heartbeat" label="健康检查" color="neutral" variant="soft" size="xs" :loading="checkingStorageBackend" @click="checkStorageBackendHealth" />
-                <UButton icon="i-tabler-key" label="轮换密钥" color="neutral" variant="soft" size="xs" :disabled="loadingStorageBackend" @click="rotateStorageBackendOpen = true" />
+                <UButton icon="i-tabler-key" label="轮换密钥" color="neutral" variant="soft" size="xs" :disabled="loadingStorageBackend" @click="() => { rotateStorageBackendOpen = true }" />
               </div>
             </div>
           </div>
@@ -1722,11 +1751,11 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
             color="error"
             variant="ghost"
             :disabled="savingStorageBackend"
-            @click="deleteStorageBackendOpen = true"
+            @click="() => { deleteStorageBackendOpen = true }"
           />
           <span v-else />
           <div class="flex items-center gap-2">
-            <UButton label="取消" color="neutral" variant="ghost" :disabled="savingStorageBackend" @click="storageBackendOpen = false" />
+            <UButton label="取消" color="neutral" variant="ghost" :disabled="savingStorageBackend" @click="() => { storageBackendOpen = false }" />
             <UButton label="保存" icon="i-tabler-device-floppy" :loading="savingStorageBackend" @click="saveStorageBackend" />
           </div>
         </div>
@@ -1736,12 +1765,12 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
     <UModal v-model:open="deleteStorageBackendOpen" title="删除存储后端?">
       <template #body>
         <p class="text-sm text-muted">
-          将删除 <span class="font-medium text-default">{{ storageBackendEditingName }}</span>。只有没有站点默认使用、也没有素材落在该后端时才允许删除。
+          将删除 <span class="font-medium text-default">{{ storageBackendEditingName }}</span>。只有没有站点默认使用、没有 Profile 指定、也没有素材落在该后端时才允许删除。
         </p>
       </template>
       <template #footer>
         <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="取消" :disabled="deletingStorageBackend" @click="deleteStorageBackendOpen = false" />
+          <UButton color="neutral" variant="ghost" label="取消" :disabled="deletingStorageBackend" @click="() => { deleteStorageBackendOpen = false }" />
           <UButton color="error" label="确认删除" :loading="deletingStorageBackend" @click="confirmDeleteStorageBackend" />
         </div>
       </template>
@@ -1760,7 +1789,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       </template>
       <template #footer>
         <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="取消" :disabled="rotatingStorageBackend" @click="rotateStorageBackendOpen = false" />
+          <UButton color="neutral" variant="ghost" label="取消" :disabled="rotatingStorageBackend" @click="() => { rotateStorageBackendOpen = false }" />
           <UButton color="primary" label="确认轮换" icon="i-tabler-key" :loading="rotatingStorageBackend" :disabled="!rotateStorageBackendSecret" @click="confirmRotateStorageBackendSecret" />
         </div>
       </template>
@@ -1782,7 +1811,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       </template>
       <template #footer>
         <div class="flex w-full justify-end gap-2">
-          <UButton label="取消" color="neutral" variant="ghost" @click="variantOpen = false" />
+          <UButton label="取消" color="neutral" variant="ghost" @click="() => { variantOpen = false }" />
           <UButton label="保存" icon="i-tabler-device-floppy" @click="saveVariant" />
         </div>
       </template>
@@ -1796,7 +1825,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       </template>
       <template #footer>
         <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="取消" :disabled="deletingProfile" @click="deleteProfileTarget = null" />
+          <UButton color="neutral" variant="ghost" label="取消" :disabled="deletingProfile" @click="() => { deleteProfileTarget = null }" />
           <UButton color="error" label="确认删除" :loading="deletingProfile" @click="confirmDeleteProfile" />
         </div>
       </template>
@@ -1810,7 +1839,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       </template>
       <template #footer>
         <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="取消" :disabled="deletingAsset" @click="deleteAssetTarget = null" />
+          <UButton color="neutral" variant="ghost" label="取消" :disabled="deletingAsset" @click="() => { deleteAssetTarget = null }" />
           <UButton color="error" label="确认删除" :loading="deletingAsset" @click="confirmDeleteAsset" />
         </div>
       </template>
@@ -1851,7 +1880,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       </template>
       <template #footer>
         <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="取消" :disabled="pruningUnreferenced" @click="pruneOpen = false" />
+          <UButton color="neutral" variant="ghost" label="取消" :disabled="pruningUnreferenced" @click="() => { pruneOpen = false }" />
           <UButton
             color="error"
             label="确认清理"
@@ -1920,7 +1949,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       </template>
       <template #footer>
         <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="取消" :disabled="auditingOrphanObjects" @click="orphanObjectsOpen = false" />
+          <UButton color="neutral" variant="ghost" label="取消" :disabled="auditingOrphanObjects" @click="() => { orphanObjectsOpen = false }" />
           <UButton
             color="error"
             label="确认清理"
@@ -1971,7 +2000,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       </template>
       <template #footer>
         <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="取消" :disabled="migratingStorage" @click="storageMigrationOpen = false" />
+          <UButton color="neutral" variant="ghost" label="取消" :disabled="migratingStorage" @click="() => { storageMigrationOpen = false }" />
           <UButton
             color="neutral"
             variant="soft"
@@ -2030,7 +2059,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       </template>
       <template #footer>
         <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="取消" :disabled="deletingVariant" @click="deleteVariantTarget = null" />
+          <UButton color="neutral" variant="ghost" label="取消" :disabled="deletingVariant" @click="() => { deleteVariantTarget = null }" />
           <UButton color="error" label="确认删除" :loading="deletingVariant" @click="confirmDeleteVariant" />
         </div>
       </template>
@@ -2071,7 +2100,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       </template>
       <template #footer>
         <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="取消" :disabled="batchRebuilding" @click="batchRebuildOpen = false" />
+          <UButton color="neutral" variant="ghost" label="取消" :disabled="batchRebuilding" @click="() => { batchRebuildOpen = false }" />
           <UButton
             color="primary"
             label="确认重建"
@@ -2121,7 +2150,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       </template>
       <template #footer>
         <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="关闭" :disabled="creatingGrant" @click="createGrantOpen = false" />
+          <UButton color="neutral" variant="ghost" label="关闭" :disabled="creatingGrant" @click="() => { createGrantOpen = false }" />
           <UButton label="生成链接" icon="i-tabler-key" :loading="creatingGrant" @click="createGrant" />
         </div>
       </template>
@@ -2136,7 +2165,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       </template>
       <template #footer>
         <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="取消" :disabled="revokingGrant" @click="revokeGrantTarget = null" />
+          <UButton color="neutral" variant="ghost" label="取消" :disabled="revokingGrant" @click="() => { revokeGrantTarget = null }" />
           <UButton color="error" label="确认撤销" :loading="revokingGrant" @click="confirmRevokeGrant" />
         </div>
       </template>

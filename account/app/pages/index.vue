@@ -385,7 +385,7 @@ const cardHeaderClass = 'flex items-center gap-2 font-semibold text-highlighted'
             v-if="hasGoogle"
             color="neutral" variant="ghost" size="xs" label="解绑"
             :disabled="isGoogleLastCredential || unbinding"
-            @click="confirmUnbindOpen = true"
+            @click="() => { confirmUnbindOpen = true }"
           />
           <UButton
             v-else
@@ -405,7 +405,7 @@ const cardHeaderClass = 'flex items-center gap-2 font-semibold text-highlighted'
       </template>
       <template #footer>
         <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="取消" :disabled="unbinding" @click="confirmUnbindOpen = false" />
+          <UButton color="neutral" variant="ghost" label="取消" :disabled="unbinding" @click="() => { confirmUnbindOpen = false }" />
           <UButton color="error" label="确认解绑" :loading="unbinding" @click="onUnbindGoogle" />
         </div>
       </template>
@@ -465,7 +465,7 @@ const cardHeaderClass = 'flex items-center gap-2 font-semibold text-highlighted'
           :label="showAllSessions ? '收起' : `显示全部 ${otherSessions.length} 个会话`"
           :icon="showAllSessions ? 'i-tabler-chevron-up' : 'i-tabler-chevron-down'"
           color="neutral" variant="ghost" size="xs" block class="mt-1"
-          @click="showAllSessions = !showAllSessions"
+          @click="() => { showAllSessions = !showAllSessions }"
         />
       </div>
     </UCard>
