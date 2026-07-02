@@ -1,0 +1,6 @@
+{
+  "name": "@platform/auth",
+  "private": true,
+  "type": "module",
+  "main": "./nuxt.config.ts"
+}
