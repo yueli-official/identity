@@ -583,6 +583,11 @@ const storageBackendForm = reactive({
   pathStyle: true,
   useSsl: false
 })
+const storageBackendTypeItems = [
+  { label: 'S3 兼容', value: 's3' },
+  { label: '腾讯云 COS', value: 'cos' },
+  { label: '阿里云 OSS', value: 'oss' }
+]
 function assignStorageBackendForm(detail?: Partial<StorageBackendDetail>) {
   Object.assign(storageBackendForm, {
     name: detail?.name || '',
@@ -1712,6 +1717,9 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
           <div class="grid gap-4 sm:grid-cols-2">
             <UFormField label="后端名称">
               <UInput v-model="storageBackendForm.name" placeholder="s3main" :disabled="!!storageBackendEditingName || loadingStorageBackend" />
+            </UFormField>
+            <UFormField label="后端类型">
+              <USelectMenu v-model="storageBackendForm.type" :items="storageBackendTypeItems" value-key="value" class="w-full" :disabled="!!storageBackendEditingName || loadingStorageBackend" />
             </UFormField>
             <UFormField label="Region">
               <UInput v-model="storageBackendForm.region" placeholder="us-east-1" />
