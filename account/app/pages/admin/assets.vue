@@ -291,13 +291,15 @@ const modeOptions = [
   { label: '等比缩放', value: 'resize' },
   { label: '填充裁剪', value: 'fill' }
 ]
-const policyOptions = [
-  { label: '公开', value: 'public' },
+const publicPolicyOptions = [{ label: '公开 URL', value: 'public' }]
+const privatePolicyOptions = [
   { label: '短期签名', value: 'signed' },
   { label: '一次性', value: 'oneTime' },
   { label: '付费', value: 'paid' },
   { label: '门禁', value: 'gated' }
 ]
+const policyOptions = [...publicPolicyOptions, ...privatePolicyOptions]
+const profilePolicyOptions = computed(() => profileForm.defaultVisibility === 'public' ? publicPolicyOptions : privatePolicyOptions)
 const hasActiveMaintenanceTask = computed(() => maintenanceTasks.value.some(task =>
   task.status === 'queued' || task.status === 'running' || task.status === 'retrying'
 ))
@@ -316,6 +318,15 @@ watch([siteKey, profileKey, visibility], async () => {
 })
 watch(page, fetchAssets)
 watch(grantPage, fetchGrants)
+watch(() => profileForm.defaultVisibility, (visibility) => {
+  if (visibility === 'public') {
+    profileForm.defaultDeliveryPolicy = 'public'
+    return
+  }
+  if (!profileForm.defaultDeliveryPolicy || profileForm.defaultDeliveryPolicy === 'public') {
+    profileForm.defaultDeliveryPolicy = 'signed'
+  }
+})
 watch(hasActiveMaintenanceTask, (active) => {
   if (active && !maintenanceTasksPollTimer) {
     maintenanceTasksPollTimer = setInterval(() => { void pollMaintenanceTasks() }, 5000)
@@ -494,7 +505,13 @@ function editProfile(p?: Profile) {
   profileOpen.value = true
 }
 async function saveProfile() {
-  await call('/api/v1/admin/assets-proxy/profiles', { method: 'POST', body: profileForm })
+  await call('/api/v1/admin/assets-proxy/profiles', {
+    method: 'POST',
+    body: {
+      ...profileForm,
+      defaultDeliveryPolicy: profileForm.defaultVisibility === 'public' ? 'public' : profileForm.defaultDeliveryPolicy
+    }
+  })
   toast.add({ title: 'Profile 已保存', color: 'success', icon: 'i-tabler-check' })
   profileOpen.value = false
   await reloadAll()
@@ -1623,7 +1640,9 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
           <UFormField label="允许后缀"><UInput v-model="profileForm.allowedExt" placeholder="jpg,jpeg,png,webp" /></UFormField>
           <UFormField label="大小上限(bytes)"><UInput v-model.number="profileForm.maxSizeBytes" type="number" /></UFormField>
           <UFormField label="默认可见性"><USelect v-model="profileForm.defaultVisibility" :items="[{ label: '公开', value: 'public' }, { label: '私有', value: 'private' }]" value-key="value" /></UFormField>
-          <UFormField label="默认交付"><USelect v-model="profileForm.defaultDeliveryPolicy" :items="policyOptions" value-key="value" /></UFormField>
+          <UFormField label="默认交付" :hint="profileForm.defaultVisibility === 'public' ? '公开资源固定公开 URL' : '私有资源的授权链接方式'">
+            <USelect v-model="profileForm.defaultDeliveryPolicy" :items="profilePolicyOptions" value-key="value" :disabled="profileForm.defaultVisibility === 'public'" />
+          </UFormField>
           <UCheckbox v-model="profileForm.keepOriginal" label="保留原图/原文件" />
         </div>
       </template>
