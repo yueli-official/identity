@@ -291,7 +291,7 @@ const modeOptions = [
   { label: '等比缩放', value: 'resize' },
   { label: '填充裁剪', value: 'fill' }
 ]
-const publicPolicyOptions = [{ label: '公开 URL', value: 'public' }]
+const publicPolicyOptions = [{ label: '公开直链', value: 'public' }]
 const privatePolicyOptions = [
   { label: '短期签名', value: 'signed' },
   { label: '一次性', value: 'oneTime' },
@@ -299,7 +299,10 @@ const privatePolicyOptions = [
   { label: '门禁', value: 'gated' }
 ]
 const policyOptions = [...publicPolicyOptions, ...privatePolicyOptions]
-const profilePolicyOptions = computed(() => profileForm.defaultVisibility === 'public' ? publicPolicyOptions : privatePolicyOptions)
+const profileAccessLevelOptions = [
+  { label: '公开资源 · 公开直链', value: 'public' },
+  { label: '私有资源 · 签名链接', value: 'private' }
+]
 const hasActiveMaintenanceTask = computed(() => maintenanceTasks.value.some(task =>
   task.status === 'queued' || task.status === 'running' || task.status === 'retrying'
 ))
@@ -505,6 +508,11 @@ function editProfile(p?: Profile) {
   profileOpen.value = true
 }
 async function saveProfile() {
+  if (profileForm.defaultVisibility === 'public') {
+    profileForm.defaultDeliveryPolicy = 'public'
+  } else if (profileForm.defaultDeliveryPolicy !== 'signed') {
+    profileForm.defaultDeliveryPolicy = 'signed'
+  }
   await call('/api/v1/admin/assets-proxy/profiles', {
     method: 'POST',
     body: {
@@ -526,6 +534,10 @@ function siteDefaultBackend(key: string) {
 
 function profileStorageText(profile: Profile) {
   return profile.storageBackend || `继承 ${siteDefaultBackend(profile.siteKey)}`
+}
+
+function profileAccessText(profile: Profile) {
+  return profile.defaultVisibility === 'private' ? '私有签名链接' : '公开直链'
 }
 
 const siteOpen = ref(false)
@@ -1539,7 +1551,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       <section v-else-if="tab === 'profiles'" class="space-y-4">
         <div>
           <h2 class="text-sm font-semibold text-highlighted">Profile 与派生规格</h2>
-          <p class="mt-1 text-xs text-muted">按站点管理上传用途、文件限制、交付策略和命名派生规格。</p>
+          <p class="mt-1 text-xs text-muted">按站点管理上传用途、文件限制、访问级别和命名派生规格。</p>
         </div>
 
         <ManageEmpty v-if="!profiles.length" icon="i-tabler-folder-off" text="还没有 Profile" />
@@ -1565,8 +1577,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
                 <div>类型 <span class="text-default">{{ profile.allowedExt }}</span></div>
                 <div>上限 <span class="text-default">{{ formatBytes(profile.maxSizeBytes) }}</span></div>
                 <div>后端 <span class="text-default">{{ profileStorageText(profile) }}</span></div>
-                <div>可见性 <span class="text-default">{{ profile.defaultVisibility }}</span></div>
-                <div>交付 <span class="text-default">{{ profile.defaultDeliveryPolicy }}</span></div>
+                <div>访问级别 <span class="text-default">{{ profileAccessText(profile) }}</span></div>
               </div>
               <div class="flex items-center justify-between">
                 <span class="text-xs font-medium text-muted">Variant · {{ profile.variantCount }}</span>
@@ -1644,9 +1655,8 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
           </UFormField>
           <UFormField label="允许后缀"><UInput v-model="profileForm.allowedExt" placeholder="jpg,jpeg,png,webp" /></UFormField>
           <UFormField label="大小上限(bytes)"><UInput v-model.number="profileForm.maxSizeBytes" type="number" /></UFormField>
-          <UFormField label="默认可见性"><USelect v-model="profileForm.defaultVisibility" :items="[{ label: '公开', value: 'public' }, { label: '私有', value: 'private' }]" value-key="value" /></UFormField>
-          <UFormField label="默认交付" :hint="profileForm.defaultVisibility === 'public' ? '公开资源固定公开 URL' : '私有资源的授权链接方式'">
-            <USelect v-model="profileForm.defaultDeliveryPolicy" :items="profilePolicyOptions" value-key="value" :disabled="profileForm.defaultVisibility === 'public'" />
+          <UFormField label="访问级别" help="公开资源返回稳定公开地址；私有资源由业务授权后生成签名链接。">
+            <USelect v-model="profileForm.defaultVisibility" :items="profileAccessLevelOptions" value-key="value" />
           </UFormField>
           <UCheckbox v-model="profileForm.keepOriginal" label="保留原图/原文件" />
         </div>
