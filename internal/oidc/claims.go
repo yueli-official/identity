@@ -24,7 +24,7 @@ func scopeSet(scopes []string) map[string]bool {
 func BuildSession(issuer, clientID, kid, sessionID string, id model.Identity, p model.Profile, scopes []string, roles []string, now time.Time) *Session {
 	has := scopeSet(scopes)
 	idExtra := map[string]interface{}{}
-	accessExtra := map[string]interface{}{}
+	accessExtra := map[string]interface{}{"client_id": clientID}
 	if has["roles"] {
 		if roles == nil {
 			roles = []string{}

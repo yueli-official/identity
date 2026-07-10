@@ -60,6 +60,15 @@ func TestBuildSession_RolesClaim(t *testing.T) {
 	}
 }
 
+func TestBuildSessionCarriesAccessTokenClientID(t *testing.T) {
+	s := oidc.BuildSession("iss", "blog-ai-web", "kid", "sid",
+		model.Identity{ID: "u1"}, model.Profile{},
+		[]string{"openid"}, nil, time.Now())
+	if got := s.JWTClaims.Extra["client_id"]; got != "blog-ai-web" {
+		t.Fatalf("access-token client_id = %#v, want blog-ai-web", got)
+	}
+}
+
 func TestBuildSession_NoRolesScope_NoClaim(t *testing.T) {
 	s := oidc.BuildSession("iss", "cli", "kid", "sid",
 		model.Identity{ID: "u1"}, model.Profile{},

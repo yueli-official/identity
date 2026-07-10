@@ -48,6 +48,9 @@ func TestAccessTokenVerifiableByGokitAuthjwt(t *testing.T) {
 	if principal.Issuer != env.base {
 		t.Fatalf("iss = %q, want %q", principal.Issuer, env.base)
 	}
+	if principal.ClientID != clientID {
+		t.Fatalf("client_id = %q, want %q", principal.ClientID, clientID)
+	}
 	if !principal.HasScope("openid") || !principal.HasScope("roles") {
 		t.Fatalf("scopes = %v, want to include openid + roles", principal.Scopes)
 	}

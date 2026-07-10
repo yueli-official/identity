@@ -215,6 +215,10 @@ func (c *OIDCController) applyServiceClaims(_ context.Context, accessReq fosite.
 	clientID := accessReq.GetClient().GetID()
 	if sess.JWTClaims != nil {
 		sess.JWTClaims.Subject = clientID
+		if sess.JWTClaims.Extra == nil {
+			sess.JWTClaims.Extra = map[string]interface{}{}
+		}
+		sess.JWTClaims.Extra["client_id"] = clientID
 	}
 	if sess.DefaultSession != nil {
 		sess.DefaultSession.Subject = clientID
