@@ -124,9 +124,11 @@ func (m *Manager) MintServiceToken(issuer, subject, scope string, ttl time.Durat
 		Expiry:    jwt.NewNumericDate(now.Add(ttl)),
 	}
 	builder := jwt.Signed(sig).Claims(claims)
+	extra := map[string]interface{}{"client_id": "identity-svc"}
 	if scope != "" {
-		builder = builder.Claims(map[string]interface{}{"scope": scope})
+		extra["scope"] = scope
 	}
+	builder = builder.Claims(extra)
 	return builder.CompactSerialize()
 }
 

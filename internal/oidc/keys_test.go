@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"testing"
+	"time"
 
 	jose "github.com/go-jose/go-jose/v3"
 	josejwt "github.com/go-jose/go-jose/v3/jwt"
@@ -11,6 +12,31 @@ import (
 	"platform/services/identity/internal/oidc"
 	"platform/services/identity/internal/repo"
 )
+
+func TestMintServiceTokenIdentifiesIdentityService(t *testing.T) {
+	ctx := context.Background()
+	m, err := oidc.NewManager(ctx, repo.NewMemory())
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := m.MintServiceToken("https://identity.test", "user-1", "", time.Minute, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := josejwt.ParseSigned(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var claims struct {
+		ClientID string `json:"client_id"`
+	}
+	if err := parsed.Claims(&m.ActivePrivateKey().PublicKey, &claims); err != nil {
+		t.Fatal(err)
+	}
+	if claims.ClientID != "identity-svc" {
+		t.Fatalf("client_id = %q, want identity-svc", claims.ClientID)
+	}
+}
 
 func TestBootstrapGeneratesActiveKeyWhenEmpty(t *testing.T) {
 	ctx := context.Background()
