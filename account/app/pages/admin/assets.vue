@@ -108,6 +108,7 @@ interface AssetItem {
   width?: number
   height?: number
   category: string
+  spaceKey: string
   siteKey: string
   profileKey: string
   deliveryPolicy: string
@@ -115,6 +116,11 @@ interface AssetItem {
   refCount: number
   cdnUrl?: string
   createdAt: string
+}
+interface AssetSpaceUsage {
+  spaceKey: string
+  assetCount: number
+  totalBytes: number
 }
 interface AssetReference {
   id: string
@@ -235,6 +241,7 @@ const storageBackends = ref<StorageBackend[]>([])
 const profiles = ref<Profile[]>([])
 const variants = ref<Variant[]>([])
 const assets = ref<AssetItem[]>([])
+const spaces = ref<AssetSpaceUsage[]>([])
 const references = ref<AssetReference[]>([])
 const grants = ref<Grant[]>([])
 const maintenanceTasks = ref<MaintenanceTask[]>([])
@@ -246,6 +253,7 @@ const grantPage = ref(1)
 const SIZE = 20
 
 const siteKey = ref(ALL)
+const spaceKey = ref(ALL)
 const profileKey = ref(ALL)
 const visibility = ref(ALL)
 const showSkeleton = useMinLoading(computed(() => !mounted.value || loading.value))
@@ -287,6 +295,13 @@ const profileStorageBackendOptions = computed(() => [
   { label: `继承站点默认 (${siteDefaultBackend(profileForm.siteKey)})`, value: '' },
   ...storageBackendOptions.value
 ])
+const spaceOptions = computed(() => [
+  { label: '全部资源空间', value: ALL },
+  ...spaces.value.map(space => ({
+    label: `${space.spaceKey} · ${space.assetCount} 个 / ${formatBytes(space.totalBytes)}`,
+    value: space.spaceKey
+  }))
+])
 const modeOptions = [
   { label: '等比缩放', value: 'resize' },
   { label: '填充裁剪', value: 'fill' }
@@ -315,7 +330,7 @@ onMounted(async () => {
   await reloadAll()
 })
 
-watch([siteKey, profileKey, visibility], async () => {
+watch([siteKey, spaceKey, profileKey, visibility], async () => {
   page.value = 1
   await fetchAssets()
 })
@@ -351,14 +366,16 @@ onBeforeUnmount(() => {
 async function reloadAll() {
   loading.value = true
   try {
-    const [st, siteData, backendData, profileData, variantData] = await Promise.all([
+    const [st, spaceData, siteData, backendData, profileData, variantData] = await Promise.all([
       call<Stats>('/api/v1/admin/assets-proxy/stats'),
+      call<{ items: AssetSpaceUsage[] }>('/api/v1/admin/assets-proxy/spaces'),
       call<{ items: Site[] }>('/api/v1/admin/assets-proxy/sites'),
       call<{ items: StorageBackend[], defaultName: string }>('/api/v1/admin/assets-proxy/storage-backends'),
       call<{ items: Profile[] }>('/api/v1/admin/assets-proxy/profiles'),
       call<{ items: Variant[] }>('/api/v1/admin/assets-proxy/variants')
     ])
     stats.value = st
+    spaces.value = spaceData.items ?? []
     sites.value = siteData.items ?? []
     storageBackends.value = backendData.items ?? []
     profiles.value = profileData.items ?? []
@@ -376,6 +393,7 @@ async function fetchAssets() {
     params: {
       page: page.value,
       size: SIZE,
+      spaceKey: spaceKey.value !== ALL ? spaceKey.value : undefined,
       siteKey: siteKey.value !== ALL ? siteKey.value : undefined,
       profileKey: profileKey.value !== ALL ? profileKey.value : undefined,
       visibility: visibility.value !== ALL ? visibility.value : undefined
@@ -1330,6 +1348,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
     <template v-else>
       <section v-if="tab === 'library'" class="space-y-4">
         <div class="flex flex-wrap items-center gap-3 rounded-lg border border-default bg-default p-3">
+          <USelectMenu v-model="spaceKey" :items="spaceOptions" value-key="value" class="w-64" :search-input="{ placeholder: '搜索资源空间…' }" />
           <USelectMenu v-model="siteKey" :items="siteOptions" value-key="value" class="w-56" :search-input="{ placeholder: '搜索站点…' }" />
           <USelectMenu v-model="profileKey" :items="profileOptions" value-key="value" class="w-56" :search-input="{ placeholder: '搜索 Profile…' }" />
           <USelect v-model="visibility" :items="visibilityOptions" value-key="value" class="w-36" />
@@ -1349,6 +1368,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
             <div class="min-w-0 flex-1">
               <div class="truncate text-sm font-medium text-highlighted">{{ asset.filename || asset.id }}</div>
               <div class="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted">
+                <span>空间 {{ asset.spaceKey || 'default' }}</span>
                 <span>{{ siteName(asset.siteKey) }}</span>
                 <span>/ {{ asset.profileKey }}</span>
                 <span>{{ asset.mime }}</span>
@@ -1908,7 +1928,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
                 </span>
                 <div class="min-w-0 flex-1">
                   <div class="truncate text-sm font-medium text-highlighted">{{ asset.filename || asset.id }}</div>
-                  <div class="truncate text-xs text-muted">{{ asset.siteKey }} / {{ asset.profileKey }} · {{ formatBytes(asset.size) }} · {{ briefDate(asset.createdAt) }}</div>
+                  <div class="truncate text-xs text-muted">{{ asset.spaceKey || 'default' }} / {{ asset.siteKey }} / {{ asset.profileKey }} · {{ formatBytes(asset.size) }} · {{ briefDate(asset.createdAt) }}</div>
                 </div>
               </div>
             </div>
