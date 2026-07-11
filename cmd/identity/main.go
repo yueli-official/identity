@@ -15,6 +15,7 @@ import (
 	_ "github.com/gogf/gf/contrib/nosql/redis/v2"
 
 	"platform/gokit/ghttpx"
+	"platform/gokit/healthcheck"
 	"platform/services/identity/internal/assetclient"
 	"platform/services/identity/internal/cache"
 	"platform/services/identity/internal/controller"
@@ -151,6 +152,10 @@ func main() {
 	s.Group("/", func(grp *ghttp.RouterGroup) {
 		grp.Middleware(ghttpx.Middleware)
 		grp.GET("/healthz", controller.Healthz)
+		grp.GET("/readyz", healthcheck.Handler(map[string]healthcheck.Check{
+			"database": healthcheck.Database,
+			"redis":    healthcheck.Redis,
+		}))
 		grp.Bind(authCtl)
 		grp.Bind(avatarCtl)
 		grp.ALL("/api/v1/admin/assets-proxy/*", assetAdminProxy.Forward)
