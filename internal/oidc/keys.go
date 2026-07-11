@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"strings"
 	"time"
 
 	jose "github.com/go-jose/go-jose/v3"
@@ -106,9 +107,13 @@ func (m *Manager) KeyGetter(context.Context) (interface{}, error) { return m.act
 // the given subject. Used for first-party server-to-server calls where the IdP
 // acts on behalf of a logged-in user (e.g. proxying an avatar upload to the
 // asset service): the user authenticates to the IdP by session cookie, and the
-// IdP mints a user-scoped bearer the resource server verifies via JWKS. scope is
-// space-delimited (may be empty).
-func (m *Manager) MintServiceToken(issuer, subject, scope string, ttl time.Duration, now time.Time) (string, error) {
+// IdP mints a user-scoped bearer the resource server verifies via JWKS. audience
+// is mandatory and identifies that resource server; scope is space-delimited
+// and may be empty.
+func (m *Manager) MintServiceToken(issuer, subject, audience, scope string, ttl time.Duration, now time.Time) (string, error) {
+	if strings.TrimSpace(audience) == "" {
+		return "", fmt.Errorf("service token audience is required")
+	}
 	sig, err := jose.NewSigner(
 		jose.SigningKey{Algorithm: jose.RS256, Key: m.activeKey},
 		(&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", m.activeKID),
@@ -119,6 +124,7 @@ func (m *Manager) MintServiceToken(issuer, subject, scope string, ttl time.Durat
 	claims := jwt.Claims{
 		Issuer:    issuer,
 		Subject:   subject,
+		Audience:  jwt.Audience{strings.TrimSpace(audience)},
 		IssuedAt:  jwt.NewNumericDate(now),
 		NotBefore: jwt.NewNumericDate(now),
 		Expiry:    jwt.NewNumericDate(now.Add(ttl)),

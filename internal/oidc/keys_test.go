@@ -9,6 +9,7 @@ import (
 	jose "github.com/go-jose/go-jose/v3"
 	josejwt "github.com/go-jose/go-jose/v3/jwt"
 
+	"platform/gokit/authjwt"
 	"platform/services/identity/internal/oidc"
 	"platform/services/identity/internal/repo"
 )
@@ -19,7 +20,7 @@ func TestMintServiceTokenIdentifiesIdentityService(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err := m.MintServiceToken("https://identity.test", "user-1", "", time.Minute, time.Now())
+	raw, err := m.MintServiceToken("https://identity.test", "user-1", "asset-api", "asset:sign", time.Minute, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,6 +36,29 @@ func TestMintServiceTokenIdentifiesIdentityService(t *testing.T) {
 	}
 	if claims.ClientID != "identity-svc" {
 		t.Fatalf("client_id = %q, want identity-svc", claims.ClientID)
+	}
+	verifier, err := authjwt.NewVerifier(authjwt.VerifierConfig{
+		Keys: authjwt.NewStaticKeySource(m.JWKS()), Issuer: "https://identity.test", Audience: "asset-api",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	principal, err := verifier.Verify(context.Background(), raw)
+	if err != nil {
+		t.Fatalf("asset verifier rejected minted service token: %v", err)
+	}
+	if principal.Subject != "user-1" || principal.ClientID != "identity-svc" || !principal.HasScope("asset:sign") {
+		t.Fatalf("verified principal = %+v", principal)
+	}
+}
+
+func TestMintServiceTokenRejectsEmptyAudience(t *testing.T) {
+	m, err := oidc.NewManager(context.Background(), repo.NewMemory())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.MintServiceToken("https://identity.test", "user-1", "", "", time.Minute, time.Now()); err == nil {
+		t.Fatal("MintServiceToken accepted an empty audience")
 	}
 }
 

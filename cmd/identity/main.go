@@ -41,6 +41,7 @@ func main() {
 	secureCookie := g.Cfg().MustGet(ctx, "cookie.secure", true).Bool()
 	accountBaseURL := g.Cfg().MustGet(ctx, "account.baseUrl", "http://localhost:3000").String()
 	assetBaseURL := g.Cfg().MustGet(ctx, "asset.baseUrl", "http://localhost:8082").String()
+	assetAudience := g.Cfg().MustGet(ctx, "asset.audience").String()
 
 	// ── Data layer ──────────────────────────────────────────────────────────
 	daoPG := dao.NewPG(g.DB())
@@ -138,8 +139,8 @@ func main() {
 
 	// Avatar/cover upload proxy: the IdP drives the asset upload server-side on
 	// behalf of the cookie-authenticated caller (mints a short-lived user token).
-	avatarCtl := controller.NewAvatar(svc, mgr, assetclient.New(assetBaseURL), issuer)
-	assetAdminProxy := controller.NewAssetAdminProxy(authCtl, mgr, issuer, assetBaseURL)
+	avatarCtl := controller.NewAvatar(svc, mgr, assetclient.New(assetBaseURL), issuer, assetAudience)
+	assetAdminProxy := controller.NewAssetAdminProxy(authCtl, mgr, issuer, assetBaseURL, assetAudience)
 
 	// ── Routing ─────────────────────────────────────────────────────────────
 	s := g.Server()

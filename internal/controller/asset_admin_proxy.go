@@ -17,15 +17,16 @@ import (
 // AssetAdminProxy forwards account-console asset admin requests to the asset
 // service after verifying the cookie-authenticated caller is a global admin.
 type AssetAdminProxy struct {
-	base   *Controller
-	mgr    *oidc.Manager
-	issuer string
-	asset  string
+	base     *Controller
+	mgr      *oidc.Manager
+	issuer   string
+	asset    string
+	audience string
 }
 
-func NewAssetAdminProxy(base *Controller, mgr *oidc.Manager, issuer, assetBaseURL string) *AssetAdminProxy {
+func NewAssetAdminProxy(base *Controller, mgr *oidc.Manager, issuer, assetBaseURL, audience string) *AssetAdminProxy {
 	return &AssetAdminProxy{
-		base: base, mgr: mgr, issuer: issuer, asset: strings.TrimRight(assetBaseURL, "/"),
+		base: base, mgr: mgr, issuer: issuer, asset: strings.TrimRight(assetBaseURL, "/"), audience: audience,
 	}
 }
 
@@ -35,7 +36,7 @@ func (p *AssetAdminProxy) Forward(r *ghttp.Request) {
 		r.SetError(err)
 		return
 	}
-	bearer, err := p.mgr.MintServiceToken(p.issuer, adminID, "asset:sign", 2*time.Minute, time.Now())
+	bearer, err := p.mgr.MintServiceToken(p.issuer, adminID, p.audience, "asset:sign", 2*time.Minute, time.Now())
 	if err != nil {
 		r.SetError(err)
 		return

@@ -37,6 +37,9 @@ oidc:
 account:
   loginUrl: "http://localhost:3000/login"
   baseUrl: "http://localhost:3000"   # env GF_ACCOUNT_BASEURL — used to build email links
+asset:
+  baseUrl: "http://localhost:8082"
+  audience: "asset-api"
 rbac:
   # The default role granted to new identities is the DefaultRole const in
   # internal/logic/roles.go (kept in lockstep with the migration 0006 seed),

@@ -27,14 +27,15 @@ const serviceTokenTTL = 2 * time.Minute
 // the cookie-authenticated caller. The IdP mints a short-lived user token and
 // drives the upload server-side, then commits the public URL to the profile.
 type AvatarController struct {
-	svc    *logic.Service
-	mgr    *oidc.Manager
-	asset  *assetclient.Client
-	issuer string
+	svc      *logic.Service
+	mgr      *oidc.Manager
+	asset    *assetclient.Client
+	issuer   string
+	audience string
 }
 
-func NewAvatar(svc *logic.Service, mgr *oidc.Manager, asset *assetclient.Client, issuer string) *AvatarController {
-	return &AvatarController{svc: svc, mgr: mgr, asset: asset, issuer: issuer}
+func NewAvatar(svc *logic.Service, mgr *oidc.Manager, asset *assetclient.Client, issuer, audience string) *AvatarController {
+	return &AvatarController{svc: svc, mgr: mgr, asset: asset, issuer: issuer, audience: audience}
 }
 
 // UploadAvatar stores the caller's avatar (square) and returns its public URL.
@@ -89,7 +90,7 @@ func (c *AvatarController) upload(ctx context.Context, kind string, file *ghttp.
 		oldAssetID = prev.CoverAssetID
 	}
 
-	bearer, err := c.mgr.MintServiceToken(c.issuer, id.ID, "", serviceTokenTTL, time.Now())
+	bearer, err := c.mgr.MintServiceToken(c.issuer, id.ID, c.audience, "", serviceTokenTTL, time.Now())
 	if err != nil {
 		return "", err
 	}
