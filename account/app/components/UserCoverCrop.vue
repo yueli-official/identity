@@ -3,7 +3,7 @@
 // (nuxtblog/web UserCoverCrop); upload posts the cropped JPEG to the IdP cover
 // proxy (cookie-authed), which stores it on the asset service and commits it to
 // the profile.
-const props = defineProps<{
+defineProps<{
   editable: boolean
   modelValue: string
 }>()

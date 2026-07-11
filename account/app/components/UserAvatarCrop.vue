@@ -3,7 +3,7 @@
 // donor (nuxtblog/web UserAvatarCrop); the upload posts the cropped JPEG to the
 // IdP avatar proxy (cookie-authed), which stores it on the asset service and
 // commits it to the profile, returning the public URL.
-const props = defineProps<{
+defineProps<{
   editable: boolean
   modelValue: string
   initial?: string
