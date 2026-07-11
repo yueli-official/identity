@@ -16,6 +16,7 @@ import (
 
 	"platform/gokit/ghttpx"
 	"platform/gokit/healthcheck"
+	"platform/gokit/observability"
 	"platform/gokit/openapiexport"
 	"platform/services/identity/internal/assetclient"
 	"platform/services/identity/internal/cache"
@@ -30,6 +31,11 @@ import (
 
 func main() {
 	ctx := gctx.New()
+	shutdown, err := observability.StartFromEnvironment(ctx, "identity-api")
+	if err != nil {
+		panic(err)
+	}
+	defer observability.ShutdownWithTimeout(shutdown)
 
 	// ── Config ──────────────────────────────────────────────────────────────
 	issuer := g.Cfg().MustGet(ctx, "oidc.issuer").String()
@@ -144,6 +150,7 @@ func main() {
 
 	// ── Routing ─────────────────────────────────────────────────────────────
 	s := g.Server()
+	s.Use(ghttpx.TraceRouteMiddleware)
 
 	// Actor middleware runs globally (before all handlers) so that every
 	// request — business API, OIDC endpoints, and OAuth login callbacks —

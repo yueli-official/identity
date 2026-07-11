@@ -9,6 +9,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"platform/gokit/observability"
 )
 
 // GoogleProvider implements Provider against Google's OAuth2 + v2 userinfo
@@ -31,7 +33,7 @@ func newGoogleWithEndpoints(clientID, clientSecret, redirectURL, authURL, tokenU
 	return &GoogleProvider{
 		clientID: clientID, clientSecret: clientSecret, redirectURL: redirectURL,
 		authURL: authURL, tokenURL: tokenURL, userinfoURL: userinfoURL,
-		hc: &http.Client{Timeout: 10 * time.Second},
+		hc: observability.HTTPClient(&http.Client{Timeout: 10 * time.Second}),
 	}
 }
 
