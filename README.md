@@ -149,10 +149,10 @@ mismatch silently breaks relying-party discovery and token validation.
 
 Use `cmd/devkit` from the platform repo root for local site development. It
 starts the real PG+Redis identity service, provisions the shared test account,
-and registers each site's OIDC client from `devstack.yaml`:
+and registers each site's OIDC client from the resolved local catalog:
 
 ```sh
-go run ./cmd/devkit up --stack devstack.yaml --root . docs-ae
+go run ./cmd/devkit up --stack catalog/overlays/local.yaml --root . docs-ae
 ```
 
 The shared local login is `test@example.com` / `Test12345`.
