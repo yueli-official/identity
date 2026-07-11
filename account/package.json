@@ -10,6 +10,7 @@
   "dependencies": {
     "@nuxt/ui": "catalog:",
     "@platform/ui": "workspace:*",
+    "@platform/manage": "workspace:*",
     "nuxt": "catalog:",
     "tailwindcss": "catalog:",
     "zod": "catalog:"

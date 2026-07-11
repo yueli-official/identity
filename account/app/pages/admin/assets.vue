@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
-import { ManageHeader, ManageEmpty, SkeletonList } from '@platform/ui/components'
+import { ManageHeader, ManageEmpty, SkeletonList } from '@platform/manage/components'
 import { useMinLoading } from '@platform/ui/use-min-loading'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {
   ManageHeader, ManageTabs, ManageEmpty, ManagePagination, ManagePageFooter, SkeletonList
-} from '@platform/ui/components'
+} from '@platform/manage/components'
 import { useMinLoading } from '@platform/ui/use-min-loading'
 
 // 站群超级管理员·用户管理。identity 全局用户的全生命周期管理:列表/搜索/筛选/
