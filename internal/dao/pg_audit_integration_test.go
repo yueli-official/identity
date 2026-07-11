@@ -255,7 +255,7 @@ func TestPGAuditNullUUIDs(t *testing.T) {
 
 	event := "test.audit.nulluuid." + uuid.NewString()
 	row := repo.AuditRow{
-		Event:  event,
+		Event: event,
 		// ActorID and TargetID intentionally empty → must become NULL in PG.
 		Result: "failure",
 		Detail: map[string]any{"reason": "bad credentials"},

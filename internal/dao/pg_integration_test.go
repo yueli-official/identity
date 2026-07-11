@@ -7,8 +7,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/gogf/gf/v2/database/gdb"
 	_ "github.com/gogf/gf/contrib/drivers/pgsql/v2"
+	"github.com/gogf/gf/v2/database/gdb"
 
 	"platform/services/identity/internal/dao"
 	"platform/services/identity/internal/repo"

@@ -62,7 +62,7 @@ type AdminUserDTO struct {
 	ID            string   `json:"id"`
 	Email         string   `json:"email"`
 	EmailVerified bool     `json:"emailVerified"`
-	Status        string   `json:"status"` // active | disabled | deleted
+	Status        string   `json:"status"`    // active | disabled | deleted
 	CreatedAt     string   `json:"createdAt"` // RFC3339
 	DisplayName   string   `json:"displayName"`
 	Username      string   `json:"username"`

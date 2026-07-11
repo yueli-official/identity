@@ -26,7 +26,7 @@ import (
 // against httptest in internal/oauthlogin/google_test.go). It lets the controller
 // e2e exercise the full redirect dance hermetically, without any network.
 type fakeProvider struct {
-	authBase string          // base URL the AuthorizeURL points at (a dummy)
+	authBase string // base URL the AuthorizeURL points at (a dummy)
 	user     oauthlogin.UserInfo
 }
 

@@ -28,10 +28,10 @@ const (
 	EvPATCreated = "pat.created"
 	EvPATRevoked = "pat.revoked"
 
-	EvProfileUpdated   = "profile.updated"
-	EvPasswordChanged  = "password.changed"
-	EvPasswordSet      = "password.set"
-	EvSessionRevoked   = "session.revoked"
+	EvProfileUpdated     = "profile.updated"
+	EvPasswordChanged    = "password.changed"
+	EvPasswordSet        = "password.set"
+	EvSessionRevoked     = "session.revoked"
 	EvCredentialUnlinked = "credential.oauth_unlinked"
 
 	EvAdminUserCreated   = "admin.user_created"

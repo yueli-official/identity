@@ -8,8 +8,8 @@ import (
 
 func TestCanonicalizeEmail(t *testing.T) {
 	cases := map[string]string{
-		"  A@B.COM ":        "a@b.com",
-		"User@Example.com":  "user@example.com",
+		"  A@B.COM ":       "a@b.com",
+		"User@Example.com": "user@example.com",
 	}
 	for in, want := range cases {
 		if got := logic.CanonicalizeEmail(in); got != want {

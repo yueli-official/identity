@@ -11,7 +11,7 @@ type CreatePATReq struct {
 type CreatePATRes struct {
 	ID          int64    `json:"id"`
 	Name        string   `json:"name"`
-	Token       string   `json:"token"`               // PLAINTEXT — shown once, never again
+	Token       string   `json:"token"` // PLAINTEXT — shown once, never again
 	TokenPrefix string   `json:"tokenPrefix"`
 	Scopes      []string `json:"scopes"`
 	ExpiresAt   string   `json:"expiresAt,omitempty"` // RFC3339 or ""

@@ -15,18 +15,18 @@ import (
 // whose names don't follow the default auto-conversion rules (e.g.
 // actor_identity_id → ActorID would mis-map without an explicit tag).
 type auditRow struct {
-	ID        int64     `orm:"id"`
-	Event     string    `orm:"event"`
-	ActorID   string    `orm:"actor_identity_id"`
-	TargetID  string    `orm:"target_identity_id"`
-	ActorEmail string   `orm:"actor_email"`
-	IP        string    `orm:"ip"`
-	UserAgent string    `orm:"user_agent"`
-	ClientID  string    `orm:"client_id"`
-	RequestID string    `orm:"request_id"`
-	Result    string    `orm:"result"`
+	ID         int64  `orm:"id"`
+	Event      string `orm:"event"`
+	ActorID    string `orm:"actor_identity_id"`
+	TargetID   string `orm:"target_identity_id"`
+	ActorEmail string `orm:"actor_email"`
+	IP         string `orm:"ip"`
+	UserAgent  string `orm:"user_agent"`
+	ClientID   string `orm:"client_id"`
+	RequestID  string `orm:"request_id"`
+	Result     string `orm:"result"`
 	// Detail is read as a raw JSON string from Postgres; we unmarshal it ourselves.
-	Detail    string    `orm:"detail"`
+	Detail     string    `orm:"detail"`
 	OccurredAt time.Time `orm:"occurred_at"`
 }
 

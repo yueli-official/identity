@@ -18,18 +18,18 @@ var memRoleCatalog = map[string]bool{"user": true, "admin": true}
 
 // Memory is a hermetic in-memory Store for unit tests and local dev.
 type Memory struct {
-	mu        sync.Mutex
-	byID      map[string]model.Identity
-	byEmail   map[string]string // email -> id
-	pwHash    map[string]string // id -> hash
-	profiles  map[string]model.Profile
-	sessions  map[string]model.Session
-	failCount map[string]int
-	lockUntil map[string]time.Time
+	mu         sync.Mutex
+	byID       map[string]model.Identity
+	byEmail    map[string]string // email -> id
+	pwHash     map[string]string // id -> hash
+	profiles   map[string]model.Profile
+	sessions   map[string]model.Session
+	failCount  map[string]int
+	lockUntil  map[string]time.Time
 	now        func() time.Time
 	clients    map[string]model.OIDCClient
 	keys       []model.SigningKey
-	oauthLinks map[string]string // provider+"\x00"+providerUID -> identity id
+	oauthLinks map[string]string          // provider+"\x00"+providerUID -> identity id
 	verifs     map[string]memVerification // token_hash -> verification record
 	roles      map[string]map[string]bool // identity id -> set of granted role slugs
 	audit      []AuditRow                 // append-only audit log (newest is highest index)

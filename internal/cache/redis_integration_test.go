@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gogf/gf/v2/database/gredis"
 	_ "github.com/gogf/gf/contrib/nosql/redis/v2" // register the go-redis adapter
+	"github.com/gogf/gf/v2/database/gredis"
 
 	"platform/services/identity/internal/cache"
 	"platform/services/identity/internal/model"
