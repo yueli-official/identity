@@ -9,7 +9,9 @@ import type { H3Event } from 'h3'
 
 export interface OidcCfg {
   clientId: string
+  clientSecret: string
   redirectUri: string
+  postLogoutRedirectUri: string
   scopes: string
   authorizeEndpoint: string
   tokenEndpoint: string
@@ -33,7 +35,9 @@ export function oidcConfig(event: H3Event): OidcCfg {
   const issuer = (rc.public.oidcIssuer as string).replace(/\/$/, '')
   return {
     clientId: rc.public.oidcClientId as string,
+    clientSecret: rc.oidcClientSecret as string,
     redirectUri: rc.public.oidcRedirectUri as string,
+    postLogoutRedirectUri: rc.public.oidcPostLogoutRedirectUri as string,
     scopes: (rc.public.oidcScopes as string) || 'openid profile email roles offline_access',
     authorizeEndpoint: issuer + '/oauth2/authorize',
     tokenEndpoint: issuer + '/oauth2/token',
@@ -112,7 +116,8 @@ export async function exchangeCode(cfg: OidcCfg, code: string, verifier: string)
       code,
       redirect_uri: cfg.redirectUri,
       client_id: cfg.clientId,
-      code_verifier: verifier
+      code_verifier: verifier,
+      ...(cfg.clientSecret ? { client_secret: cfg.clientSecret } : {})
     }).toString()
   })
 }
@@ -124,7 +129,8 @@ export async function refreshTokens(cfg: OidcCfg, refresh: string): Promise<Toke
     body: new URLSearchParams({
       grant_type: 'refresh_token',
       refresh_token: refresh,
-      client_id: cfg.clientId
+      client_id: cfg.clientId,
+      ...(cfg.clientSecret ? { client_secret: cfg.clientSecret } : {})
     }).toString()
   })
 }

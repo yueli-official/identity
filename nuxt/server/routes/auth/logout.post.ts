@@ -8,7 +8,10 @@ export default defineEventHandler((event) => {
   const cfg = oidcConfig(event)
   deleteCookie(event, SESSION_COOKIE, { path: '/' })
 
-  const origin = new URL(cfg.redirectUri).origin
-  const endSession = `${cfg.endSessionEndpoint}?post_logout_redirect_uri=${encodeURIComponent(origin + '/')}`
+  const query = new URLSearchParams({
+    client_id: cfg.clientId,
+    post_logout_redirect_uri: cfg.postLogoutRedirectUri
+  })
+  const endSession = `${cfg.endSessionEndpoint}?${query}`
   return { ok: true, endSession }
 })

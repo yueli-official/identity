@@ -9,6 +9,7 @@ export interface AuthUser {
 // useAuth exposes the BFF session: the user (display claims, never tokens),
 // login (full navigation to the BFF /auth/login), and logout.
 export function useAuth() {
+	const runtime = useRuntimeConfig()
   const user = useState<AuthUser | null>('rs-auth-user', () => null)
 
   async function refresh() {
@@ -37,6 +38,12 @@ export function useAuth() {
   }
 
   const loggedIn = computed(() => !!user.value)
-  const isAdmin = computed(() => !!user.value?.roles?.includes('admin'))
+	const operatorSubs = computed(() =>
+		String(runtime.public.operatorSubs || '')
+			.split(',')
+			.map((sub) => sub.trim())
+			.filter(Boolean)
+	)
+	const isAdmin = computed(() => !!user.value && operatorSubs.value.includes(user.value.sub))
   return { user, loggedIn, isAdmin, refresh, login, logout }
 }
