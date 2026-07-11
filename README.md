@@ -193,13 +193,11 @@ See milestone ④ below.
 - Refresh token：从 PG 删除，同 family 的所有未过期 refresh token 一并作废。
 - Access token：当前为幂等空操作（access token 是无状态 JWT，到期自然失效；即时撤销可通过 denylist 实现，计划在后续 milestone 中追加）。
 
-### `/oauth2/end_session`（MVP）
-
-MVP 行为：
+### `/oauth2/end_session`
 
 1. 清除 IdP 侧的身份会话（`id_session` cookie）。
 2. 撤销该会话关联的所有 refresh token（`RevokeRefreshBySession`）。
-3. 不进行 `post_logout_redirect_uri` 跳转（完整的 RP-initiated logout 重定向支持留待后续）。
+3. 当请求同时携带 `client_id` 和 `post_logout_redirect_uri`，且 URI 与该 client 注册的 `post_logout_redirect_uris` 之一完全相同时，302 回跳；缺参或未登记 URI 只返登出结果，避免开放重定向。
 
 ### 被动登出语义
 

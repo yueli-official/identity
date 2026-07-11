@@ -3,7 +3,7 @@ package controller
 import (
 	"context"
 	"net/url"
-	"strings"
+	"slices"
 	"time"
 
 	"github.com/gogf/gf/v2/net/ghttp"
@@ -11,41 +11,30 @@ import (
 
 	"platform/services/identity/internal/logic"
 	"platform/services/identity/internal/oidc"
+	"platform/services/identity/internal/repo"
 )
 
 // OIDCController handles the OAuth2/OIDC protocol endpoints.
 type OIDCController struct {
-	provider   fosite.OAuth2Provider
-	keys       *oidc.Manager
-	svc        *logic.Service
-	issuer     string
-	loginURL   string
-	postLogout map[string]bool // allowed post_logout_redirect_uri origins (RP logout)
+	provider fosite.OAuth2Provider
+	keys     *oidc.Manager
+	svc      *logic.Service
+	issuer   string
+	loginURL string
+	clients  repo.ClientRepo
 }
 
-// SetPostLogoutRedirects registers the origins a post_logout_redirect_uri may
-// point at (RP-initiated logout, end_session). Without a match the uri is
-// ignored — guards against an open redirect. Prod should derive this from each
-// client's registered post_logout_redirect_uris; the seeded consumer origins
-// suffice for the self-operated station group.
-func (c *OIDCController) SetPostLogoutRedirects(origins []string) {
-	c.postLogout = map[string]bool{}
-	for _, o := range origins {
-		c.postLogout[strings.TrimRight(o, "/")] = true
-	}
-}
-
-func (c *OIDCController) allowedPostLogout(uri string) bool {
-	u, err := url.Parse(uri)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+func (c *OIDCController) allowedPostLogout(ctx context.Context, clientID, uri string) bool {
+	if clientID == "" || uri == "" || c.clients == nil {
 		return false
 	}
-	return c.postLogout[u.Scheme+"://"+u.Host]
+	client, err := c.clients.GetClient(ctx, clientID)
+	return err == nil && slices.Contains(client.PostLogoutRedirectURIs, uri)
 }
 
 // NewOIDC creates an OIDCController wired to a fosite provider and key manager.
-func NewOIDC(p fosite.OAuth2Provider, keys *oidc.Manager, svc *logic.Service, issuer, loginURL string) *OIDCController {
-	return &OIDCController{provider: p, keys: keys, svc: svc, issuer: issuer, loginURL: loginURL}
+func NewOIDC(p fosite.OAuth2Provider, keys *oidc.Manager, svc *logic.Service, clients repo.ClientRepo, issuer, loginURL string) *OIDCController {
+	return &OIDCController{provider: p, keys: keys, svc: svc, clients: clients, issuer: issuer, loginURL: loginURL}
 }
 
 // discoveryDoc builds the OIDC discovery document (testable without HTTP).
@@ -103,6 +92,10 @@ func (c *OIDCController) Authorize(r *ghttp.Request) {
 	for _, scope := range ar.GetRequestedScopes() {
 		ar.GrantScope(scope) // first-party: no consent UI
 	}
+	audiences := c.clientAudiences(ctx, ar.GetClient().GetID())
+	for _, audience := range audiences {
+		ar.GrantAudience(audience)
+	}
 
 	profile, _ := c.svc.GetProfile(ctx, id.ID) // empty profile is acceptable
 	roles, _ := c.svc.GetRoles(ctx, id.ID)     // empty roles is acceptable
@@ -110,6 +103,7 @@ func (c *OIDCController) Authorize(r *ghttp.Request) {
 		c.issuer, ar.GetClient().GetID(), c.keys.ActiveKID(), sid,
 		id, profile, ar.GetGrantedScopes(), roles, time.Now().UTC(),
 	)
+	session.JWTClaims.Audience = audiences
 
 	resp, err := c.provider.NewAuthorizeResponse(ctx, ar, session)
 	if err != nil {
@@ -197,7 +191,7 @@ func (c *OIDCController) refreshRolesClaim(ctx context.Context, accessReq fosite
 // service, and copy the active "kid" into the JWT header so resource servers can
 // resolve the signing key (EmptySession carries no kid). No-op for every other
 // grant, whose session already holds an authenticated subject + kid.
-func (c *OIDCController) applyServiceClaims(_ context.Context, accessReq fosite.AccessRequester) {
+func (c *OIDCController) applyServiceClaims(ctx context.Context, accessReq fosite.AccessRequester) {
 	if !accessReq.GetGrantTypes().ExactOne("client_credentials") {
 		return
 	}
@@ -213,8 +207,12 @@ func (c *OIDCController) applyServiceClaims(_ context.Context, accessReq fosite.
 		return
 	}
 	clientID := accessReq.GetClient().GetID()
+	for _, audience := range c.clientAudiences(ctx, clientID) {
+		accessReq.GrantAudience(audience)
+	}
 	if sess.JWTClaims != nil {
 		sess.JWTClaims.Subject = clientID
+		sess.JWTClaims.Audience = c.clientAudiences(ctx, clientID)
 		if sess.JWTClaims.Extra == nil {
 			sess.JWTClaims.Extra = map[string]interface{}{}
 		}
@@ -229,6 +227,16 @@ func (c *OIDCController) applyServiceClaims(_ context.Context, accessReq fosite.
 		}
 		sess.JWTHeader.Extra["kid"] = c.keys.ActiveKID()
 	}
+}
+
+func (c *OIDCController) clientAudiences(ctx context.Context, clientID string) []string {
+	if c.clients != nil {
+		client, err := c.clients.GetClient(ctx, clientID)
+		if err == nil && len(client.Audiences) > 0 {
+			return append([]string(nil), client.Audiences...)
+		}
+	}
+	return []string{clientID}
 }
 
 // Userinfo handles GET/POST /oauth2/userinfo.
@@ -268,9 +276,8 @@ func (c *OIDCController) Revoke(r *ghttp.Request) {
 }
 
 // EndSession handles GET/POST /oauth2/end_session (RP-initiated logout, MVP).
-// Clears the IdP login session and revokes refresh tokens bound to it (via
-// svc.Logout, which is session-bound). Does NOT honor arbitrary
-// post_logout_redirect_uri (open-redirect guard; whitelist redirect is future work).
+// Clears the IdP login session and revokes refresh tokens bound to it. Redirects
+// only when client_id owns the exact registered post_logout_redirect_uri.
 func (c *OIDCController) EndSession(r *ghttp.Request) {
 	ctx := r.Context()
 	sid := r.Cookie.Get("id_session", "").String()
@@ -281,7 +288,9 @@ func (c *OIDCController) EndSession(r *ghttp.Request) {
 	// RP-initiated logout: after clearing the IdP session, bounce back to the
 	// relying party (so the user lands on the consumer site, logged out) when it
 	// supplies an allow-listed post_logout_redirect_uri.
-	if uri := r.GetQuery("post_logout_redirect_uri").String(); uri != "" && c.allowedPostLogout(uri) {
+	uri := r.GetQuery("post_logout_redirect_uri").String()
+	clientID := r.GetQuery("client_id").String()
+	if c.allowedPostLogout(ctx, clientID, uri) {
 		r.Response.RedirectTo(uri)
 		return
 	}

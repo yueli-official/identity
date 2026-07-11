@@ -67,6 +67,7 @@ func toFositeClient(c model.OIDCClient) *fosite.DefaultClient {
 		GrantTypes:    c.GrantTypes,
 		ResponseTypes: c.ResponseTypes,
 		Scopes:        c.Scopes,
+		Audience:      c.Audiences,
 	}
 }
 

@@ -4,13 +4,16 @@ import "time"
 
 // OIDCClient is a registered relying party (consumer site).
 type OIDCClient struct {
-	ID            string
-	Public        bool
-	SecretHash    string
-	RedirectURIs  []string
-	GrantTypes    []string
-	ResponseTypes []string
-	Scopes        []string
+	ID                     string
+	Public                 bool
+	SecretHash             string
+	SecretRef              string
+	RedirectURIs           []string
+	PostLogoutRedirectURIs []string
+	Audiences              []string
+	GrantTypes             []string
+	ResponseTypes          []string
+	Scopes                 []string
 }
 
 type KeyStatus string

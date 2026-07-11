@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -71,12 +72,14 @@ func setupE2E(t *testing.T, clientID string) *e2eEnv {
 	//    advertises the refresh_token grant and offline_access scope.
 	r := repo.NewMemory()
 	r.SetClient(model.OIDCClient{
-		ID:            clientID,
-		Public:        true,
-		RedirectURIs:  []string{callbackURI},
-		GrantTypes:    []string{"authorization_code", "refresh_token"},
-		ResponseTypes: []string{"code"},
-		Scopes:        []string{"openid", "profile", "email", "roles", "offline_access"},
+		ID:                     clientID,
+		Public:                 true,
+		RedirectURIs:           []string{callbackURI},
+		PostLogoutRedirectURIs: []string{"http://127.0.0.1/after-logout"},
+		Audiences:              []string{clientID, "api://" + clientID},
+		GrantTypes:             []string{"authorization_code", "refresh_token"},
+		ResponseTypes:          []string{"code"},
+		Scopes:                 []string{"openid", "profile", "email", "roles", "offline_access"},
 	})
 
 	// 2. User: register + login → session id + subject.
@@ -124,8 +127,7 @@ func setupE2E(t *testing.T, clientID string) *e2eEnv {
 		IDTTL:        10 * time.Minute,
 		RefreshTTL:   720 * time.Hour,
 	}, mgr.KeyGetter)
-	ctl := controller.NewOIDC(provider, mgr, svc, base, base+"/login")
-	ctl.SetPostLogoutRedirects([]string{"http://127.0.0.1"})
+	ctl := controller.NewOIDC(provider, mgr, svc, r, base, base+"/login")
 
 	// 5. Start GoFrame server on the pre-chosen port (NO ghttpx.Middleware), with
 	//    the full OIDC route set.
@@ -455,7 +457,7 @@ func TestOIDCFlow(t *testing.T) {
 		AccessTTL:    10 * time.Minute,
 		IDTTL:        10 * time.Minute,
 	}, mgr.KeyGetter)
-	ctl := controller.NewOIDC(provider, mgr, svc, base, base+"/login")
+	ctl := controller.NewOIDC(provider, mgr, svc, r, base, base+"/login")
 
 	// -----------------------------------------------------------------------
 	// 5. Start GoFrame server on the pre-chosen port (NO ghttpx.Middleware)
@@ -660,6 +662,7 @@ func TestOIDCRefreshFlow(t *testing.T) {
 		t.Fatalf("offline_access requested but no refresh_token in response: %s", body)
 	}
 	verifyAccessTokenLocally(t, env.base, ts.AccessToken, env.base, env.subject)
+	assertAccessTokenAudiences(t, ts.AccessToken, []string{clientID, "api://" + clientID})
 	t.Logf("initial token OK: refresh_token len=%d", len(ts.RefreshToken))
 
 	// Refresh grant → NEW access token + NEW refresh token (rotation). The refresh
@@ -676,6 +679,7 @@ func TestOIDCRefreshFlow(t *testing.T) {
 		t.Fatalf("refresh did not mint a new access_token")
 	}
 	verifyAccessTokenLocally(t, env.base, rts.AccessToken, env.base, env.subject)
+	assertAccessTokenAudiences(t, rts.AccessToken, []string{clientID, "api://" + clientID})
 	t.Logf("refresh OK: new access_token + rotated refresh_token (rt→rt2)")
 }
 
@@ -918,6 +922,7 @@ func TestOIDCEndSessionRedirectsToAllowedPostLogoutURI(t *testing.T) {
 	postLogoutURI := "http://127.0.0.1/after-logout"
 	esReq, err := http.NewRequestWithContext(env.ctx, http.MethodGet,
 		env.base+"/oauth2/end_session?"+url.Values{
+			"client_id":                {clientID},
 			"post_logout_redirect_uri": {postLogoutURI},
 		}.Encode(), nil)
 	if err != nil {
@@ -940,6 +945,50 @@ func TestOIDCEndSessionRedirectsToAllowedPostLogoutURI(t *testing.T) {
 	}
 	if _, err := env.svc.Me(env.ctx, env.sid); err == nil {
 		t.Fatalf("end_session redirect: IdP session still resolves via Me after logout")
+	}
+}
+
+func TestOIDCEndSessionRejectsUnregisteredPostLogoutURI(t *testing.T) {
+	const clientID = "demo-web"
+	env := setupE2E(t, clientID)
+	req, err := http.NewRequestWithContext(env.ctx, http.MethodGet,
+		env.base+"/oauth2/end_session?"+url.Values{
+			"client_id":                {clientID},
+			"post_logout_redirect_uri": {"http://127.0.0.1/not-registered"},
+		}.Encode(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Cookie", "id_session="+env.sid)
+
+	resp, err := noRedirectClient().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || resp.Header.Get("Location") != "" {
+		t.Fatalf("unregistered logout URI accepted: status=%d location=%q", resp.StatusCode, resp.Header.Get("Location"))
+	}
+}
+
+func assertAccessTokenAudiences(t *testing.T, token string, want []string) {
+	t.Helper()
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		t.Fatalf("access token is not a compact JWT")
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		t.Fatalf("decode access-token claims: %v", err)
+	}
+	var claims struct {
+		Audience []string `json:"aud"`
+	}
+	if err := json.Unmarshal(raw, &claims); err != nil {
+		t.Fatalf("unmarshal access-token claims: %v", err)
+	}
+	if !slices.Equal(claims.Audience, want) {
+		t.Fatalf("access-token aud = %v, want %v", claims.Audience, want)
 	}
 }
 
