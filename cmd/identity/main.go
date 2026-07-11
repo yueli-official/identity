@@ -16,6 +16,7 @@ import (
 
 	"platform/gokit/ghttpx"
 	"platform/gokit/healthcheck"
+	"platform/gokit/openapiexport"
 	"platform/services/identity/internal/assetclient"
 	"platform/services/identity/internal/cache"
 	"platform/services/identity/internal/controller"
@@ -177,6 +178,13 @@ func main() {
 		grp.GET("/api/v1/auth/oauth/google/start", oauthCtl.GoogleStart)
 		grp.GET("/api/v1/auth/oauth/google/callback", oauthCtl.GoogleCallback)
 	})
+
+	if handled, err := openapiexport.ExportIfRequested(s); handled {
+		if err != nil {
+			panic(err)
+		}
+		return
+	}
 
 	g.Log().Info(ctx, "identity-service starting")
 	s.Run()
