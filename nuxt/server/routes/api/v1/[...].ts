@@ -3,7 +3,10 @@
 // Anonymous requests (no session) are forwarded without a token, so public
 // endpoints keep working logged-out.
 export default defineEventHandler(async (event) => {
-  const cfg = oidcConfig(event)
-  const headers = await sessionAuthHeaders(event)
-  return await proxyRequest(event, cfg.downstreamBase + event.path, { headers })
-})
+  const cfg = oidcConfig(event);
+  const headers = platformProxyHeaders(event, await sessionAuthHeaders(event));
+  return await proxyRequest(event, cfg.downstreamBase + event.path, {
+    headers,
+    streamRequest: true,
+  });
+});
