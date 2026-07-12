@@ -5,7 +5,7 @@ export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event)
   const observedAt = new Date().toISOString()
   const services = await aggregatePlatformServices(key => fetchPlatformService(event, key))
-  const applications = evaluateCapabilityRequirements(readCapabilityRequirements(event), services)
+  const applications = evaluateCapabilityRequirements(await readCapabilityRequirements(event), services)
   return {
     observedAt,
     environment: config.platformEnvironment,

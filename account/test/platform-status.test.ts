@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest'
-import { aggregatePlatformServices, capabilityManifestSchema, capabilityVersionSatisfies, classifyPlatformServiceFailure, evaluateCapabilityRequirements, manifestAgeSeconds, parsePlatformManifest, platformProbeFailureStatus } from '../server/utils/platform-status'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { describe, expect, it, vi } from 'vitest'
+import { aggregatePlatformServices, capabilityManifestSchema, capabilityVersionSatisfies, classifyPlatformServiceFailure, evaluateCapabilityRequirements, manifestAgeSeconds, mergeCapabilityRequirements, parsePlatformManifest, platformProbeFailureStatus, readCapabilityRequirements } from '../server/utils/platform-status'
 import type { PlatformServiceResult } from '../shared/types/platform'
 
 function envelope(value = manifest()) {
@@ -126,5 +129,29 @@ describe('platform capability BFF schema', () => {
     expect(capabilityVersionSatisfies('2.0.0', '=2.0')).toBe(true)
     expect(capabilityVersionSatisfies('2.1', '2.0')).toBe(false)
     expect(capabilityVersionSatisfies('latest', '>=1.0')).toBe(false)
+  })
+
+  it('merges attached composition requirements deterministically and rejects conflicts', () => {
+    const blog = { site: 'blog-ai', productType: 'blog', brand: 'AI Blog', capabilities: { 'identity.oidc': '>=1.0' } }
+    const docs = { site: 'docs-ae', productType: 'docs', brand: 'Docs', capabilities: { 'identity.oidc': '>=1.0' } }
+    expect(mergeCapabilityRequirements([[docs], [blog], [blog]])).toEqual([blog, docs])
+    expect(() => mergeCapabilityRequirements([[blog], [{ ...blog, capabilities: { 'identity.oidc': '>=2.0' } }]])).toThrow('conflicting')
+  })
+
+  it('loads strict attach registrations from the Core control directory', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'account-compositions-'))
+    const base = [{ site: 'blog-ai', productType: 'blog', brand: 'AI Blog', capabilities: { 'identity.oidc': '>=1.0' } }]
+    const attached = [{ site: 'docs-ae', productType: 'docs', brand: 'Docs', capabilities: { 'asset.object-storage': '>=1.0' } }]
+    await writeFile(join(directory, 'docs.json'), JSON.stringify(attached))
+    vi.stubGlobal('useRuntimeConfig', () => ({
+      platformCapabilityRequirementsB64: Buffer.from(JSON.stringify(base)).toString('base64'),
+      platformCompositionDir: directory,
+    }))
+    try {
+      expect(await readCapabilityRequirements({} as never)).toEqual([...base, ...attached])
+    } finally {
+      vi.unstubAllGlobals()
+      await rm(directory, { recursive: true, force: true })
+    }
   })
 })

@@ -16,6 +16,7 @@ export default defineNuxtConfig({
     platformEnvironment: process.env.NUXT_PLATFORM_ENVIRONMENT || "local",
     platformCapabilityRequirementsB64:
       process.env.NUXT_PLATFORM_CAPABILITY_REQUIREMENTS_B64 || "W10=",
+    platformCompositionDir: process.env.NUXT_PLATFORM_COMPOSITION_DIR || "",
   },
   // Dev-only proxy to the Go backend so the app is same-origin in `nuxt dev`.
   // In Nuxt 4 this lives under `nitro.devProxy` (the top-level `devProxy`

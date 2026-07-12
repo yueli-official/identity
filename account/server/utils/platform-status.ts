@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import type { H3Event } from 'h3'
+import { readdir, readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import type { ApplicationCapabilityStatus, CapabilityItem, CapabilityManifest, CapabilityRequirementResult, PlatformServiceKey, PlatformServiceResult, ProviderItem, SiteCapabilityRequirements } from '../../shared/types/platform'
 
 export const platformServiceKeys = ['identity', 'asset', 'commerce', 'notification'] as const
@@ -144,13 +146,46 @@ export async function aggregatePlatformServices(fetcher: (key: PlatformServiceKe
   return Promise.all(platformServiceKeys.map(key => fetcher(key)))
 }
 
-export function readCapabilityRequirements(event: H3Event): SiteCapabilityRequirements[] {
-  const encoded = useRuntimeConfig(event).platformCapabilityRequirementsB64
+export async function readCapabilityRequirements(event: H3Event): Promise<SiteCapabilityRequirements[]> {
+  const config = useRuntimeConfig(event)
+  const sources: SiteCapabilityRequirements[][] = []
   try {
-    return siteCapabilityRequirementsSchema.parse(JSON.parse(Buffer.from(encoded, 'base64').toString('utf8')))
+    sources.push(siteCapabilityRequirementsSchema.parse(JSON.parse(Buffer.from(config.platformCapabilityRequirementsB64, 'base64').toString('utf8'))))
+    if (config.platformCompositionDir) {
+      let entries: string[] = []
+      try {
+        entries = (await readdir(config.platformCompositionDir, { withFileTypes: true }))
+          .filter(entry => entry.isFile() && entry.name.endsWith('.json'))
+          .map(entry => entry.name)
+          .sort()
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+      }
+      if (entries.length > 128) throw new Error('too many composition registrations')
+      for (const filename of entries) {
+        const data = await readFile(join(config.platformCompositionDir, filename))
+        if (data.length > 1 << 20) throw new Error('composition registration exceeds 1 MiB')
+        sources.push(siteCapabilityRequirementsSchema.parse(JSON.parse(data.toString('utf8'))))
+      }
+    }
+    return mergeCapabilityRequirements(sources)
   } catch {
     throw createError({ statusCode: 503, statusMessage: 'Platform capability requirements are invalid' })
   }
+}
+
+export function mergeCapabilityRequirements(sources: SiteCapabilityRequirements[][]): SiteCapabilityRequirements[] {
+  const merged = new Map<string, SiteCapabilityRequirements>()
+  for (const source of sources) {
+    for (const application of source) {
+      const existing = merged.get(application.site)
+      if (existing && JSON.stringify(existing) !== JSON.stringify(application)) {
+        throw new Error(`conflicting capability requirements for ${application.site}`)
+      }
+      merged.set(application.site, application)
+    }
+  }
+  return [...merged.values()].sort((left, right) => left.site.localeCompare(right.site))
 }
 
 export function evaluateCapabilityRequirements(requirements: SiteCapabilityRequirements[], services: PlatformServiceResult[]): ApplicationCapabilityStatus[] {
