@@ -15,24 +15,14 @@ import { useMinLoading } from '@platform/ui/use-min-loading'
 import type {
   AssetAdminSection,
   AssetAdminStats as Stats,
-  AssetBatchRebuildResult as BatchRebuildResult,
   AssetGrant as Grant,
   AssetGrantForm as GrantForm,
   AssetItem,
-  AssetMaintenanceTask as MaintenanceTask,
-  AssetOrphanObjectForm as OrphanObjectForm,
-  AssetOrphanObjectItem as OrphanObjectItem,
-  AssetOrphanObjectResult as OrphanObjectResult,
   AssetProfile as Profile,
-  AssetPruneResult as PruneResult,
-  AssetPruneForm as PruneForm,
   AssetReference,
   AssetSite as Site,
   AssetSpaceUsage,
   AssetStorageBackend as StorageBackend,
-  AssetStorageMigrationResult as StorageMigrationResult,
-  AssetStorageMigrationForm as StorageMigrationForm,
-  AssetSweepResult as SweepResult,
   AssetVariant as Variant,
   CreatedAssetGrant as CreatedGrant
 } from '~/types/asset-admin'
@@ -100,14 +90,16 @@ const assets = ref<AssetItem[]>([])
 const spaces = ref<AssetSpaceUsage[]>([])
 const references = ref<AssetReference[]>([])
 const grants = ref<Grant[]>([])
-const maintenanceTasks = ref<MaintenanceTask[]>([])
-const controllingMaintenanceTaskId = ref('')
-const queueingSelectedRebuild = ref(false)
-const selectedRebuildError = ref('')
 const totalAssets = ref(0)
 const totalGrants = ref(0)
 const grantPage = ref(1)
 const GRANT_PAGE_SIZE = 20
+function maintenanceSelectedAssetIds() {
+  return [...selectedIds.value]
+}
+function clearMaintenanceSelection() {
+  clearSelection()
+}
 const {
   storageBackends,
   setStorageBackends,
@@ -131,11 +123,65 @@ const {
   checkStorageBackendHealth,
   confirmRotateStorageBackendSecret
 } = useAssetStorageBackends({ reloadAll })
+const {
+  maintenanceTasks,
+  controllingMaintenanceTaskId,
+  queueingSelectedRebuild,
+  selectedRebuildError,
+  selectedTask,
+  activeMaintenanceCount,
+  fetchMaintenanceTasks,
+  showQueuedMaintenanceTask,
+  controlMaintenanceTask,
+  dismissSelectedTask,
+  controlSelectedTask,
+  queueSelectedRebuild
+} = useAssetMaintenanceTasks({
+  selectedTaskId,
+  getSelectedAssetIds: maintenanceSelectedAssetIds,
+  clearSelection: clearMaintenanceSelection,
+  refreshAfterSettled: refreshAfterMaintenanceTasksSettled
+})
+const {
+  rebuildingAssetId,
+  sweepingStaging,
+  pruneOpen,
+  pruningUnreferenced,
+  prunePreview,
+  pruneForm,
+  orphanObjectsOpen,
+  auditingOrphanObjects,
+  orphanObjectsPreview,
+  orphanObjectsForm,
+  storageMigrationOpen,
+  migratingStorage,
+  storageMigrationPreview,
+  storageMigrationForm,
+  batchRebuildOpen,
+  batchRebuilding,
+  batchRebuildProfile,
+  batchRebuildPreview,
+  batchRebuildLimit,
+  rebuildDerivatives,
+  previewBatchRebuild,
+  refreshBatchRebuildPreview,
+  confirmBatchRebuild,
+  sweepStaging,
+  previewPruneUnreferenced,
+  confirmPruneUnreferenced,
+  previewOrphanObjects,
+  confirmPruneOrphanObjects,
+  openStorageMigration,
+  previewStorageMigration,
+  confirmStorageMigration
+} = useAssetMaintenanceOperations({
+  storageBackends,
+  fetchMaintenanceTasks,
+  showQueuedTask: showQueuedMaintenanceTask,
+  reloadAll
+})
 const showSkeleton = useMinLoading(computed(() => !mounted.value || loading.value))
 const enabledStorageBackends = computed(() => storageBackends.value.filter(b => b.enabled !== false))
-const activeMaintenanceCount = computed(() => maintenanceTasks.value.filter(task =>
-  task.status === 'queued' || task.status === 'running' || task.status === 'retrying'
-).length)
 const sectionItems = computed<Array<{ label: string, icon: string, value: AssetAdminSection, count: number }>>(() => [
   { label: '素材库', icon: 'i-tabler-photo', value: 'library', count: stats.value.assets },
   { label: '站点', icon: 'i-tabler-world', value: 'sites', count: stats.value.sites },
@@ -206,12 +252,6 @@ const profileAccessLevelOptions = [
   { label: '公开资源 · 公开直链', value: 'public' },
   { label: '私有资源 · 签名链接', value: 'private' }
 ]
-const hasActiveMaintenanceTask = computed(() => maintenanceTasks.value.some(task =>
-  task.status === 'queued' || task.status === 'running' || task.status === 'retrying'
-))
-let maintenanceTasksPollTimer: ReturnType<typeof setInterval> | undefined
-let maintenanceTasksPollInFlight = false
-let maintenanceTasksPollErrorShown = false
 
 const selectionResetKey = computed(() => manageCollectionQueryFingerprint(
   serializeManageCollectionQuery(collectionState.value, collectionDefinition)
@@ -229,40 +269,8 @@ const {
   resetKey: selectionResetKey
 })
 
-const selectedTask = computed(() => maintenanceTasks.value.find(task => task.id === selectedTaskId.value))
-
 function openMaintenanceTaskList() {
   tab.value = 'maintenance'
-}
-
-function dismissSelectedTask() {
-  selectedTaskId.value = ''
-  selectedRebuildError.value = ''
-}
-
-function controlSelectedTask(action: 'pause' | 'resume' | 'cancel') {
-  if (selectedTask.value) void controlMaintenanceTask(selectedTask.value, action, true)
-}
-
-async function queueSelectedRebuild() {
-  if (!selectedIds.value.length || queueingSelectedRebuild.value) return
-  const ids = [...selectedIds.value]
-  queueingSelectedRebuild.value = true
-  selectedRebuildError.value = ''
-  try {
-    const response = await call<{ task?: MaintenanceTask }>('/api/v1/admin/assets-proxy/maintenance/rebuild-derivatives', {
-      method: 'POST',
-      body: { ids, dryRun: false }
-    })
-    if (!response.task?.id) throw new Error('后台未返回任务 ID')
-    maintenanceTasks.value = [response.task, ...maintenanceTasks.value.filter(task => task.id !== response.task?.id)]
-    selectedTaskId.value = response.task.id
-    clearSelection()
-  } catch (e) {
-    selectedRebuildError.value = (e as Error)?.message || '无法创建后台任务，请稍后重试。'
-  } finally {
-    queueingSelectedRebuild.value = false
-  }
 }
 
 onMounted(async () => {
@@ -282,23 +290,6 @@ watch(() => profileForm.defaultVisibility, (visibility) => {
   }
   if (!profileForm.defaultDeliveryPolicy || profileForm.defaultDeliveryPolicy === 'public') {
     profileForm.defaultDeliveryPolicy = 'signed'
-  }
-})
-watch(hasActiveMaintenanceTask, (active) => {
-  if (active && !maintenanceTasksPollTimer) {
-    maintenanceTasksPollTimer = setInterval(() => { void pollMaintenanceTasks() }, 5000)
-    return
-  }
-  if (!active && maintenanceTasksPollTimer) {
-    clearInterval(maintenanceTasksPollTimer)
-    maintenanceTasksPollTimer = undefined
-  }
-}, { immediate: true })
-
-onBeforeUnmount(() => {
-  if (maintenanceTasksPollTimer) {
-    clearInterval(maintenanceTasksPollTimer)
-    maintenanceTasksPollTimer = undefined
   }
 })
 
@@ -366,71 +357,6 @@ async function refreshAfterMaintenanceTasksSettled() {
   profiles.value = profileData.items ?? []
   variants.value = variantData.items ?? []
   await fetchAssets()
-}
-
-async function fetchMaintenanceTasks() {
-  const data = await call<{ items: MaintenanceTask[] }>('/api/v1/admin/assets-proxy/maintenance/tasks', {
-    params: { page: 1, size: 8 }
-  })
-  const items = data.items ?? []
-  if (selectedTaskId.value && !items.some(task => task.id === selectedTaskId.value)) {
-    try {
-      const selected = await call<{ task: MaintenanceTask }>(`/api/v1/admin/assets-proxy/maintenance/tasks/${selectedTaskId.value}`)
-      items.unshift(selected.task)
-    } catch {
-      // Keep the recent task list useful even when an old deep-linked task no longer exists.
-    }
-  }
-  maintenanceTasks.value = items
-}
-
-async function pollMaintenanceTasks() {
-  if (maintenanceTasksPollInFlight) return
-  maintenanceTasksPollInFlight = true
-  const hadActiveTask = hasActiveMaintenanceTask.value
-  try {
-    await fetchMaintenanceTasks()
-    if (hadActiveTask && !hasActiveMaintenanceTask.value) {
-      await refreshAfterMaintenanceTasksSettled()
-    }
-    maintenanceTasksPollErrorShown = false
-  } catch (e) {
-    if (!maintenanceTasksPollErrorShown) {
-      toast.add({ title: '维护任务状态刷新失败', description: (e as Error)?.message, color: 'warning' })
-      maintenanceTasksPollErrorShown = true
-    }
-  } finally {
-    maintenanceTasksPollInFlight = false
-  }
-}
-
-function showQueuedMaintenanceTask(title: string, task: MaintenanceTask) {
-  toast.add({
-    title,
-    description: `任务 ${task.id.slice(0, 8)} 已进入队列`,
-    color: 'success',
-    icon: 'i-tabler-clock-check'
-  })
-}
-
-async function controlMaintenanceTask(task: MaintenanceTask, action: 'pause' | 'resume' | 'cancel', silent = false) {
-  controllingMaintenanceTaskId.value = `${task.id}:${action}`
-  try {
-    await call(`/api/v1/admin/assets-proxy/maintenance/tasks/${task.id}/${action}`, { method: 'POST' })
-    if (!silent) {
-      toast.add({
-        title: action === 'pause' ? '维护任务已暂停' : action === 'resume' ? '维护任务已恢复' : '维护任务已取消',
-        color: action === 'cancel' ? 'warning' : 'success',
-        icon: action === 'pause' ? 'i-tabler-player-pause' : action === 'resume' ? 'i-tabler-player-play' : 'i-tabler-ban'
-      })
-    }
-    await fetchMaintenanceTasks()
-  } catch (e) {
-    if (silent) selectedRebuildError.value = (e as Error)?.message || '维护任务操作失败'
-    else toast.add({ title: '维护任务操作失败', description: (e as Error)?.message, color: 'error' })
-  } finally {
-    controllingMaintenanceTaskId.value = ''
-  }
 }
 
 const profileOpen = ref(false)
@@ -572,25 +498,6 @@ async function saveVariant(value: Variant) {
 const deleteAssetTarget = ref<AssetItem | null>(null)
 const deleteAssetOpen = computed({ get: () => !!deleteAssetTarget.value, set: v => { if (!v) deleteAssetTarget.value = null } })
 const deletingAsset = ref(false)
-const rebuildingAssetId = ref('')
-const sweepingStaging = ref(false)
-const pruneOpen = ref(false)
-const pruningUnreferenced = ref(false)
-const prunePreview = ref<PruneResult | null>(null)
-const pruneForm = reactive<PruneForm>({ olderThanDays: 30, limit: 50 })
-const orphanObjectsOpen = ref(false)
-const auditingOrphanObjects = ref(false)
-const orphanObjectsPreview = ref<OrphanObjectResult | null>(null)
-const orphanObjectsForm = reactive<OrphanObjectForm>({ olderThanDays: 7, limit: 100, backend: ALL })
-const storageMigrationOpen = ref(false)
-const migratingStorage = ref(false)
-const storageMigrationPreview = ref<StorageMigrationResult | null>(null)
-const storageMigrationForm = reactive<StorageMigrationForm>({ sourceBackend: '', targetBackend: '', limit: 50 })
-const batchRebuildOpen = ref(false)
-const batchRebuilding = ref(false)
-const batchRebuildProfile = ref<Profile | null>(null)
-const batchRebuildPreview = ref<BatchRebuildResult | null>(null)
-const batchRebuildLimit = ref(50)
 async function confirmDeleteAsset() {
   if (!deleteAssetTarget.value) return
   deletingAsset.value = true
@@ -603,264 +510,6 @@ async function confirmDeleteAsset() {
     toast.add({ title: '删除素材失败', description: (e as Error)?.message, color: 'error' })
   } finally {
     deletingAsset.value = false
-  }
-}
-
-async function rebuildDerivatives(asset: AssetItem) {
-  rebuildingAssetId.value = asset.id
-  try {
-    const data = await call<{ generated: number }>(`/api/v1/admin/assets-proxy/library/${asset.id}/derivatives/rebuild`, { method: 'POST' })
-    toast.add({ title: '派生图已重建', description: `生成 ${data.generated ?? 0} 个 Variant`, color: 'success', icon: 'i-tabler-check' })
-  } catch (e) {
-    toast.add({ title: '重建派生图失败', description: (e as Error)?.message, color: 'error' })
-  } finally {
-    rebuildingAssetId.value = ''
-  }
-}
-
-async function previewBatchRebuild(profile: Profile, limit = batchRebuildLimit.value) {
-  batchRebuildProfile.value = profile
-  batchRebuildPreview.value = null
-  batchRebuildLimit.value = limit
-  batchRebuilding.value = true
-  try {
-    batchRebuildPreview.value = await call<BatchRebuildResult>('/api/v1/admin/assets-proxy/maintenance/rebuild-derivatives', {
-      method: 'POST',
-      body: { siteKey: profile.siteKey, profileKey: profile.profileKey, limit: batchRebuildLimit.value, dryRun: true }
-    })
-    await fetchMaintenanceTasks()
-    batchRebuildOpen.value = true
-  } catch (e) {
-    toast.add({ title: '批量重建预检失败', description: (e as Error)?.message, color: 'error' })
-  } finally {
-    batchRebuilding.value = false
-  }
-}
-
-async function refreshBatchRebuildPreview(limit: number) {
-  if (!batchRebuildProfile.value) return
-  await previewBatchRebuild(batchRebuildProfile.value, limit)
-}
-
-async function confirmBatchRebuild(limit = batchRebuildLimit.value) {
-  if (!batchRebuildProfile.value) return
-  batchRebuildLimit.value = limit
-  batchRebuilding.value = true
-  try {
-    const profile = batchRebuildProfile.value
-    const data = await call<BatchRebuildResult>('/api/v1/admin/assets-proxy/maintenance/rebuild-derivatives', {
-      method: 'POST',
-      body: { siteKey: profile.siteKey, profileKey: profile.profileKey, limit: batchRebuildLimit.value, dryRun: false }
-    })
-    if (data.task) {
-      showQueuedMaintenanceTask('批量派生图重建已排队', data.task)
-      batchRebuildOpen.value = false
-      batchRebuildPreview.value = null
-      await fetchMaintenanceTasks()
-      return
-    }
-    const failed = data.errors?.length ?? 0
-    toast.add({
-      title: '批量派生图重建完成',
-      description: `处理 ${data.rebuilt ?? 0} 个素材，生成 ${data.generated ?? 0} 个 Variant${failed ? `，${failed} 个失败` : ''}`,
-      color: failed ? 'warning' : 'success',
-      icon: failed ? 'i-tabler-alert-triangle' : 'i-tabler-check'
-    })
-    batchRebuildOpen.value = false
-    batchRebuildPreview.value = null
-    await fetchMaintenanceTasks()
-  } catch (e) {
-    toast.add({ title: '批量重建失败', description: (e as Error)?.message, color: 'error' })
-  } finally {
-    batchRebuilding.value = false
-  }
-}
-
-async function sweepStaging() {
-  sweepingStaging.value = true
-  try {
-    const data = await call<{ items: SweepResult[], removed: number }>('/api/v1/admin/assets-proxy/maintenance/sweep-staging', { method: 'POST' })
-    const skipped = (data.items ?? []).filter(i => i.skipped).length
-    const failed = (data.items ?? []).filter(i => i.error).length
-    toast.add({
-      title: '暂存清理完成',
-      description: `删除 ${data.removed ?? 0} 个对象${skipped ? `，跳过 ${skipped} 个后端` : ''}${failed ? `，${failed} 个异常` : ''}`,
-      color: failed ? 'warning' : 'success',
-      icon: failed ? 'i-tabler-alert-triangle' : 'i-tabler-check'
-    })
-    await reloadAll()
-  } catch (e) {
-    toast.add({ title: '暂存清理失败', description: (e as Error)?.message, color: 'error' })
-  } finally {
-    sweepingStaging.value = false
-  }
-}
-
-async function previewPruneUnreferenced(value?: PruneForm) {
-  if (value) Object.assign(pruneForm, value)
-  prunePreview.value = null
-  pruningUnreferenced.value = true
-  try {
-    prunePreview.value = await call<PruneResult>('/api/v1/admin/assets-proxy/maintenance/prune-unreferenced', {
-      method: 'POST',
-      body: { ...pruneForm, dryRun: true }
-    })
-    await fetchMaintenanceTasks()
-    pruneOpen.value = true
-  } catch (e) {
-    toast.add({ title: '无引用素材预检失败', description: (e as Error)?.message, color: 'error' })
-  } finally {
-    pruningUnreferenced.value = false
-  }
-}
-
-async function confirmPruneUnreferenced(value?: PruneForm) {
-  if (value) Object.assign(pruneForm, value)
-  pruningUnreferenced.value = true
-  try {
-    const data = await call<PruneResult>('/api/v1/admin/assets-proxy/maintenance/prune-unreferenced', {
-      method: 'POST',
-      body: { ...pruneForm, dryRun: false }
-    })
-    if (data.task) {
-      showQueuedMaintenanceTask('无引用素材清理已排队', data.task)
-      pruneOpen.value = false
-      prunePreview.value = null
-      await fetchMaintenanceTasks()
-      return
-    }
-    const failed = data.errors?.length ?? 0
-    toast.add({
-      title: '无引用素材清理完成',
-      description: `删除 ${data.deleted ?? 0} 个素材${failed ? `，${failed} 个失败` : ''}`,
-      color: failed ? 'warning' : 'success',
-      icon: failed ? 'i-tabler-alert-triangle' : 'i-tabler-check'
-    })
-    pruneOpen.value = false
-    prunePreview.value = null
-    await reloadAll()
-  } catch (e) {
-    toast.add({ title: '无引用素材清理失败', description: (e as Error)?.message, color: 'error' })
-  } finally {
-    pruningUnreferenced.value = false
-  }
-}
-
-async function previewOrphanObjects(value?: OrphanObjectForm) {
-  if (value) Object.assign(orphanObjectsForm, value)
-  orphanObjectsPreview.value = null
-  auditingOrphanObjects.value = true
-  try {
-    orphanObjectsPreview.value = await call<OrphanObjectResult>('/api/v1/admin/assets-proxy/maintenance/orphan-objects', {
-      method: 'POST',
-      body: {
-        olderThanDays: orphanObjectsForm.olderThanDays,
-        limit: orphanObjectsForm.limit,
-        backend: orphanObjectsForm.backend !== ALL ? orphanObjectsForm.backend : '',
-        dryRun: true
-      }
-    })
-    await fetchMaintenanceTasks()
-    orphanObjectsOpen.value = true
-  } catch (e) {
-    toast.add({ title: '孤儿对象预检失败', description: (e as Error)?.message, color: 'error' })
-  } finally {
-    auditingOrphanObjects.value = false
-  }
-}
-
-async function confirmPruneOrphanObjects(value?: OrphanObjectForm) {
-  if (value) Object.assign(orphanObjectsForm, value)
-  auditingOrphanObjects.value = true
-  try {
-    const data = await call<OrphanObjectResult>('/api/v1/admin/assets-proxy/maintenance/orphan-objects', {
-      method: 'POST',
-      body: {
-        olderThanDays: orphanObjectsForm.olderThanDays,
-        limit: orphanObjectsForm.limit,
-        backend: orphanObjectsForm.backend !== ALL ? orphanObjectsForm.backend : '',
-        dryRun: false
-      }
-    })
-    if (data.task) {
-      showQueuedMaintenanceTask('孤儿对象清理已排队', data.task)
-      orphanObjectsOpen.value = false
-      orphanObjectsPreview.value = null
-      await fetchMaintenanceTasks()
-      return
-    }
-    const failed = (data.items ?? []).reduce((sum, item) => sum + (item.errors?.length ?? 0), 0)
-    toast.add({
-      title: '孤儿对象清理完成',
-      description: `删除 ${data.deleted ?? 0} 个对象${failed ? `，${failed} 个失败` : ''}`,
-      color: failed ? 'warning' : 'success',
-      icon: failed ? 'i-tabler-alert-triangle' : 'i-tabler-check'
-    })
-    orphanObjectsOpen.value = false
-    orphanObjectsPreview.value = null
-    await fetchMaintenanceTasks()
-  } catch (e) {
-    toast.add({ title: '孤儿对象清理失败', description: (e as Error)?.message, color: 'error' })
-  } finally {
-    auditingOrphanObjects.value = false
-  }
-}
-
-function openStorageMigration() {
-  const enabled = storageBackends.value.filter(b => b.enabled !== false)
-  storageMigrationForm.sourceBackend = enabled[0]?.name || ''
-  storageMigrationForm.targetBackend = enabled.find(b => b.name !== storageMigrationForm.sourceBackend)?.name || ''
-  storageMigrationForm.limit = 50
-  storageMigrationPreview.value = null
-  storageMigrationOpen.value = true
-}
-
-async function previewStorageMigration(value?: StorageMigrationForm) {
-  if (value) Object.assign(storageMigrationForm, value)
-  storageMigrationPreview.value = null
-  migratingStorage.value = true
-  try {
-    storageMigrationPreview.value = await call<StorageMigrationResult>('/api/v1/admin/assets-proxy/maintenance/migrate-storage', {
-      method: 'POST',
-      body: { ...storageMigrationForm, dryRun: true }
-    })
-    await fetchMaintenanceTasks()
-  } catch (e) {
-    toast.add({ title: '存储迁移预检失败', description: (e as Error)?.message, color: 'error' })
-  } finally {
-    migratingStorage.value = false
-  }
-}
-
-async function confirmStorageMigration(value?: StorageMigrationForm) {
-  if (value) Object.assign(storageMigrationForm, value)
-  migratingStorage.value = true
-  try {
-    const data = await call<StorageMigrationResult>('/api/v1/admin/assets-proxy/maintenance/migrate-storage', {
-      method: 'POST',
-      body: { ...storageMigrationForm, dryRun: false }
-    })
-    if (data.task) {
-      showQueuedMaintenanceTask('存储迁移已排队', data.task)
-      storageMigrationOpen.value = false
-      storageMigrationPreview.value = null
-      await fetchMaintenanceTasks()
-      return
-    }
-    const failed = data.errors?.length ?? 0
-    toast.add({
-      title: '存储迁移完成',
-      description: `迁移 ${data.migrated ?? 0} 个素材${failed ? `，${failed} 个失败` : ''}`,
-      color: failed ? 'warning' : 'success',
-      icon: failed ? 'i-tabler-alert-triangle' : 'i-tabler-check'
-    })
-    storageMigrationOpen.value = false
-    storageMigrationPreview.value = null
-    await reloadAll()
-  } catch (e) {
-    toast.add({ title: '存储迁移失败', description: (e as Error)?.message, color: 'error' })
-  } finally {
-    migratingStorage.value = false
   }
 }
 
