@@ -46,7 +46,7 @@ func TestCapabilityMachineAuthorizationSeparatesReadAndProbeScopes(t *testing.T)
 	}
 	userCtx := authjwt.WithPrincipal(context.Background(), &authjwt.Principal{Subject: "4f553f75-e2d9-4f21-8d12-5f43659504f2", ClientID: "account-platform", Scopes: []string{"platform:capabilities:probe"}})
 	actor, err = controller.authorize(userCtx, "platform:capabilities:probe")
-	if err != nil || actor.identityID != "4f553f75-e2d9-4f21-8d12-5f43659504f2" || actor.clientID != "account-platform" {
+	if err != nil || actor.rateKey != "4f553f75-e2d9-4f21-8d12-5f43659504f2" || actor.identityID != "4f553f75-e2d9-4f21-8d12-5f43659504f2" || actor.clientID != "account-platform" {
 		t.Fatalf("user-scoped machine actor=%+v err=%v", actor, err)
 	}
 }

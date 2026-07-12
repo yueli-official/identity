@@ -41,6 +41,12 @@ account:
 asset:
   baseUrl: "http://localhost:8082"
   audience: "asset-api"
+commerce:
+  baseUrl: "http://localhost:8084"
+  audience: "commerce-api"
+notification:
+  baseUrl: "http://localhost:8089"
+  audience: "notification-api"
 rbac:
   # The default role granted to new identities is the DefaultRole const in
   # internal/logic/roles.go (kept in lockstep with the migration 0006 seed),

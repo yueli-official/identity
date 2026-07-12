@@ -53,6 +53,10 @@ func main() {
 	accountBaseURL := g.Cfg().MustGet(ctx, "account.baseUrl", "http://localhost:3000").String()
 	assetBaseURL := g.Cfg().MustGet(ctx, "asset.baseUrl", "http://localhost:8082").String()
 	assetAudience := g.Cfg().MustGet(ctx, "asset.audience").String()
+	commerceBaseURL := g.Cfg().MustGet(ctx, "commerce.baseUrl", "http://localhost:8084").String()
+	commerceAudience := g.Cfg().MustGet(ctx, "commerce.audience", "commerce-api").String()
+	notificationBaseURL := g.Cfg().MustGet(ctx, "notification.baseUrl", "http://localhost:8089").String()
+	notificationAudience := g.Cfg().MustGet(ctx, "notification.audience", "notification-api").String()
 
 	// ── Data layer ──────────────────────────────────────────────────────────
 	daoPG := dao.NewPG(g.DB())
@@ -206,6 +210,14 @@ func main() {
 	// behalf of the cookie-authenticated caller (mints a short-lived user token).
 	avatarCtl := controller.NewAvatar(svc, mgr, assetclient.New(assetBaseURL), issuer, assetAudience)
 	assetAdminProxy := controller.NewAssetAdminProxy(authCtl, mgr, issuer, assetBaseURL, assetAudience)
+	platformCapabilityProxy, err := controller.NewPlatformCapabilityProxy(authCtl, mgr, issuer, map[string]controller.CapabilityProxyTarget{
+		"asset":        {BaseURL: assetBaseURL, Audience: assetAudience},
+		"commerce":     {BaseURL: commerceBaseURL, Audience: commerceAudience},
+		"notification": {BaseURL: notificationBaseURL, Audience: notificationAudience},
+	})
+	if err != nil {
+		panic(fmt.Sprintf("platform capability proxy: %v", err))
+	}
 
 	// ── Routing ─────────────────────────────────────────────────────────────
 	s := g.Server()
@@ -231,6 +243,7 @@ func main() {
 		grp.Bind(avatarCtl)
 		grp.Bind(capabilityCtl)
 		grp.ALL("/api/v1/admin/assets-proxy/*", assetAdminProxy.Forward)
+		grp.ALL("/api/v1/admin/platform-proxy/*", platformCapabilityProxy.Forward)
 	})
 
 	// OIDC standard endpoints: raw RFC responses — NO envelope middleware.
