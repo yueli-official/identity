@@ -35,7 +35,7 @@ const handleLogout = async () => {
         :avatar-url="me.avatarUrl || ''"
         home-to="/"
         home-label="账户中心"
-        settings-to="/"
+        settings-to="/#profile-settings"
         :settings-external="false"
         :logout="handleLogout"
       />

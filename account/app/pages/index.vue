@@ -254,7 +254,7 @@ const cardHeaderClass = 'flex items-center gap-2 font-semibold text-highlighted'
     </UAlert>
 
     <!-- Profile edit -->
-    <UCard>
+    <UCard id="profile-settings" class="scroll-mt-24">
       <template #header>
         <h2 :class="cardHeaderClass"><UIcon name="i-tabler-user-edit" class="size-5 text-primary" />个人资料</h2>
       </template>
