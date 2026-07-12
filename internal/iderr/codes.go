@@ -37,8 +37,12 @@ var (
 	CodeLastCredential     = errs.Register("identity.last_credential", http.StatusConflict)
 	CodePasswordAlreadySet = errs.Register("identity.password_already_set", http.StatusConflict)
 
-	CodeIdentityNotFound = errs.Register("identity.not_found", http.StatusNotFound)
-	CodeInvalidStatus    = errs.Register("identity.invalid_status", http.StatusBadRequest)
+	CodeIdentityNotFound         = errs.Register("identity.not_found", http.StatusNotFound)
+	CodeInvalidStatus            = errs.Register("identity.invalid_status", http.StatusBadRequest)
+	CodeCapabilityNotFound       = errs.Register("identity.capability_not_found", http.StatusNotFound)
+	CodeProviderNotFound         = errs.Register("identity.provider_not_found", http.StatusNotFound)
+	CodeCapabilityProbeRateLimit = errs.Register("identity.capability_probe_rate_limited", http.StatusTooManyRequests)
+	CodeCapabilityAudit          = errs.Register("identity.capability_audit_unavailable", http.StatusInternalServerError)
 )
 
 func EmailTaken(email string) *errs.Coded {
@@ -68,6 +72,22 @@ func InvalidEmail(email string) *errs.Coded {
 
 func NotAuthenticated() *errs.Coded {
 	return errs.New(CodeNotAuthenticated, "not authenticated", nil)
+}
+
+func CapabilityNotFound(key string) *errs.Coded {
+	return errs.New(CodeCapabilityNotFound, "identity capability not found", map[string]any{"key": key})
+}
+
+func ProviderNotFound(key string) *errs.Coded {
+	return errs.New(CodeProviderNotFound, "identity provider not found", map[string]any{"key": key})
+}
+
+func CapabilityProbeRateLimited(key string) *errs.Coded {
+	return errs.New(CodeCapabilityProbeRateLimit, "identity provider health check rate limited", map[string]any{"key": key})
+}
+
+func CapabilityAuditUnavailable() *errs.Coded {
+	return errs.New(CodeCapabilityAudit, "identity capability audit is unavailable", nil)
 }
 
 // OAuthEmailConflict: the provider's (unverified) email collides with an

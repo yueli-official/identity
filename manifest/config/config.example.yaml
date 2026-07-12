@@ -28,6 +28,7 @@ auth:
   sessionIdleTtl: "720h"  # 30 days; Redis is a cache, PG remains the durable session source
 oidc:
   issuer: "http://localhost:8081"
+  audience: "identity-api" # audience for scoped machine discovery tokens
   refreshTtl: "720h"      # 30 days; access/id tokens stay 10m (set in code)
   globalSecret: ""        # set via env GF_OIDC_GLOBALSECRET (>=32 bytes), never commit a real value
   google:

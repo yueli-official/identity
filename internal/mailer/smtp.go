@@ -28,7 +28,17 @@ func (m *SMTPMailer) SendPasswordReset(ctx context.Context, to, link string) err
 		fmt.Sprintf("<p>我们收到了重置密码的请求。点击以下链接设置新密码：</p><p><a href=\"%s\">%s</a></p><p>链接 1 小时内有效。若非本人操作请忽略。</p>", link, link))
 }
 
+func (m *SMTPMailer) CheckHealth(ctx context.Context) error {
+	checker, ok := m.sender.(mail.HealthChecker)
+	if !ok {
+		return fmt.Errorf("smtp sender does not support health checks")
+	}
+	return checker.CheckHealth(ctx)
+}
+
 var (
-	_ Mailer = (*SMTPMailer)(nil)
-	_ Mailer = (*DevMailer)(nil)
+	_ Mailer        = (*SMTPMailer)(nil)
+	_ Mailer        = (*DevMailer)(nil)
+	_ HealthChecker = (*SMTPMailer)(nil)
+	_ HealthChecker = (*DevMailer)(nil)
 )

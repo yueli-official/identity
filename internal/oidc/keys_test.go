@@ -38,7 +38,7 @@ func TestMintServiceTokenIdentifiesIdentityService(t *testing.T) {
 		t.Fatalf("client_id = %q, want identity-svc", claims.ClientID)
 	}
 	verifier, err := authjwt.NewVerifier(authjwt.VerifierConfig{
-		Keys: authjwt.NewStaticKeySource(m.JWKS()), Issuer: "https://identity.test", Audience: "asset-api",
+		Keys: m, Issuer: "https://identity.test", Audience: "asset-api",
 	})
 	if err != nil {
 		t.Fatal(err)

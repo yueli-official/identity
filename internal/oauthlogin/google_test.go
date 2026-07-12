@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
+	"time"
 )
 
 func TestGoogle_ExchangeAndFetch(t *testing.T) {
@@ -53,5 +54,51 @@ func TestGoogle_AuthorizeURL(t *testing.T) {
 	if q.Get("client_id") != "cid" || q.Get("state") != "STATE" ||
 		q.Get("response_type") != "code" || q.Get("redirect_uri") != "http://localhost/cb" {
 		t.Fatalf("bad authorize url: %s", u.String())
+	}
+}
+
+func TestGoogle_CheckHealthDoesNotExchangeCode(t *testing.T) {
+	requests := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		if r.URL.Path != "/auth" {
+			t.Fatalf("unexpected probe path %q", r.URL.Path)
+		}
+		w.WriteHeader(http.StatusBadRequest)
+	}))
+	defer srv.Close()
+	g := newGoogleWithEndpoints("cid", "secret", "http://localhost/cb", srv.URL+"/auth", srv.URL+"/token", srv.URL+"/userinfo")
+	if err := g.CheckHealth(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if requests != 1 {
+		t.Fatalf("requests = %d, want one side-effect-free authorization endpoint probe", requests)
+	}
+}
+
+func TestGoogle_CheckHealthRejectsUnavailableAuthorizationEndpoint(t *testing.T) {
+	for _, status := range []int{http.StatusNotFound, http.StatusGone, http.StatusTooManyRequests, http.StatusInternalServerError} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(status) }))
+			defer srv.Close()
+			provider := newGoogleWithEndpoints("cid", "secret", "http://localhost/cb", srv.URL, srv.URL, srv.URL)
+			if err := provider.CheckHealth(context.Background()); err == nil {
+				t.Fatalf("status %d must be unhealthy", status)
+			}
+		})
+	}
+}
+
+func TestGoogle_CheckHealthHonorsContextTimeout(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(100 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+	provider := newGoogleWithEndpoints("cid", "secret", "http://localhost/cb", srv.URL, srv.URL, srv.URL)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+	if err := provider.CheckHealth(ctx); err == nil {
+		t.Fatal("timed-out probe must be unhealthy")
 	}
 }

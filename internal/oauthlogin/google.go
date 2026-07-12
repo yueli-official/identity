@@ -51,6 +51,25 @@ func (g *GoogleProvider) AuthorizeURL(state string) string {
 	return g.authURL + "?" + q.Encode()
 }
 
+// CheckHealth checks the authorization endpoint without exchanging a code or
+// creating/linking an identity. Any non-5xx HTTP response proves connectivity;
+// credential completeness is represented separately in the manifest.
+func (g *GoogleProvider) CheckHealth(ctx context.Context) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, g.authURL, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := g.hc.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= http.StatusBadRequest && resp.StatusCode != http.StatusBadRequest && resp.StatusCode != http.StatusUnauthorized && resp.StatusCode != http.StatusForbidden {
+		return fmt.Errorf("google authorization endpoint returned %d", resp.StatusCode)
+	}
+	return nil
+}
+
 func (g *GoogleProvider) ExchangeCode(ctx context.Context, code string) (string, error) {
 	form := url.Values{}
 	form.Set("client_id", g.clientID)
@@ -114,3 +133,4 @@ func (g *GoogleProvider) FetchUserInfo(ctx context.Context, accessToken string) 
 
 // compile-time assertion that GoogleProvider satisfies Provider.
 var _ Provider = (*GoogleProvider)(nil)
+var _ HealthChecker = (*GoogleProvider)(nil)

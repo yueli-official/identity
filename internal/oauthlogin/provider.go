@@ -20,3 +20,8 @@ type Provider interface {
 	ExchangeCode(ctx context.Context, code string) (accessToken string, err error)
 	FetchUserInfo(ctx context.Context, accessToken string) (UserInfo, error)
 }
+
+// HealthChecker performs a side-effect-free provider connectivity probe.
+type HealthChecker interface {
+	CheckHealth(context.Context) error
+}

@@ -21,3 +21,5 @@ func (DevMailer) SendPasswordReset(ctx context.Context, to, link string) error {
 	g.Log().Infof(ctx, "[mailer:dev] password-reset to=%s link=%s", to, link)
 	return nil
 }
+
+func (DevMailer) CheckHealth(context.Context) error { return nil }

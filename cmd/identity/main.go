@@ -3,17 +3,21 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
+	"github.com/gogf/gf/v2/net/goai"
 	"github.com/gogf/gf/v2/os/gctx"
 
 	_ "github.com/gogf/gf/contrib/drivers/pgsql/v2"
 	_ "github.com/gogf/gf/contrib/nosql/redis/v2"
 
+	"platform/gokit/authjwt"
+	"platform/gokit/capability"
 	"platform/gokit/ghttpx"
 	"platform/gokit/healthcheck"
 	"platform/gokit/observability"
@@ -22,6 +26,7 @@ import (
 	"platform/services/identity/internal/cache"
 	"platform/services/identity/internal/controller"
 	"platform/services/identity/internal/dao"
+	"platform/services/identity/internal/identitycap"
 	"platform/services/identity/internal/logic"
 	"platform/services/identity/internal/mailer"
 	"platform/services/identity/internal/oauthlogin"
@@ -97,16 +102,17 @@ func main() {
 	// ── Mailer ──────────────────────────────────────────────────────────────
 	// Default to the dev-log mailer (links printed to logs); switch to real SMTP
 	// only when mail.smtp.host is configured.
-	var mlr mailer.Mailer = mailer.NewDev()
-	if host := g.Cfg().MustGet(ctx, "mail.smtp.host").String(); host != "" {
-		mlr = mailer.NewSMTP(
-			host,
-			g.Cfg().MustGet(ctx, "mail.smtp.port", "465").String(),
-			g.Cfg().MustGet(ctx, "mail.smtp.username").String(),
-			g.Cfg().MustGet(ctx, "mail.smtp.password").String(),
-			g.Cfg().MustGet(ctx, "mail.from").String(),
-			g.Cfg().MustGet(ctx, "mail.fromName").String(),
-		)
+	smtpHost := g.Cfg().MustGet(ctx, "mail.smtp.host").String()
+	smtpPort := g.Cfg().MustGet(ctx, "mail.smtp.port", "465").String()
+	smtpUsername := g.Cfg().MustGet(ctx, "mail.smtp.username").String()
+	smtpPassword := g.Cfg().MustGet(ctx, "mail.smtp.password").String()
+	mailFrom := g.Cfg().MustGet(ctx, "mail.from").String()
+	mailFromName := g.Cfg().MustGet(ctx, "mail.fromName").String()
+	devMailer := mailer.NewDev()
+	smtpMailer := mailer.NewSMTP(smtpHost, smtpPort, smtpUsername, smtpPassword, mailFrom, mailFromName)
+	var mlr mailer.Mailer = devMailer
+	if smtpHost != "" {
+		mlr = smtpMailer
 	}
 	svc.SetMailer(mlr)
 
@@ -114,6 +120,12 @@ func main() {
 	mgr, err := oidc.NewManager(ctx, daoPG)
 	if err != nil {
 		panic(fmt.Sprintf("oidc.NewManager: %v", err))
+	}
+	identityVerifier, err := authjwt.NewVerifier(authjwt.VerifierConfig{
+		Keys: mgr, Issuer: issuer, Audience: g.Cfg().MustGet(ctx, "oidc.audience", "identity-api").String(),
+	})
+	if err != nil {
+		panic(fmt.Sprintf("identity capability token verifier: %v", err))
 	}
 	// Durable PG-backed OIDC store: persists OAuth requests and refresh tokens
 	// across restarts. Access tokens remain stateless JWTs.
@@ -143,6 +155,53 @@ func main() {
 	}
 	oauthCtl := controller.NewOAuth(svc, googleProvider, secureCookie, []byte(globalSecret), loginURL, cfg.SessionIdleTTL)
 
+	coreKeys := []string{"identity.oidc", "identity.pat", "identity.profile", "identity.user-admin"}
+	mailKeys := []string{"identity.reset-password", "identity.verify-email"}
+	var googleChecker identitycap.HealthChecker
+	if googleProvider != nil {
+		googleChecker, _ = googleProvider.(identitycap.HealthChecker)
+	}
+	capabilityRegistry, err := identitycap.New(
+		identitycap.Registration{
+			Key: "identity-jwks", Adapter: "builtin", Mode: "in-memory", Registered: true, Enabled: true,
+			CapabilityKeys: []string{"identity.jwks"}, Operations: []string{"get"},
+			Checker: identitycap.HealthCheckFunc(func(context.Context) error { return nil }), InitialHealth: capability.HealthHealthy,
+		},
+		identitycap.Registration{
+			Key: "identity-core", Adapter: "builtin", Mode: "first-party", Registered: true, Enabled: true,
+			CapabilityKeys: coreKeys, Operations: []string{"admin", "authenticate", "authorize", "issue", "profile", "verify"},
+			RequiredConfig: []capability.ConfigField{identitycap.Field("issuer", issuer, false), identitycap.Field("global_secret", globalSecret, true)},
+			Checker: identitycap.HealthCheckFunc(func(ctx context.Context) error {
+				return errors.Join(healthcheck.Database(ctx), healthcheck.Redis(ctx))
+			}),
+		},
+		identitycap.Registration{
+			Key: "dev-mail", Adapter: "dev", Mode: "development", Registered: true, Enabled: smtpHost == "",
+			CapabilityKeys: mailKeys, Operations: []string{"send"}, Checker: devMailer, InitialHealth: capability.HealthHealthy,
+		},
+		identitycap.Registration{
+			Key: "primary-smtp", Adapter: "smtp", Mode: "production", Registered: true, Enabled: smtpHost != "",
+			CapabilityKeys: mailKeys, Operations: []string{"send"}, Checker: smtpMailer,
+			RequiredConfig: []capability.ConfigField{
+				identitycap.Field("host", smtpHost, false), identitycap.Field("port", smtpPort, false),
+				identitycap.Field("username", smtpUsername, false), identitycap.Field("password", smtpPassword, true),
+				identitycap.Field("from", mailFrom, false),
+			},
+		},
+		identitycap.Registration{
+			Key: "google", Adapter: "google-oauth", Mode: "external", Registered: googleProvider != nil, Enabled: googleProvider != nil,
+			CapabilityKeys: []string{"identity.external-login"}, Operations: []string{"authorize", "callback", "link", "unlink"}, Checker: googleChecker,
+			RequiredConfig: []capability.ConfigField{
+				identitycap.Field("client_id", googleClientID, false), identitycap.Field("client_secret", googleClientSecret, true),
+				identitycap.Field("redirect_url", googleRedirectURL, false),
+			},
+		},
+	)
+	if err != nil {
+		panic(fmt.Sprintf("identity capability registry: %v", err))
+	}
+	capabilityCtl := controller.NewCapability(authCtl, capabilityRegistry, daoPG, identitycap.ServiceMetadata())
+
 	// Avatar/cover upload proxy: the IdP drives the asset upload server-side on
 	// behalf of the cookie-authenticated caller (mints a short-lived user token).
 	avatarCtl := controller.NewAvatar(svc, mgr, assetclient.New(assetBaseURL), issuer, assetAudience)
@@ -150,6 +209,9 @@ func main() {
 
 	// ── Routing ─────────────────────────────────────────────────────────────
 	s := g.Server()
+	s.GetOpenApi().Components.SecuritySchemes = goai.SecuritySchemes{
+		"AdminAuth": {Value: &goai.SecurityScheme{Type: "http", Scheme: "bearer", BearerFormat: "JWT", Description: "Admin session cookie or an Identity access token with platform capability scope."}},
+	}
 	s.Use(ghttpx.TraceRouteMiddleware)
 
 	// Actor middleware runs globally (before all handlers) so that every
@@ -159,7 +221,7 @@ func main() {
 
 	// Business API: JSON envelope middleware applied to this group only.
 	s.Group("/", func(grp *ghttp.RouterGroup) {
-		grp.Middleware(ghttpx.Middleware)
+		grp.Middleware(ghttpx.Middleware, authjwt.OptionalMiddleware(identityVerifier))
 		grp.GET("/healthz", controller.Healthz)
 		grp.GET("/readyz", healthcheck.Handler(map[string]healthcheck.Check{
 			"database": healthcheck.Database,
@@ -167,6 +229,7 @@ func main() {
 		}))
 		grp.Bind(authCtl)
 		grp.Bind(avatarCtl)
+		grp.Bind(capabilityCtl)
 		grp.ALL("/api/v1/admin/assets-proxy/*", assetAdminProxy.Forward)
 	})
 

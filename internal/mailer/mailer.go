@@ -8,3 +8,8 @@ type Mailer interface {
 	SendVerifyEmail(ctx context.Context, to, link string) error
 	SendPasswordReset(ctx context.Context, to, link string) error
 }
+
+// HealthChecker performs a side-effect-free transport probe.
+type HealthChecker interface {
+	CheckHealth(context.Context) error
+}

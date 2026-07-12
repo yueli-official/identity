@@ -100,6 +100,16 @@ func (m *Manager) ActivePrivateKey() *rsa.PrivateKey { return m.activeKey }
 // JWKS returns the public JSON Web Key Set (active + retired keys).
 func (m *Manager) JWKS() jose.JSONWebKeySet { return m.jwks }
 
+// PublicKey lets the identity service validate its own scoped access tokens
+// without making an HTTP request back through its JWKS endpoint.
+func (m *Manager) PublicKey(_ context.Context, kid string) (any, error) {
+	keys := m.jwks.Key(kid)
+	if len(keys) != 1 || keys[0].Key == nil {
+		return nil, fmt.Errorf("signing key %q not found", kid)
+	}
+	return keys[0].Key, nil
+}
+
 // KeyGetter is fosite's key getter: returns the active private key.
 func (m *Manager) KeyGetter(context.Context) (interface{}, error) { return m.activeKey, nil }
 
