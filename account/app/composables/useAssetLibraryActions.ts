@@ -1,4 +1,5 @@
 import type { AssetItem, AssetReference } from '~/types/asset-admin'
+import { createPlatformNotifier } from '@platform/ui/feedback'
 
 interface UseAssetLibraryActionsOptions {
   reloadAll: () => Promise<void>
@@ -6,7 +7,7 @@ interface UseAssetLibraryActionsOptions {
 
 export function useAssetLibraryActions(options: UseAssetLibraryActionsOptions) {
   const { call } = useApi()
-  const toast = useToast()
+  const toast = createPlatformNotifier(useToast())
   const references = ref<AssetReference[]>([])
   const referenceAsset = ref<AssetItem | null>(null)
   const referencesOpen = computed({ get: () => !!referenceAsset.value, set: value => { if (!value) referenceAsset.value = null } })
@@ -24,7 +25,6 @@ export function useAssetLibraryActions(options: UseAssetLibraryActionsOptions) {
     deletingAsset.value = true
     try {
       await call(`/api/v1/admin/assets-proxy/library/${deleteAssetTarget.value.id}`, { method: 'DELETE' })
-      toast.add({ title: '素材已删除', color: 'success', icon: 'i-tabler-check' })
       deleteAssetTarget.value = null
       await options.reloadAll()
     } catch (error) {

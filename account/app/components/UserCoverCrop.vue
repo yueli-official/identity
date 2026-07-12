@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { createPlatformNotifier } from '@platform/ui/feedback'
+
 // Banner-ratio cover crop + upload. Canvas crop ported from the donor
 // (nuxtblog/web UserCoverCrop); upload posts the cropped JPEG to the IdP cover
 // proxy (cookie-authed), which stores it on the asset service and commits it to
@@ -11,7 +13,7 @@ defineProps<{
 const emit = defineEmits<{ 'update:modelValue': [url: string] }>()
 
 const { call } = useApi()
-const toast = useToast()
+const toast = createPlatformNotifier(useToast())
 
 const COVER_CW = 640
 const COVER_CH = 200
@@ -177,7 +179,6 @@ async function confirmCrop() {
     fd.append('file', new File([blob], 'cover.jpg', { type: 'image/jpeg' }))
     const { coverUrl } = await call<{ coverUrl: string }>('/api/v1/session/cover', { method: 'POST', body: fd })
     emit('update:modelValue', coverUrl)
-    toast.add({ title: '封面已更新', color: 'success', icon: 'i-tabler-check' })
     cropModalOpen.value = false
   } catch (err: any) {
     toast.add({ title: '封面上传失败', description: err?.data?.message || err?.message, color: 'error' })

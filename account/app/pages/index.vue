@@ -2,13 +2,16 @@
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import { SOCIAL_PLATFORMS, socialPlatform } from '@platform/ui/social'
+import { ActionFeedbackButton } from '@platform/manage/components'
+import { useActionFeedback } from '@platform/manage/use-action-feedback'
+import { createPlatformNotifier } from '@platform/ui/feedback'
 import type { SocialLink } from '~/composables/useSession'
 
 definePageMeta({ middleware: 'auth' })
 
 const { me, refresh, logout } = useSession()
 const { call } = useApi()
-const toast = useToast()
+const toast = createPlatformNotifier(useToast())
 
 const initial = computed(() =>
   (me.value?.displayName || me.value?.email || '?').charAt(0).toUpperCase()
@@ -20,6 +23,7 @@ async function onResendVerification() {
   resending.value = true
   try {
     await call('/api/v1/auth/email/verify-request', { method: 'POST' })
+    // feedback-contract: the email is delivered outside the current surface
     toast.add({ title: '验证邮件已发送', description: '请检查邮箱完成验证。(demo 无真实邮件:链接打印在后端日志)', color: 'success', icon: 'i-tabler-mail-check' })
   } catch (err: any) {
     toast.add({ title: '发送失败', description: err?.data?.message || '请稍后重试。', color: 'error' })
@@ -65,9 +69,9 @@ function addLink() {
 }
 function removeLink(i: number) { socialRows.value.splice(i, 1) }
 
-const savingProfile = ref(false)
+const { status: profileSaveStatus, pending: markProfileSaving, success: markProfileSaved, error: markProfileError } = useActionFeedback()
 async function onSaveProfile(e: FormSubmitEvent<ProfileSchema>) {
-  savingProfile.value = true
+  markProfileSaving()
   try {
     const socialLinks: SocialLink[] = socialRows.value
       .filter(r => r.url.trim())
@@ -76,11 +80,10 @@ async function onSaveProfile(e: FormSubmitEvent<ProfileSchema>) {
       ...e.data, avatarUrl: avatarUrl.value, coverUrl: coverUrl.value, socialLinks
     } })
     await refresh()
-    toast.add({ title: '资料已更新', color: 'success', icon: 'i-tabler-check' })
+    markProfileSaved()
   } catch (err: any) {
+    markProfileError()
     toast.add({ title: '保存失败', description: err?.data?.message || '请重试', color: 'error' })
-  } finally {
-    savingProfile.value = false
   }
 }
 async function onAvatarUpdated(url: string) { avatarUrl.value = url; await refresh() }
@@ -94,9 +97,9 @@ const pwSchema = z.object({
 }).refine(d => d.newPassword === d.confirm, { message: '两次输入不一致', path: ['confirm'] })
 type PwSchema = z.output<typeof pwSchema>
 const pwState = reactive<Partial<PwSchema>>({ currentPassword: '', newPassword: '', confirm: '' })
-const savingPw = ref(false)
+const { status: passwordSaveStatus, pending: markPasswordSaving, success: markPasswordSaved, error: markPasswordError } = useActionFeedback()
 async function onChangePassword(e: FormSubmitEvent<PwSchema>) {
-  savingPw.value = true
+  markPasswordSaving()
   try {
     await call('/api/v1/auth/password/change', {
       method: 'POST',
@@ -104,11 +107,10 @@ async function onChangePassword(e: FormSubmitEvent<PwSchema>) {
     })
     pwState.currentPassword = pwState.newPassword = pwState.confirm = ''
     await loadSessions()
-    toast.add({ title: '密码已修改', description: '其他设备的登录会话已退出。', color: 'success', icon: 'i-tabler-lock' })
+    markPasswordSaved()
   } catch (err: any) {
+    markPasswordError()
     toast.add({ title: '修改失败', description: err?.data?.message || '请检查当前密码', color: 'error' })
-  } finally {
-    savingPw.value = false
   }
 }
 
@@ -119,18 +121,17 @@ const setPwSchema = z.object({
 }).refine(d => d.newPassword === d.confirm, { message: '两次输入不一致', path: ['confirm'] })
 type SetPwSchema = z.output<typeof setPwSchema>
 const setPwState = reactive<Partial<SetPwSchema>>({ newPassword: '', confirm: '' })
-const settingPw = ref(false)
+const { status: initialPasswordStatus, pending: markInitialPasswordSaving, success: markInitialPasswordSaved, error: markInitialPasswordError } = useActionFeedback()
 async function onSetPassword(e: FormSubmitEvent<SetPwSchema>) {
-  settingPw.value = true
+  markInitialPasswordSaving()
   try {
     await call('/api/v1/auth/password/set', { method: 'POST', body: { newPassword: e.data.newPassword } })
     setPwState.newPassword = setPwState.confirm = ''
     await refreshCreds()
-    toast.add({ title: '密码已设置', description: '现在可以用邮箱 + 密码登录,也能解绑第三方账号了。', color: 'success', icon: 'i-tabler-lock-check' })
+    markInitialPasswordSaved()
   } catch (err: any) {
+    markInitialPasswordError()
     toast.add({ title: '设置失败', description: err?.data?.message || '请重试', color: 'error' })
-  } finally {
-    settingPw.value = false
   }
 }
 
@@ -153,7 +154,6 @@ async function onRevoke(id: string) {
   try {
     await call(`/api/v1/session/${id}`, { method: 'DELETE' })
     await refreshSessions()
-    toast.add({ title: '已退出该会话', color: 'success' })
   } catch (err: any) {
     toast.add({ title: '操作失败', description: err?.data?.message || '请重试', color: 'error' })
   } finally {
@@ -192,7 +192,6 @@ async function onUnbindGoogle() {
     await call('/api/v1/session/credentials/google', { method: 'DELETE' })
     await refreshCreds()
     confirmUnbindOpen.value = false
-    toast.add({ title: '已解绑 Google', color: 'success', icon: 'i-tabler-check' })
   } catch (err: any) {
     toast.add({ title: '解绑失败', description: err?.data?.message || '请重试', color: 'error' })
   } finally {
@@ -294,7 +293,14 @@ const cardHeaderClass = 'flex items-center gap-2 font-semibold text-highlighted'
 
         <div class="flex items-center justify-between gap-4 border-t border-default pt-4">
           <p class="text-xs text-muted">邮箱 {{ me?.email }} 不可在此修改</p>
-          <UButton type="submit" icon="i-tabler-device-floppy" label="保存资料" :loading="savingProfile" />
+          <ActionFeedbackButton
+            type="submit"
+            :status="profileSaveStatus"
+            idle-label="保存资料"
+            pending-label="保存中"
+            success-label="已保存"
+            error-label="保存失败"
+          />
         </div>
       </UForm>
     </UCard>
@@ -318,7 +324,15 @@ const cardHeaderClass = 'flex items-center gap-2 font-semibold text-highlighted'
         </div>
         <div class="flex items-center justify-between gap-4 border-t border-default pt-4">
           <p class="text-xs text-muted">改密后其他设备会被强制登出</p>
-          <UButton type="submit" color="neutral" label="修改密码" :loading="savingPw" />
+          <ActionFeedbackButton
+            type="submit"
+            color="neutral"
+            :status="passwordSaveStatus"
+            idle-label="修改密码"
+            pending-label="修改中"
+            success-label="已修改"
+            error-label="修改失败"
+          />
         </div>
       </UForm>
     </UCard>
@@ -343,7 +357,14 @@ const cardHeaderClass = 'flex items-center gap-2 font-semibold text-highlighted'
           </UFormField>
         </div>
         <div class="flex justify-end">
-          <UButton type="submit" label="设置密码" :loading="settingPw" />
+          <ActionFeedbackButton
+            type="submit"
+            :status="initialPasswordStatus"
+            idle-label="设置密码"
+            pending-label="设置中"
+            success-label="已设置"
+            error-label="设置失败"
+          />
         </div>
       </UForm>
     </UCard>

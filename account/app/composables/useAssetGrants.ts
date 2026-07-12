@@ -1,4 +1,5 @@
 import type { AssetGrant, AssetGrantForm, AssetItem, CreatedAssetGrant } from '~/types/asset-admin'
+import { createPlatformNotifier } from '@platform/ui/feedback'
 
 interface UseAssetGrantsOptions {
   reloadAll: () => Promise<void>
@@ -6,7 +7,7 @@ interface UseAssetGrantsOptions {
 
 export function useAssetGrants(options: UseAssetGrantsOptions) {
   const { call } = useApi()
-  const toast = useToast()
+  const toast = createPlatformNotifier(useToast())
   const grants = ref<AssetGrant[]>([])
   const totalGrants = ref(0)
   const grantPage = ref(1)
@@ -41,7 +42,6 @@ export function useAssetGrants(options: UseAssetGrantsOptions) {
     revokingGrant.value = true
     try {
       await call(`/api/v1/admin/assets-proxy/grants/${revokeGrantTarget.value.id}/revoke`, { method: 'POST' })
-      toast.add({ title: '授权已撤销', color: 'success', icon: 'i-tabler-check' })
       revokeGrantTarget.value = null
       await options.reloadAll()
     } catch (error) {
@@ -70,7 +70,6 @@ export function useAssetGrants(options: UseAssetGrantsOptions) {
       createdGrant.value = await call<CreatedAssetGrant>('/api/v1/admin/assets-proxy/grants/create', {
         method: 'POST', body: { ...grantForm, assetId: grantAsset.value.id }
       })
-      toast.add({ title: '交付链接已生成', color: 'success', icon: 'i-tabler-check' })
       await fetchGrants()
     } catch (error) {
       toast.add({ title: '生成交付链接失败', description: (error as Error)?.message, color: 'error' })

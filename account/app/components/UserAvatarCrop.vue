@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { createPlatformNotifier } from '@platform/ui/feedback'
+
 // Square avatar crop + upload. The canvas crop interaction is ported from the
 // donor (nuxtblog/web UserAvatarCrop); the upload posts the cropped JPEG to the
 // IdP avatar proxy (cookie-authed), which stores it on the asset service and
@@ -12,7 +14,7 @@ defineProps<{
 const emit = defineEmits<{ 'update:modelValue': [url: string] }>()
 
 const { call } = useApi()
-const toast = useToast()
+const toast = createPlatformNotifier(useToast())
 
 const AVATAR_C = 320
 const HIT = 14
@@ -169,7 +171,6 @@ async function confirmCrop() {
     fd.append('file', new File([blob], 'avatar.jpg', { type: 'image/jpeg' }))
     const { avatarUrl } = await call<{ avatarUrl: string }>('/api/v1/session/avatar', { method: 'POST', body: fd })
     emit('update:modelValue', avatarUrl)
-    toast.add({ title: '头像已更新', color: 'success', icon: 'i-tabler-check' })
     cropModalOpen.value = false
   } catch (err: any) {
     toast.add({ title: '头像上传失败', description: err?.data?.message || err?.message, color: 'error' })

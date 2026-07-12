@@ -4,6 +4,7 @@ import type {
   AssetStorageBackendEvent,
   AssetStorageBackendForm
 } from '~/types/asset-admin'
+import { createPlatformNotifier } from '@platform/ui/feedback'
 
 interface UseAssetStorageBackendsOptions {
   reloadAll: () => Promise<void>
@@ -11,7 +12,7 @@ interface UseAssetStorageBackendsOptions {
 
 export function useAssetStorageBackends(options: UseAssetStorageBackendsOptions) {
   const { call } = useApi()
-  const toast = useToast()
+  const toast = createPlatformNotifier(useToast())
 
   const storageBackends = ref<AssetStorageBackend[]>([])
   const storageBackendOpen = ref(false)
@@ -111,7 +112,6 @@ export function useAssetStorageBackends(options: UseAssetStorageBackendsOptions)
     savingStorageBackend.value = true
     try {
       await call('/api/v1/admin/assets-proxy/storage-backends', { method: 'POST', body: storageBackendForm })
-      toast.add({ title: '存储后端已保存', color: 'success', icon: 'i-tabler-check' })
       storageBackendOpen.value = false
       await options.reloadAll()
     } catch (error) {
@@ -126,7 +126,6 @@ export function useAssetStorageBackends(options: UseAssetStorageBackendsOptions)
     deletingStorageBackend.value = true
     try {
       await call(`/api/v1/admin/assets-proxy/storage-backends/${storageBackendEditingName.value}`, { method: 'DELETE' })
-      toast.add({ title: '存储后端已删除', color: 'success', icon: 'i-tabler-check' })
       deleteStorageBackendOpen.value = false
       storageBackendOpen.value = false
       storageBackendEditingName.value = ''
@@ -147,12 +146,9 @@ export function useAssetStorageBackends(options: UseAssetStorageBackendsOptions)
         { method: 'POST' }
       )
       storageBackendDetail.value = data.backend
-      toast.add({
-        title: data.backend.lastHealthOk === false ? '健康检查失败' : '健康检查通过',
-        description: data.backend.lastHealthError || undefined,
-        color: data.backend.lastHealthOk === false ? 'error' : 'success',
-        icon: data.backend.lastHealthOk === false ? 'i-tabler-alert-triangle' : 'i-tabler-heartbeat'
-      })
+      if (data.backend.lastHealthOk === false) {
+        toast.add({ title: '健康检查失败', description: data.backend.lastHealthError || undefined, color: 'error', icon: 'i-tabler-alert-triangle' })
+      }
       await Promise.all([reloadStorageBackends(), fetchStorageBackendEvents()])
     } catch (error) {
       toast.add({ title: '健康检查失败', description: (error as Error)?.message, color: 'error' })
@@ -171,7 +167,6 @@ export function useAssetStorageBackends(options: UseAssetStorageBackendsOptions)
       )
       storageBackendDetail.value = data.backend
       rotateStorageBackendOpen.value = false
-      toast.add({ title: '密钥已轮换', color: 'success', icon: 'i-tabler-key' })
       await Promise.all([reloadStorageBackends(), fetchStorageBackendEvents()])
     } catch (error) {
       toast.add({ title: '密钥轮换失败', description: (error as Error)?.message, color: 'error' })

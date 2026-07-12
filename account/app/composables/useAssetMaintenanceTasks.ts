@@ -1,4 +1,5 @@
 import type { Ref } from 'vue'
+import { createPlatformNotifier } from '@platform/ui/feedback'
 import type { AssetMaintenanceTask } from '~/types/asset-admin'
 
 type MaintenanceAction = 'pause' | 'resume' | 'cancel'
@@ -12,7 +13,7 @@ interface UseAssetMaintenanceTasksOptions {
 
 export function useAssetMaintenanceTasks(options: UseAssetMaintenanceTasksOptions) {
   const { call } = useApi()
-  const toast = useToast()
+  const toast = createPlatformNotifier(useToast())
   const maintenanceTasks = ref<AssetMaintenanceTask[]>([])
   const controllingMaintenanceTaskId = ref('')
   const queueingSelectedRebuild = ref(false)
@@ -80,25 +81,15 @@ export function useAssetMaintenanceTasks(options: UseAssetMaintenanceTasksOption
   }
 
   function showQueuedMaintenanceTask(title: string, task: AssetMaintenanceTask) {
-    toast.add({
-      title,
-      description: `任务 ${task.id.slice(0, 8)} 已进入队列`,
-      color: 'success',
-      icon: 'i-tabler-clock-check'
-    })
+    const queued = { ...task, summary: task.summary || title }
+    maintenanceTasks.value = [queued, ...maintenanceTasks.value.filter(item => item.id !== task.id)]
+    options.selectedTaskId.value = task.id
   }
 
   async function controlMaintenanceTask(task: AssetMaintenanceTask, action: MaintenanceAction, silent = false) {
     controllingMaintenanceTaskId.value = `${task.id}:${action}`
     try {
       await call(`/api/v1/admin/assets-proxy/maintenance/tasks/${task.id}/${action}`, { method: 'POST' })
-      if (!silent) {
-        toast.add({
-          title: action === 'pause' ? '维护任务已暂停' : action === 'resume' ? '维护任务已恢复' : '维护任务已取消',
-          color: action === 'cancel' ? 'warning' : 'success',
-          icon: action === 'pause' ? 'i-tabler-player-pause' : action === 'resume' ? 'i-tabler-player-play' : 'i-tabler-ban'
-        })
-      }
       await fetchMaintenanceTasks()
     } catch (error) {
       if (silent) selectedRebuildError.value = (error as Error)?.message || '维护任务操作失败'

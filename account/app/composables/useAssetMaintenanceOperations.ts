@@ -1,4 +1,5 @@
 import type { Ref } from 'vue'
+import { createPlatformNotifier } from '@platform/ui/feedback'
 import type {
   AssetBatchRebuildResult,
   AssetItem,
@@ -21,10 +22,17 @@ interface UseAssetMaintenanceOperationsOptions {
   reloadAll: () => Promise<void>
 }
 
+export interface AssetMaintenanceOperationFeedback {
+  title: string
+  description: string
+  tone: 'success' | 'warning'
+}
+
 export function useAssetMaintenanceOperations(options: UseAssetMaintenanceOperationsOptions) {
   const { call } = useApi()
-  const toast = useToast()
+  const toast = createPlatformNotifier(useToast())
   const allBackends = '__all__'
+  const operationFeedback = ref<AssetMaintenanceOperationFeedback | null>(null)
 
   const rebuildingAssetId = ref('')
   const sweepingStaging = ref(false)
@@ -48,9 +56,10 @@ export function useAssetMaintenanceOperations(options: UseAssetMaintenanceOperat
 
   async function rebuildDerivatives(asset: AssetItem) {
     rebuildingAssetId.value = asset.id
+    operationFeedback.value = null
     try {
       const data = await call<{ generated: number }>(`/api/v1/admin/assets-proxy/library/${asset.id}/derivatives/rebuild`, { method: 'POST' })
-      toast.add({ title: '派生图已重建', description: `生成 ${data.generated ?? 0} 个 Variant`, color: 'success', icon: 'i-tabler-check' })
+      operationFeedback.value = { title: '派生图已重建', description: `生成 ${data.generated ?? 0} 个 Variant`, tone: 'success' }
     } catch (error) {
       toast.add({ title: '重建派生图失败', description: (error as Error)?.message, color: 'error' })
     } finally {
@@ -84,6 +93,7 @@ export function useAssetMaintenanceOperations(options: UseAssetMaintenanceOperat
 
   async function confirmBatchRebuild(limit = batchRebuildLimit.value) {
     if (!batchRebuildProfile.value) return
+    operationFeedback.value = null
     batchRebuildLimit.value = limit
     batchRebuilding.value = true
     try {
@@ -100,12 +110,11 @@ export function useAssetMaintenanceOperations(options: UseAssetMaintenanceOperat
         return
       }
       const failed = data.errors?.length ?? 0
-      toast.add({
+      operationFeedback.value = {
         title: '批量派生图重建完成',
         description: `处理 ${data.rebuilt ?? 0} 个素材，生成 ${data.generated ?? 0} 个 Variant${failed ? `，${failed} 个失败` : ''}`,
-        color: failed ? 'warning' : 'success',
-        icon: failed ? 'i-tabler-alert-triangle' : 'i-tabler-check'
-      })
+        tone: failed ? 'warning' : 'success'
+      }
       batchRebuildOpen.value = false
       batchRebuildPreview.value = null
       await options.fetchMaintenanceTasks()
@@ -117,17 +126,17 @@ export function useAssetMaintenanceOperations(options: UseAssetMaintenanceOperat
   }
 
   async function sweepStaging() {
+    operationFeedback.value = null
     sweepingStaging.value = true
     try {
       const data = await call<{ items: AssetSweepResult[], removed: number }>('/api/v1/admin/assets-proxy/maintenance/sweep-staging', { method: 'POST' })
       const skipped = (data.items ?? []).filter(item => item.skipped).length
       const failed = (data.items ?? []).filter(item => item.error).length
-      toast.add({
+      operationFeedback.value = {
         title: '暂存清理完成',
         description: `删除 ${data.removed ?? 0} 个对象${skipped ? `，跳过 ${skipped} 个后端` : ''}${failed ? `，${failed} 个异常` : ''}`,
-        color: failed ? 'warning' : 'success',
-        icon: failed ? 'i-tabler-alert-triangle' : 'i-tabler-check'
-      })
+        tone: failed ? 'warning' : 'success'
+      }
       await options.reloadAll()
     } catch (error) {
       toast.add({ title: '暂存清理失败', description: (error as Error)?.message, color: 'error' })
@@ -155,6 +164,7 @@ export function useAssetMaintenanceOperations(options: UseAssetMaintenanceOperat
 
   async function confirmPruneUnreferenced(value?: AssetPruneForm) {
     if (value) Object.assign(pruneForm, value)
+    operationFeedback.value = null
     pruningUnreferenced.value = true
     try {
       const data = await call<AssetPruneResult>('/api/v1/admin/assets-proxy/maintenance/prune-unreferenced', {
@@ -168,12 +178,11 @@ export function useAssetMaintenanceOperations(options: UseAssetMaintenanceOperat
         return
       }
       const failed = data.errors?.length ?? 0
-      toast.add({
+      operationFeedback.value = {
         title: '无引用素材清理完成',
         description: `删除 ${data.deleted ?? 0} 个素材${failed ? `，${failed} 个失败` : ''}`,
-        color: failed ? 'warning' : 'success',
-        icon: failed ? 'i-tabler-alert-triangle' : 'i-tabler-check'
-      })
+        tone: failed ? 'warning' : 'success'
+      }
       pruneOpen.value = false
       prunePreview.value = null
       await options.reloadAll()
@@ -212,6 +221,7 @@ export function useAssetMaintenanceOperations(options: UseAssetMaintenanceOperat
 
   async function confirmPruneOrphanObjects(value?: AssetOrphanObjectForm) {
     if (value) Object.assign(orphanObjectsForm, value)
+    operationFeedback.value = null
     auditingOrphanObjects.value = true
     try {
       const data = await call<AssetOrphanObjectResult>('/api/v1/admin/assets-proxy/maintenance/orphan-objects', {
@@ -225,12 +235,11 @@ export function useAssetMaintenanceOperations(options: UseAssetMaintenanceOperat
         return
       }
       const failed = (data.items ?? []).reduce((sum, item) => sum + (item.errors?.length ?? 0), 0)
-      toast.add({
+      operationFeedback.value = {
         title: '孤儿对象清理完成',
         description: `删除 ${data.deleted ?? 0} 个对象${failed ? `，${failed} 个失败` : ''}`,
-        color: failed ? 'warning' : 'success',
-        icon: failed ? 'i-tabler-alert-triangle' : 'i-tabler-check'
-      })
+        tone: failed ? 'warning' : 'success'
+      }
       orphanObjectsOpen.value = false
       orphanObjectsPreview.value = null
       await options.reloadAll()
@@ -268,6 +277,7 @@ export function useAssetMaintenanceOperations(options: UseAssetMaintenanceOperat
 
   async function confirmStorageMigration(value?: AssetStorageMigrationForm) {
     if (value) Object.assign(storageMigrationForm, value)
+    operationFeedback.value = null
     migratingStorage.value = true
     try {
       const data = await call<AssetStorageMigrationResult>('/api/v1/admin/assets-proxy/maintenance/migrate-storage', {
@@ -281,12 +291,11 @@ export function useAssetMaintenanceOperations(options: UseAssetMaintenanceOperat
         return
       }
       const failed = data.errors?.length ?? 0
-      toast.add({
+      operationFeedback.value = {
         title: '存储迁移完成',
         description: `迁移 ${data.migrated ?? 0} 个素材${failed ? `，${failed} 个失败` : ''}`,
-        color: failed ? 'warning' : 'success',
-        icon: failed ? 'i-tabler-alert-triangle' : 'i-tabler-check'
-      })
+        tone: failed ? 'warning' : 'success'
+      }
       storageMigrationOpen.value = false
       storageMigrationPreview.value = null
       await options.reloadAll()
@@ -298,6 +307,8 @@ export function useAssetMaintenanceOperations(options: UseAssetMaintenanceOperat
   }
 
   return {
+    operationFeedback: shallowReadonly(operationFeedback),
+    dismissOperationFeedback: () => { operationFeedback.value = null },
     rebuildingAssetId: readonly(rebuildingAssetId),
     sweepingStaging: readonly(sweepingStaging),
     pruneOpen,

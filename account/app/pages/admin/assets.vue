@@ -12,6 +12,7 @@ import {
 import { useManageCollectionState } from '@platform/manage/use-manage-collection-state'
 import { useManageSelection } from '@platform/manage/use-manage-selection'
 import { useMinLoading } from '@platform/ui/use-min-loading'
+import { createPlatformNotifier } from '@platform/ui/feedback'
 import type {
   AssetAdminSection,
   AssetAdminStats as Stats,
@@ -28,7 +29,7 @@ definePageMeta({ layout: 'admin', middleware: 'admin' })
 useSeoMeta({ title: '资源管理 · 控制台' })
 
 const { call } = useApi()
-const toast = useToast()
+const toast = createPlatformNotifier(useToast())
 const route = useRoute()
 const router = useRouter()
 const ALL = '__all__'
@@ -199,6 +200,8 @@ const {
   refreshAfterSettled: refreshAfterMaintenanceTasksSettled
 })
 const {
+  operationFeedback,
+  dismissOperationFeedback,
   rebuildingAssetId,
   sweepingStaging,
   pruneOpen,
@@ -498,6 +501,21 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
         @click="() => { tab = item.value }"
       />
     </div>
+
+    <UAlert
+      v-if="operationFeedback"
+      class="mb-5"
+      :color="operationFeedback.tone"
+      variant="subtle"
+      :icon="operationFeedback.tone === 'warning' ? 'i-tabler-alert-triangle' : 'i-tabler-circle-check'"
+      :title="operationFeedback.title"
+      :description="operationFeedback.description"
+      role="status"
+    >
+      <template #actions>
+        <UButton label="关闭" color="neutral" variant="ghost" size="xs" @click="dismissOperationFeedback" />
+      </template>
+    </UAlert>
 
     <SkeletonList v-if="showSkeleton" :rows="8" />
 

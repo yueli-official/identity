@@ -1,4 +1,5 @@
 import type { Ref } from 'vue'
+import { createPlatformNotifier } from '@platform/ui/feedback'
 import type {
   AssetProfile,
   AssetSite,
@@ -21,7 +22,7 @@ interface UseAssetConfigurationOptions {
 
 export function useAssetConfiguration(options: UseAssetConfigurationOptions) {
   const { call } = useApi()
-  const toast = useToast()
+  const toast = createPlatformNotifier(useToast())
   const sites = ref<AssetSite[]>([])
   const profiles = ref<AssetProfile[]>([])
   const variants = ref<AssetVariant[]>([])
@@ -82,7 +83,6 @@ export function useAssetConfiguration(options: UseAssetConfigurationOptions) {
     savingProfile.value = true
     try {
       await call('/api/v1/admin/assets-proxy/profiles', { method: 'POST', body: { ...profileForm } })
-      toast.add({ title: 'Profile 已保存', color: 'success', icon: 'i-tabler-check' })
       profileOpen.value = false
       await options.reloadAll()
     } finally {
@@ -104,7 +104,6 @@ export function useAssetConfiguration(options: UseAssetConfigurationOptions) {
     savingSite.value = true
     try {
       await call('/api/v1/admin/assets-proxy/sites', { method: 'POST', body: siteForm })
-      toast.add({ title: '站点已保存', color: 'success', icon: 'i-tabler-check' })
       siteOpen.value = false
       await options.reloadAll()
     } finally {
@@ -126,7 +125,6 @@ export function useAssetConfiguration(options: UseAssetConfigurationOptions) {
     savingVariant.value = true
     try {
       await call('/api/v1/admin/assets-proxy/variants', { method: 'POST', body: variantForm })
-      toast.add({ title: 'Variant 已保存', color: 'success', icon: 'i-tabler-check' })
       variantOpen.value = false
       await options.reloadAll()
     } finally {
@@ -143,7 +141,6 @@ export function useAssetConfiguration(options: UseAssetConfigurationOptions) {
     deletingVariant.value = true
     try {
       await call(`/api/v1/admin/assets-proxy/variants/${deleteVariantTarget.value.id}`, { method: 'DELETE' })
-      toast.add({ title: 'Variant 已删除', color: 'success', icon: 'i-tabler-check' })
       deleteVariantTarget.value = null
       await options.reloadAll()
     } catch (error) {
@@ -163,7 +160,6 @@ export function useAssetConfiguration(options: UseAssetConfigurationOptions) {
     try {
       const target = deleteProfileTarget.value
       await call(`/api/v1/admin/assets-proxy/profiles/${target.siteKey}/${target.profileKey}`, { method: 'DELETE' })
-      toast.add({ title: 'Profile 已删除', color: 'success', icon: 'i-tabler-check' })
       deleteProfileTarget.value = null
       await options.reloadAll()
     } catch (error) {

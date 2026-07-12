@@ -7,6 +7,7 @@ import { useManageCollectionState } from '@platform/manage/use-manage-collection
 import { useManageSelection } from '@platform/manage/use-manage-selection'
 import { useMinLoading } from '@platform/ui/use-min-loading'
 import { abs } from '@platform/ui/date'
+import { createPlatformNotifier } from '@platform/ui/feedback'
 
 // 站群超级管理员·用户管理。identity 全局用户的全生命周期管理:列表/搜索/筛选/
 // 分页 + 封禁/解封/删除 + 重置密码 + 建用户 + 授/撤 admin 角色。
@@ -15,7 +16,7 @@ useSeoMeta({ title: '用户管理 · 控制台' })
 
 const { me } = useSession()
 const { call } = useApi()
-const toast = useToast()
+const toast = createPlatformNotifier(useToast())
 const route = useRoute()
 const router = useRouter()
 
