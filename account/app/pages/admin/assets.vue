@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
 import {
-  ManageEmpty,
   ManageHeader,
   SkeletonList
 } from '@platform/manage/components'
@@ -1157,9 +1156,6 @@ function grantStatus(grant: Grant): { label: string, color: 'success' | 'warning
 function canRevokeGrant(grant: Grant) {
   return grantStatus(grant).label === '有效'
 }
-function openExternal(url: string) {
-  if (url) window.open(url, '_blank')
-}
 function grantActions(grant: Grant): DropdownMenuItem[][] {
   return [[
     { label: '撤销授权', icon: 'i-tabler-ban', color: 'error', disabled: !canRevokeGrant(grant), onSelect: () => { revokeGrantTarget.value = grant } }
@@ -1360,33 +1356,23 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       @save="saveVariant"
     />
 
-    <UModal v-model:open="deleteProfileOpen" title="删除 Profile?">
-      <template #body>
-        <p class="text-sm text-muted">
-          将删除 <span class="font-medium text-default">{{ deleteProfileTarget?.profileKey }}</span>。只有没有素材、没有 Variant 的 Profile 才允许删除。
-        </p>
-      </template>
-      <template #footer>
-        <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="取消" :disabled="deletingProfile" @click="() => { deleteProfileTarget = null }" />
-          <UButton color="error" label="确认删除" :loading="deletingProfile" @click="confirmDeleteProfile" />
-        </div>
-      </template>
-    </UModal>
+    <AssetDeleteConfirmModal
+      v-model:open="deleteProfileOpen"
+      title="删除 Profile？"
+      description="只有没有素材、没有 Variant 的 Profile 才允许删除。"
+      :subject="deleteProfileTarget?.profileKey"
+      :deleting="deletingProfile"
+      @confirm="confirmDeleteProfile"
+    />
 
-    <UModal v-model:open="deleteAssetOpen" title="删除素材?">
-      <template #body>
-        <p class="text-sm text-muted">
-          将删除 <span class="font-medium text-default">{{ deleteAssetTarget?.filename || deleteAssetTarget?.id }}</span>。原文件、派生图和相关交付授权会一并失效。
-        </p>
-      </template>
-      <template #footer>
-        <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="取消" :disabled="deletingAsset" @click="() => { deleteAssetTarget = null }" />
-          <UButton color="error" label="确认删除" :loading="deletingAsset" @click="confirmDeleteAsset" />
-        </div>
-      </template>
-    </UModal>
+    <AssetDeleteConfirmModal
+      v-model:open="deleteAssetOpen"
+      title="删除素材？"
+      description="原文件、派生图和相关交付授权会一并失效。"
+      :subject="deleteAssetTarget?.filename || deleteAssetTarget?.id"
+      :deleting="deletingAsset"
+      @confirm="confirmDeleteAsset"
+    />
 
     <AssetPruneModal
       v-model:open="pruneOpen"
@@ -1417,49 +1403,21 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       @confirm="confirmStorageMigration"
     />
 
-    <UModal v-model:open="referencesOpen" title="素材引用">
-      <template #body>
-        <div class="space-y-3">
-          <p class="truncate font-mono text-xs text-dimmed">{{ referenceAsset?.id }}</p>
-          <SkeletonList v-if="loadingReferences" :rows="3" />
-          <ManageEmpty v-else-if="!references.length" icon="i-tabler-link-off" text="还没有引用记录" />
-          <div v-else class="overflow-hidden rounded-lg border border-default bg-default">
-            <div v-for="ref in references" :key="ref.id" class="flex items-center gap-3 border-b border-default px-3 py-2.5 last:border-b-0">
-              <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-                <UIcon name="i-tabler-link" class="size-4" />
-              </span>
-              <div class="min-w-0 flex-1">
-                <div class="truncate text-sm font-medium text-highlighted">{{ ref.refLabel || ref.refId }}</div>
-                <div class="truncate text-xs text-muted">{{ ref.siteKey }} · {{ ref.refType }} · {{ ref.refId }}</div>
-              </div>
-              <UButton
-                v-if="ref.refUrl"
-                icon="i-tabler-external-link"
-                color="neutral"
-                variant="ghost"
-                square
-                size="xs"
-                @click="openExternal(ref.refUrl)"
-              />
-            </div>
-          </div>
-        </div>
-      </template>
-    </UModal>
+    <AssetReferencesModal
+      v-model:open="referencesOpen"
+      :asset-id="referenceAsset?.id"
+      :references="references"
+      :loading="loadingReferences"
+    />
 
-    <UModal v-model:open="deleteVariantOpen" title="删除 Variant?">
-      <template #body>
-        <p class="text-sm text-muted">
-          将删除 <span class="font-medium text-default">{{ deleteVariantTarget?.variantKey }}</span>。已有文件不会被删除，但之后不会再生成这个派生规格。
-        </p>
-      </template>
-      <template #footer>
-        <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="取消" :disabled="deletingVariant" @click="() => { deleteVariantTarget = null }" />
-          <UButton color="error" label="确认删除" :loading="deletingVariant" @click="confirmDeleteVariant" />
-        </div>
-      </template>
-    </UModal>
+    <AssetDeleteConfirmModal
+      v-model:open="deleteVariantOpen"
+      title="删除 Variant？"
+      description="已有文件不会被删除，但之后不会再生成这个派生规格。"
+      :subject="deleteVariantTarget?.variantKey"
+      :deleting="deletingVariant"
+      @confirm="confirmDeleteVariant"
+    />
 
     <AssetBatchRebuildModal
       v-model:open="batchRebuildOpen"
