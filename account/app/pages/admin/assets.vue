@@ -16,15 +16,12 @@ import type {
   AssetAdminSection,
   AssetAdminStats as Stats,
   AssetGrant as Grant,
-  AssetGrantForm as GrantForm,
   AssetItem,
   AssetProfile as Profile,
-  AssetReference,
   AssetSite as Site,
   AssetSpaceUsage,
   AssetStorageBackend as StorageBackend,
-  AssetVariant as Variant,
-  CreatedAssetGrant as CreatedGrant
+  AssetVariant as Variant
 } from '~/types/asset-admin'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
@@ -83,17 +80,9 @@ const visibility = filterModel('visibility', ALL)
 const mime = filterModel('mime', ALL)
 const selectedTaskId = filterModel('task', '')
 const stats = ref<Stats>({ assets: 0, publicAssets: 0, privateAssets: 0, sites: 0, profiles: 0, activeGrants: 0 })
-const sites = ref<Site[]>([])
-const profiles = ref<Profile[]>([])
-const variants = ref<Variant[]>([])
 const assets = ref<AssetItem[]>([])
 const spaces = ref<AssetSpaceUsage[]>([])
-const references = ref<AssetReference[]>([])
-const grants = ref<Grant[]>([])
 const totalAssets = ref(0)
-const totalGrants = ref(0)
-const grantPage = ref(1)
-const GRANT_PAGE_SIZE = 20
 function maintenanceSelectedAssetIds() {
   return [...selectedIds.value]
 }
@@ -123,6 +112,73 @@ const {
   checkStorageBackendHealth,
   confirmRotateStorageBackendSecret
 } = useAssetStorageBackends({ reloadAll })
+const {
+  sites,
+  profiles,
+  variants,
+  setConfigurationData,
+  profileOpen,
+  savingProfile,
+  profileForm,
+  editProfile,
+  saveProfile,
+  siteOpen,
+  savingSite,
+  siteForm,
+  editSite,
+  saveSite,
+  variantOpen,
+  savingVariant,
+  variantForm,
+  editVariant,
+  saveVariant,
+  deleteVariantTarget,
+  deleteVariantOpen,
+  deletingVariant,
+  requestDeleteVariant,
+  confirmDeleteVariant,
+  deleteProfileTarget,
+  deleteProfileOpen,
+  deletingProfile,
+  requestDeleteProfile,
+  confirmDeleteProfile
+} = useAssetConfiguration({
+  storageBackends,
+  currentSiteKey: siteKey,
+  allSiteKey: ALL,
+  reloadAll
+})
+const {
+  grants,
+  totalGrants,
+  grantPage,
+  grantPageSize,
+  fetchGrants,
+  revokeGrantTarget,
+  revokeGrantOpen,
+  revokingGrant,
+  requestRevokeGrant,
+  confirmRevokeGrant,
+  createGrantOpen,
+  creatingGrant,
+  grantAsset,
+  createdGrant,
+  grantForm,
+  openCreateGrant,
+  createGrant
+} = useAssetGrants({ reloadAll })
+const {
+  references,
+  referenceAsset,
+  referencesOpen,
+  loadingReferences,
+  openReferences,
+  deleteAssetTarget,
+  deleteAssetOpen,
+  deletingAsset,
+  requestDeleteAsset,
+  confirmDeleteAsset
+} = useAssetLibraryActions({ reloadAll })
 const {
   maintenanceTasks,
   controllingMaintenanceTaskId,
@@ -282,16 +338,6 @@ watch([q, sort, direction, page, size, siteKey, spaceKey, profileKey, visibility
 watch(totalAssetPages, (lastPage) => {
   if (page.value > lastPage) page.value = lastPage
 }, { flush: 'sync' })
-watch(grantPage, fetchGrants)
-watch(() => profileForm.defaultVisibility, (visibility) => {
-  if (visibility === 'public') {
-    profileForm.defaultDeliveryPolicy = 'public'
-    return
-  }
-  if (!profileForm.defaultDeliveryPolicy || profileForm.defaultDeliveryPolicy === 'public') {
-    profileForm.defaultDeliveryPolicy = 'signed'
-  }
-})
 
 async function reloadAll() {
   loading.value = true
@@ -306,10 +352,12 @@ async function reloadAll() {
     ])
     stats.value = st
     spaces.value = spaceData.items ?? []
-    sites.value = siteData.items ?? []
     setStorageBackends(backendData.items ?? [])
-    profiles.value = profileData.items ?? []
-    variants.value = variantData.items ?? []
+    setConfigurationData({
+      sites: siteData.items ?? [],
+      profiles: profileData.items ?? [],
+      variants: variantData.items ?? []
+    })
     await Promise.all([fetchAssets(), fetchGrants(), fetchMaintenanceTasks()])
   } catch (e) {
     toast.add({ title: '资源后台加载失败', description: (e as Error)?.message, color: 'error' })
@@ -337,14 +385,6 @@ async function fetchAssets() {
   totalAssets.value = data.total ?? 0
 }
 
-async function fetchGrants() {
-  const data = await call<{ items: Grant[], total: number }>('/api/v1/admin/assets-proxy/grants', {
-    params: { page: grantPage.value, size: GRANT_PAGE_SIZE }
-  })
-  grants.value = data.items ?? []
-  totalGrants.value = data.total ?? 0
-}
-
 async function refreshAfterMaintenanceTasksSettled() {
   const [st, siteData, profileData, variantData] = await Promise.all([
     call<Stats>('/api/v1/admin/assets-proxy/stats'),
@@ -353,282 +393,12 @@ async function refreshAfterMaintenanceTasksSettled() {
     call<{ items: Variant[] }>('/api/v1/admin/assets-proxy/variants')
   ])
   stats.value = st
-  sites.value = siteData.items ?? []
-  profiles.value = profileData.items ?? []
-  variants.value = variantData.items ?? []
+  setConfigurationData({
+    sites: siteData.items ?? [],
+    profiles: profileData.items ?? [],
+    variants: variantData.items ?? []
+  })
   await fetchAssets()
-}
-
-const profileOpen = ref(false)
-const savingProfile = ref(false)
-const profileForm = reactive<Profile>({
-  siteKey: 'platform',
-  profileKey: '',
-  purpose: '',
-  storageBackend: '',
-  allowedExt: 'jpg,jpeg,png,webp',
-  maxSizeBytes: 20 * 1024 * 1024,
-  defaultVisibility: 'public',
-  defaultDeliveryPolicy: 'public',
-  keepOriginal: true,
-  assetCount: 0,
-  variantCount: 0
-})
-function editProfile(p?: Profile) {
-  Object.assign(profileForm, p ?? {
-    siteKey: sites.value[0]?.siteKey || 'platform',
-    profileKey: '',
-    purpose: '',
-    storageBackend: '',
-    allowedExt: 'jpg,jpeg,png,webp',
-    maxSizeBytes: 20 * 1024 * 1024,
-    defaultVisibility: 'public',
-    defaultDeliveryPolicy: 'public',
-    keepOriginal: true,
-    assetCount: 0,
-    variantCount: 0
-  })
-  profileOpen.value = true
-}
-async function saveProfile(value: Profile) {
-  Object.assign(profileForm, value)
-  if (profileForm.defaultVisibility === 'public') {
-    profileForm.defaultDeliveryPolicy = 'public'
-  } else if (profileForm.defaultDeliveryPolicy !== 'signed') {
-    profileForm.defaultDeliveryPolicy = 'signed'
-  }
-  savingProfile.value = true
-  try {
-    await call('/api/v1/admin/assets-proxy/profiles', {
-      method: 'POST',
-      body: {
-        ...profileForm,
-        defaultDeliveryPolicy: profileForm.defaultVisibility === 'public' ? 'public' : profileForm.defaultDeliveryPolicy
-      }
-    })
-    toast.add({ title: 'Profile 已保存', color: 'success', icon: 'i-tabler-check' })
-    profileOpen.value = false
-    await reloadAll()
-  } finally {
-    savingProfile.value = false
-  }
-}
-
-const siteOpen = ref(false)
-const savingSite = ref(false)
-const siteForm = reactive<Site>({
-  siteKey: '',
-  name: '',
-  defaultStorageBackend: 'local',
-  enabled: true,
-  assetCount: 0,
-  profileCount: 0,
-  variantCount: 0
-})
-function editSite(site?: Site) {
-  Object.assign(siteForm, site ?? {
-    siteKey: '',
-    name: '',
-    defaultStorageBackend: storageBackends.value.find(b => b.isDefault)?.name || storageBackends.value[0]?.name || 'local',
-    enabled: true,
-    assetCount: 0,
-    profileCount: 0,
-    variantCount: 0
-  })
-  siteOpen.value = true
-}
-async function saveSite(value: Site) {
-  Object.assign(siteForm, value)
-  savingSite.value = true
-  try {
-    await call('/api/v1/admin/assets-proxy/sites', { method: 'POST', body: siteForm })
-    toast.add({ title: '站点已保存', color: 'success', icon: 'i-tabler-check' })
-    siteOpen.value = false
-    await reloadAll()
-  } finally {
-    savingSite.value = false
-  }
-}
-
-const variantOpen = ref(false)
-const savingVariant = ref(false)
-const variantForm = reactive<Variant>({
-  id: '',
-  siteKey: 'platform',
-  profileKey: 'default',
-  variantKey: '',
-  width: 800,
-  height: 600,
-  mode: 'resize',
-  format: 'source',
-  quality: 85,
-  version: 1,
-  enabled: true
-})
-function editVariant(v?: Variant, p?: Profile) {
-  const fallbackSite = siteKey.value !== ALL ? siteKey.value : 'platform'
-  Object.assign(variantForm, v ?? {
-    id: '',
-    siteKey: p?.siteKey || fallbackSite,
-    profileKey: p?.profileKey || 'default',
-    variantKey: '',
-    width: 800,
-    height: 600,
-    mode: 'resize',
-    format: 'source',
-    quality: 85,
-    version: 1,
-    enabled: true
-  })
-  variantOpen.value = true
-}
-async function saveVariant(value: Variant) {
-  Object.assign(variantForm, value)
-  savingVariant.value = true
-  try {
-    await call('/api/v1/admin/assets-proxy/variants', { method: 'POST', body: variantForm })
-    toast.add({ title: 'Variant 已保存', color: 'success', icon: 'i-tabler-check' })
-    variantOpen.value = false
-    await reloadAll()
-  } finally {
-    savingVariant.value = false
-  }
-}
-
-const deleteAssetTarget = ref<AssetItem | null>(null)
-const deleteAssetOpen = computed({ get: () => !!deleteAssetTarget.value, set: v => { if (!v) deleteAssetTarget.value = null } })
-const deletingAsset = ref(false)
-async function confirmDeleteAsset() {
-  if (!deleteAssetTarget.value) return
-  deletingAsset.value = true
-  try {
-    await call(`/api/v1/admin/assets-proxy/library/${deleteAssetTarget.value.id}`, { method: 'DELETE' })
-    toast.add({ title: '素材已删除', color: 'success', icon: 'i-tabler-check' })
-    deleteAssetTarget.value = null
-    await reloadAll()
-  } catch (e) {
-    toast.add({ title: '删除素材失败', description: (e as Error)?.message, color: 'error' })
-  } finally {
-    deletingAsset.value = false
-  }
-}
-
-const referenceAsset = ref<AssetItem | null>(null)
-const referencesOpen = computed({ get: () => !!referenceAsset.value, set: v => { if (!v) referenceAsset.value = null } })
-const loadingReferences = ref(false)
-async function openReferences(asset: AssetItem) {
-  referenceAsset.value = asset
-  references.value = []
-  loadingReferences.value = true
-  try {
-    const data = await call<{ items: AssetReference[] }>('/api/v1/admin/assets-proxy/references', {
-      params: { assetId: asset.id, page: 1, size: 50 }
-    })
-    references.value = data.items ?? []
-  } catch (e) {
-    toast.add({ title: '加载引用失败', description: (e as Error)?.message, color: 'error' })
-  } finally {
-    loadingReferences.value = false
-  }
-}
-
-const deleteVariantTarget = ref<Variant | null>(null)
-const deleteVariantOpen = computed({ get: () => !!deleteVariantTarget.value, set: v => { if (!v) deleteVariantTarget.value = null } })
-const deletingVariant = ref(false)
-async function confirmDeleteVariant() {
-  if (!deleteVariantTarget.value) return
-  deletingVariant.value = true
-  try {
-    await call(`/api/v1/admin/assets-proxy/variants/${deleteVariantTarget.value.id}`, { method: 'DELETE' })
-    toast.add({ title: 'Variant 已删除', color: 'success', icon: 'i-tabler-check' })
-    deleteVariantTarget.value = null
-    await reloadAll()
-  } catch (e) {
-    toast.add({ title: '删除 Variant 失败', description: (e as Error)?.message, color: 'error' })
-  } finally {
-    deletingVariant.value = false
-  }
-}
-
-const deleteProfileTarget = ref<Profile | null>(null)
-const deleteProfileOpen = computed({ get: () => !!deleteProfileTarget.value, set: v => { if (!v) deleteProfileTarget.value = null } })
-const deletingProfile = ref(false)
-async function confirmDeleteProfile() {
-  if (!deleteProfileTarget.value) return
-  deletingProfile.value = true
-  try {
-    const p = deleteProfileTarget.value
-    await call(`/api/v1/admin/assets-proxy/profiles/${p.siteKey}/${p.profileKey}`, { method: 'DELETE' })
-    toast.add({ title: 'Profile 已删除', color: 'success', icon: 'i-tabler-check' })
-    deleteProfileTarget.value = null
-    await reloadAll()
-  } catch (e) {
-    toast.add({ title: '删除 Profile 失败', description: (e as Error)?.message, color: 'error' })
-  } finally {
-    deletingProfile.value = false
-  }
-}
-
-const revokeGrantTarget = ref<Grant | null>(null)
-const revokeGrantOpen = computed({ get: () => !!revokeGrantTarget.value, set: v => { if (!v) revokeGrantTarget.value = null } })
-const revokingGrant = ref(false)
-const createGrantOpen = ref(false)
-const creatingGrant = ref(false)
-const grantAsset = ref<AssetItem | null>(null)
-const createdGrant = ref<CreatedGrant | null>(null)
-const grantForm = reactive<GrantForm>({
-  variantKey: 'original',
-  policy: 'oneTime',
-  subjectId: '',
-  expiresIn: 3600,
-  maxUses: 1,
-  reason: 'admin-issued'
-})
-async function confirmRevokeGrant() {
-  if (!revokeGrantTarget.value) return
-  revokingGrant.value = true
-  try {
-    await call(`/api/v1/admin/assets-proxy/grants/${revokeGrantTarget.value.id}/revoke`, { method: 'POST' })
-    toast.add({ title: '授权已撤销', color: 'success', icon: 'i-tabler-check' })
-    revokeGrantTarget.value = null
-    await reloadAll()
-  } catch (e) {
-    toast.add({ title: '撤销授权失败', description: (e as Error)?.message, color: 'error' })
-  } finally {
-    revokingGrant.value = false
-  }
-}
-
-function openCreateGrant(asset: AssetItem) {
-  grantAsset.value = asset
-  createdGrant.value = null
-  Object.assign(grantForm, {
-    variantKey: 'original',
-    policy: asset.deliveryPolicy && asset.deliveryPolicy !== 'public' ? asset.deliveryPolicy : 'oneTime',
-    subjectId: '',
-    expiresIn: 3600,
-    maxUses: 1,
-    reason: `admin:${asset.filename || asset.id}`
-  })
-  createGrantOpen.value = true
-}
-
-async function createGrant(value: GrantForm) {
-  if (!grantAsset.value) return
-  Object.assign(grantForm, value)
-  creatingGrant.value = true
-  try {
-    createdGrant.value = await call<CreatedGrant>('/api/v1/admin/assets-proxy/grants/create', {
-      method: 'POST',
-      body: { ...grantForm, assetId: grantAsset.value.id }
-    })
-    toast.add({ title: '交付链接已生成', color: 'success', icon: 'i-tabler-check' })
-    await fetchGrants()
-  } catch (e) {
-    toast.add({ title: '生成交付链接失败', description: (e as Error)?.message, color: 'error' })
-  } finally {
-    creatingGrant.value = false
-  }
 }
 
 function formatBytes(n: number) {
@@ -643,7 +413,7 @@ function profileActions(profile: Profile): DropdownMenuItem[][] {
   return [[
     { label: '编辑', icon: 'i-tabler-pencil', onSelect: () => editProfile(profile) },
     { label: '批量重建派生图', icon: 'i-tabler-refresh-dot', disabled: !profile.assetCount || batchRebuilding.value, onSelect: () => previewBatchRebuild(profile) },
-    { label: '删除', icon: 'i-tabler-trash', color: 'error', disabled: inUse, onSelect: () => { deleteProfileTarget.value = profile } }
+    { label: '删除', icon: 'i-tabler-trash', color: 'error', disabled: inUse, onSelect: () => requestDeleteProfile(profile) }
   ]]
 }
 function assetActions(asset: AssetItem): DropdownMenuItem[][] {
@@ -653,13 +423,13 @@ function assetActions(asset: AssetItem): DropdownMenuItem[][] {
     { label: '签发交付链接', icon: 'i-tabler-key', onSelect: () => openCreateGrant(asset) },
     { label: '重建派生图', icon: 'i-tabler-refresh-dot', disabled: !asset.mime.startsWith('image/') || rebuildingAssetId.value === asset.id, onSelect: () => rebuildDerivatives(asset) }
   ], [
-    { label: asset.refCount ? '有引用，不能删除' : '删除素材', icon: 'i-tabler-trash', color: 'error', disabled: !!asset.refCount, onSelect: () => { deleteAssetTarget.value = asset } }
+    { label: asset.refCount ? '有引用，不能删除' : '删除素材', icon: 'i-tabler-trash', color: 'error', disabled: !!asset.refCount, onSelect: () => requestDeleteAsset(asset) }
   ]]
 }
 function variantActions(variant: Variant): DropdownMenuItem[][] {
   return [[
     { label: '编辑', icon: 'i-tabler-pencil', onSelect: () => editVariant(variant) },
-    { label: '删除', icon: 'i-tabler-trash', color: 'error', onSelect: () => { deleteVariantTarget.value = variant } }
+    { label: '删除', icon: 'i-tabler-trash', color: 'error', onSelect: () => requestDeleteVariant(variant) }
   ]]
 }
 function grantStatus(grant: Grant): { label: string, color: 'success' | 'warning' | 'error' | 'neutral' } {
@@ -673,7 +443,7 @@ function canRevokeGrant(grant: Grant) {
 }
 function grantActions(grant: Grant): DropdownMenuItem[][] {
   return [[
-    { label: '撤销授权', icon: 'i-tabler-ban', color: 'error', disabled: !canRevokeGrant(grant), onSelect: () => { revokeGrantTarget.value = grant } }
+    { label: '撤销授权', icon: 'i-tabler-ban', color: 'error', disabled: !canRevokeGrant(grant), onSelect: () => requestRevokeGrant(grant) }
   ]]
 }
 </script>
@@ -808,7 +578,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
         v-model:page="grantPage"
         :grants="grants"
         :total="totalGrants"
-        :page-size="GRANT_PAGE_SIZE"
+        :page-size="grantPageSize"
         :actions-for="grantActions"
       />
     </template>
