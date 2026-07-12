@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
 import {
-  ManageCollectionDock,
   ManageCollectionToolbar,
   ManageEmpty,
   ManageHeader,
-  ManagePagination,
   ManageRowShell,
   ManageViewToggle,
   SkeletonList
@@ -434,29 +432,11 @@ const {
 })
 
 const selectedTask = computed(() => maintenanceTasks.value.find(task => task.id === selectedTaskId.value))
-const selectedTaskResult = computed<MaintenanceTaskResult>(() => parseTaskResult(selectedTask.value?.result))
-const selectedTaskPayload = computed<{ ids?: string[] }>(() => parseTaskPayload(selectedTask.value?.payload))
-const selectedTaskCandidateCount = computed(() => selectedTaskResult.value.candidates || selectedTaskPayload.value.ids?.length || 0)
-const selectedTaskProcessed = computed(() => (selectedTaskResult.value.rebuilt || 0) + (selectedTaskResult.value.errors?.length || 0))
-const selectedTaskPercent = computed(() => {
-  const candidates = selectedTaskCandidateCount.value
-  if (!candidates) return selectedTask.value?.status === 'completed' ? 100 : 0
-  return Math.min(100, Math.round(selectedTaskProcessed.value / candidates * 100))
-})
 
 function parseTaskResult(value?: string): MaintenanceTaskResult {
   if (!value || value === '{}') return {}
   try {
     return JSON.parse(value) as MaintenanceTaskResult
-  } catch {
-    return {}
-  }
-}
-
-function parseTaskPayload(value?: string): { ids?: string[] } {
-  if (!value || value === '{}') return {}
-  try {
-    return JSON.parse(value) as { ids?: string[] }
   } catch {
     return {}
   }
@@ -479,6 +459,10 @@ function openMaintenanceTaskList() {
 function dismissSelectedTask() {
   selectedTaskId.value = ''
   selectedRebuildError.value = ''
+}
+
+function controlSelectedTask(action: 'pause' | 'resume' | 'cancel') {
+  if (selectedTask.value) void controlMaintenanceTask(selectedTask.value, action, true)
 }
 
 async function queueSelectedRebuild() {
@@ -1638,85 +1622,28 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
           </ManageRowShell>
         </div>
 
-        <ManageCollectionDock v-if="totalAssets > 0 || assets.length" :with-sidebar="false" label="素材库选择与分页">
-          <template #selection>
-            <template v-if="selectedTaskId">
-              <UIcon
-                :name="selectedTask && ['failed', 'cancelled'].includes(selectedTask.status) ? 'i-tabler-alert-triangle' : selectedTask?.status === 'completed' ? 'i-tabler-circle-check' : 'i-tabler-progress'"
-                :class="selectedTask && ['failed', 'cancelled'].includes(selectedTask.status) ? 'text-warning' : selectedTask?.status === 'completed' ? 'text-success' : 'text-primary'"
-                class="size-4 shrink-0"
-              />
-              <div class="min-w-0" role="status" aria-live="polite">
-                <div class="flex flex-wrap items-center gap-2">
-                  <span class="text-sm font-medium text-default">所选素材派生图重建</span>
-                  <UBadge v-if="selectedTask" :label="taskStatus(selectedTask).label" :color="taskStatus(selectedTask).color" variant="soft" size="sm" />
-                  <span v-else class="text-xs text-muted">正在读取任务…</span>
-                </div>
-                <div v-if="selectedTask" class="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
-                  <UProgress :model-value="selectedTaskPercent" size="xs" class="w-24" />
-                  <span>{{ selectedTaskProcessed }}/{{ selectedTaskCandidateCount || '—' }} 已处理</span>
-                  <span v-if="selectedTaskResult.generated">生成 {{ selectedTaskResult.generated }} 个派生文件</span>
-                  <span v-if="selectedTaskResult.errors?.length" class="text-warning">{{ selectedTaskResult.errors.length }} 个未完成</span>
-                </div>
-              </div>
-              <UButton
-                v-if="selectedTask && canPauseTask(selectedTask)"
-                icon="i-tabler-player-pause"
-                label="暂停"
-                color="neutral"
-                variant="ghost"
-                size="sm"
-                :loading="controllingMaintenanceTaskId === `${selectedTask.id}:pause`"
-                @click="controlMaintenanceTask(selectedTask, 'pause', true)"
-              />
-              <UButton
-                v-if="selectedTask && canResumeTask(selectedTask)"
-                icon="i-tabler-player-play"
-                label="恢复"
-                color="neutral"
-                variant="ghost"
-                size="sm"
-                :loading="controllingMaintenanceTaskId === `${selectedTask.id}:resume`"
-                @click="controlMaintenanceTask(selectedTask, 'resume', true)"
-              />
-              <UButton
-                v-if="selectedTask && canCancelTask(selectedTask)"
-                icon="i-tabler-ban"
-                label="取消任务"
-                color="error"
-                variant="ghost"
-                size="sm"
-                :loading="controllingMaintenanceTaskId === `${selectedTask.id}:cancel`"
-                @click="controlMaintenanceTask(selectedTask, 'cancel', true)"
-              />
-              <UButton label="维护记录" color="neutral" variant="soft" size="sm" @click="openMaintenanceTaskList" />
-              <UButton icon="i-tabler-x" color="neutral" variant="ghost" square size="sm" aria-label="关闭任务状态" @click="dismissSelectedTask" />
-            </template>
-            <template v-else>
-              <UCheckbox :model-value="isPageSelected" :indeterminate="isPageIndeterminate" aria-label="选择当前页素材" @update:model-value="togglePage" />
-              <template v-if="selectionCount">
-                <span class="text-sm text-default">已选 {{ selectionCount }}</span>
-                <UButton
-                  icon="i-tabler-refresh-dot"
-                  label="后台重建派生图"
-                  color="primary"
-                  variant="soft"
-                  size="sm"
-                  :loading="queueingSelectedRebuild"
-                  @click="queueSelectedRebuild"
-                />
-                <span class="text-xs text-muted">仅图片会处理，其它类型记录为未完成</span>
-                <span v-if="selectedRebuildError" role="alert" class="text-xs text-error">{{ selectedRebuildError }}</span>
-                <UButton label="取消选择" color="neutral" variant="ghost" size="sm" :disabled="queueingSelectedRebuild" @click="clearSelection" />
-              </template>
-              <span v-else class="text-xs">共 {{ totalAssets }} 个素材</span>
-            </template>
-          </template>
-          <template #pagination>
-            <USelect v-model="size" :items="pageSizeItems" value-key="value" size="sm" class="w-20" />
-            <ManagePagination v-model="page" :total-pages="totalAssetPages" class="!mt-0" />
-          </template>
-        </ManageCollectionDock>
+        <AssetMaintenanceDock
+          v-if="totalAssets > 0 || assets.length"
+          v-model:page="page"
+          v-model:page-size="size"
+          :total-pages="totalAssetPages"
+          :page-size-items="pageSizeItems"
+          :total="totalAssets"
+          :selected-count="selectionCount"
+          :page-selected="isPageSelected"
+          :page-indeterminate="isPageIndeterminate"
+          :queueing="queueingSelectedRebuild"
+          :queue-error="selectedRebuildError"
+          :task-id="selectedTaskId"
+          :task="selectedTask"
+          :controlling-task-id="controllingMaintenanceTaskId"
+          @toggle-page="togglePage"
+          @queue-selected="queueSelectedRebuild"
+          @clear-selection="clearSelection"
+          @task-action="controlSelectedTask"
+          @open-maintenance="openMaintenanceTaskList"
+          @dismiss-task="dismissSelectedTask"
+        />
       </section>
 
       <section v-else-if="tab === 'storage'" class="space-y-4">
