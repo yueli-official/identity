@@ -1,12 +1,6 @@
 <script setup lang="ts">
 import { ManageCollectionDock, ManagePagination } from '@platform/manage/components'
-
-interface MaintenanceTask {
-  id: string
-  status: 'queued' | 'running' | 'retrying' | 'paused' | 'completed' | 'failed' | 'cancelled'
-  payload?: string
-  result?: string
-}
+import type { AssetMaintenanceTask as MaintenanceTask } from '~/types/asset-admin'
 
 interface MaintenanceTaskError {
   id?: string

@@ -1,11 +1,8 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
 import {
-  ManageCollectionToolbar,
   ManageEmpty,
   ManageHeader,
-  ManageRowShell,
-  ManageViewToggle,
   SkeletonList
 } from '@platform/manage/components'
 import {
@@ -16,6 +13,30 @@ import {
 import { useManageCollectionState } from '@platform/manage/use-manage-collection-state'
 import { useManageSelection } from '@platform/manage/use-manage-selection'
 import { useMinLoading } from '@platform/ui/use-min-loading'
+import type {
+  AssetAdminSection,
+  AssetAdminStats as Stats,
+  AssetBatchRebuildResult as BatchRebuildResult,
+  AssetGrant as Grant,
+  AssetItem,
+  AssetMaintenanceTask as MaintenanceTask,
+  AssetMaintenanceTaskResult as MaintenanceTaskResult,
+  AssetOrphanObjectBackend as OrphanObjectBackend,
+  AssetOrphanObjectItem as OrphanObjectItem,
+  AssetOrphanObjectResult as OrphanObjectResult,
+  AssetProfile as Profile,
+  AssetPruneResult as PruneResult,
+  AssetReference,
+  AssetSite as Site,
+  AssetSpaceUsage,
+  AssetStorageBackend as StorageBackend,
+  AssetStorageBackendDetail as StorageBackendDetail,
+  AssetStorageBackendEvent as StorageBackendEvent,
+  AssetStorageMigrationResult as StorageMigrationResult,
+  AssetSweepResult as SweepResult,
+  AssetVariant as Variant,
+  CreatedAssetGrant as CreatedGrant
+} from '~/types/asset-admin'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
 useSeoMeta({ title: '资源管理 · 控制台' })
@@ -26,242 +47,8 @@ const route = useRoute()
 const router = useRouter()
 const ALL = '__all__'
 
-interface Stats {
-  assets: number
-  publicAssets: number
-  privateAssets: number
-  sites: number
-  profiles: number
-  activeGrants: number
-}
-interface Site {
-  siteKey: string
-  name: string
-  defaultStorageBackend: string
-  enabled: boolean
-  assetCount: number
-  profileCount: number
-  variantCount: number
-}
-interface StorageBackend {
-  name: string
-  type?: string
-  enabled: boolean
-  managed: boolean
-  isDefault: boolean
-  healthy: boolean
-  secretVersion: number
-  secretRotatedAt?: string
-  lastHealthOk?: boolean
-  lastHealthError?: string
-  lastHealthCheckedAt?: string
-  assetCount: number
-  siteCount: number
-  profileCount: number
-  error?: string
-}
-interface StorageBackendDetail {
-  name: string
-  type: string
-  enabled: boolean
-  endpoint: string
-  region: string
-  bucketPublic: string
-  bucketPrivate: string
-  accessKey: string
-  hasSecretKey: boolean
-  publicBaseUrl: string
-  pathStyle: boolean
-  useSsl: boolean
-  secretVersion: number
-  secretRotatedAt?: string
-  lastHealthOk?: boolean
-  lastHealthError?: string
-  lastHealthCheckedAt?: string
-}
-interface StorageBackendEvent {
-  id: string
-  backendName: string
-  eventType: string
-  status: 'ok' | 'error' | string
-  actor: string
-  message: string
-  metadata: string
-  createdAt: string
-}
-interface Profile {
-  siteKey: string
-  profileKey: string
-  purpose: string
-  storageBackend: string
-  allowedExt: string
-  maxSizeBytes: number
-  defaultVisibility: string
-  defaultDeliveryPolicy: string
-  keepOriginal: boolean
-  assetCount: number
-  variantCount: number
-}
-interface Variant {
-  id: string
-  siteKey: string
-  profileKey: string
-  variantKey: string
-  width: number
-  height: number
-  mode: string
-  format: string
-  quality: number
-  version: number
-  enabled: boolean
-}
-interface AssetItem {
-  id: string
-  visibility: string
-  filename: string
-  mime: string
-  size: number
-  width?: number
-  height?: number
-  category: string
-  spaceKey: string
-  siteKey: string
-  profileKey: string
-  deliveryPolicy: string
-  storageBackend: string
-  refCount: number
-  cdnUrl?: string
-  createdAt: string
-}
-interface AssetSpaceUsage {
-  spaceKey: string
-  assetCount: number
-  totalBytes: number
-}
-interface AssetReference {
-  id: string
-  assetId: string
-  siteKey: string
-  refType: string
-  refId: string
-  refLabel: string
-  refUrl: string
-  createdByService: string
-  createdAt: string
-}
-interface SweepResult {
-  backend: string
-  removed: number
-  skipped: boolean
-  error?: string
-}
-interface PruneError {
-  id: string
-  filename: string
-  error: string
-}
-interface PruneResult {
-  candidates: number
-  deleted: number
-  items: AssetItem[]
-  errors?: PruneError[]
-  task?: MaintenanceTask
-}
-interface BatchRebuildResult {
-  candidates: number
-  rebuilt: number
-  generated: number
-  items: AssetItem[]
-  errors?: PruneError[]
-  task?: MaintenanceTask
-}
-interface OrphanObjectItem {
-  key: string
-  size: number
-  modTime?: string
-}
-interface OrphanObjectBackend {
-  backend: string
-  scanned: number
-  expected: number
-  orphans: number
-  deleted: number
-  skipped: boolean
-  error?: string
-  items: OrphanObjectItem[]
-  errors?: { key: string, error: string }[]
-}
-interface OrphanObjectResult {
-  items: OrphanObjectBackend[]
-  orphans: number
-  deleted: number
-  task?: MaintenanceTask
-}
-interface StorageMigrationResult {
-  candidates: number
-  migrated: number
-  items: AssetItem[]
-  errors?: PruneError[]
-  task?: MaintenanceTask
-}
-interface MaintenanceTask {
-  id: string
-  taskType: string
-  status: 'queued' | 'running' | 'retrying' | 'paused' | 'completed' | 'failed' | 'cancelled'
-  dryRun: boolean
-  summary: string
-  payload?: string
-  result?: string
-  attempts: number
-  maxAttempts: number
-  error?: string
-  nextRunAt?: string
-  lockedAt?: string
-  lockedBy?: string
-  startedAt?: string
-  finishedAt?: string
-  createdAt: string
-}
-interface MaintenanceTaskError {
-  id?: string
-  filename?: string
-  error: string
-}
-interface MaintenanceTaskResult {
-  candidates?: number
-  rebuilt?: number
-  generated?: number
-  errors?: MaintenanceTaskError[]
-  lastAsset?: string
-}
-interface Grant {
-  id: string
-  assetId: string
-  variantKey: string
-  siteKey: string
-  subjectId: string
-  policy: string
-  purpose: string
-  expiresAt: string
-  maxUses: number
-  usedCount: number
-  firstUsedAt?: string
-  lastUsedAt?: string
-  revokedAt?: string
-  revokedBy?: string
-  createdByService: string
-  reason: string
-  createdAt: string
-}
-interface CreatedGrant {
-  grantId: string
-  url: string
-  expiresAt: string
-}
-
 const mounted = ref(false)
 const loading = ref(true)
-type AssetAdminSection = 'library' | 'sites' | 'profiles' | 'storage' | 'maintenance' | 'grants'
 const collectionDefinition = {
   resourceKind: 'asset',
   statuses: [''],
@@ -409,19 +196,13 @@ let maintenanceTasksPollTimer: ReturnType<typeof setInterval> | undefined
 let maintenanceTasksPollInFlight = false
 let maintenanceTasksPollErrorShown = false
 
-function toggleSortDirection() {
-  direction.value = direction.value === 'desc' ? 'asc' : 'desc'
-}
-
 const selectionResetKey = computed(() => manageCollectionQueryFingerprint(
   serializeManageCollectionQuery(collectionState.value, collectionDefinition)
 ))
 const {
   selectedIds,
-  selectionCount,
   isPageSelected,
   isPageIndeterminate,
-  isSelected,
   toggleOne,
   togglePage,
   clear: clearSelection
@@ -1522,129 +1303,48 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
     <SkeletonList v-if="showSkeleton" :rows="8" />
 
     <template v-else>
-      <section v-if="tab === 'library'" class="space-y-4">
-        <ManageCollectionToolbar
-          v-model:search="searchInput"
-          search-placeholder="搜索文件名、标题、替代文本或 ID…"
-          :filter-count="activeLibraryFilterCount"
-        >
-          <template #filters>
-            <USelectMenu v-model="spaceKey" :items="spaceOptions" value-key="value" :search-input="{ placeholder: '搜索资源空间…' }" />
-            <USelectMenu v-model="siteKey" :items="siteOptions" value-key="value" :search-input="{ placeholder: '搜索站点…' }" />
-            <USelectMenu v-model="profileKey" :items="profileOptions" value-key="value" :search-input="{ placeholder: '搜索 Profile…' }" />
-            <USelect v-model="visibility" :items="visibilityOptions" value-key="value" />
-            <USelect v-model="mime" :items="mimeOptions" value-key="value" />
-            <USelect v-model="sort" :items="sortOptions" value-key="value" icon="i-tabler-arrows-sort" />
-            <UButton
-              :icon="direction === 'desc' ? 'i-tabler-sort-descending' : 'i-tabler-sort-ascending'"
-              :label="direction === 'desc' ? '降序' : '升序'"
-              color="neutral"
-              variant="outline"
-              @click="toggleSortDirection"
-            />
-          </template>
-          <template #actions>
-            <ManageViewToggle v-model="libraryView" :items="[
-              { key: 'grid', label: '网格', icon: 'i-tabler-layout-grid' },
-              { key: 'list', label: '列表', icon: 'i-tabler-list' }
-            ]" />
-          </template>
-        </ManageCollectionToolbar>
-
-        <ManageEmpty v-if="!assets.length" icon="i-tabler-photo-off" text="没有匹配的资源" />
-        <div v-else-if="libraryView === 'grid'" class="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(14rem,100%),1fr))]">
-          <article
-            v-for="asset in assets"
-            :key="asset.id"
-            class="group relative overflow-hidden rounded-xl border border-default bg-default transition hover:-translate-y-0.5 hover:shadow-sm"
-            :class="isSelected(asset.id) ? 'ring-2 ring-primary' : ''"
-          >
-            <div class="relative aspect-[4/3] overflow-hidden border-b border-default bg-elevated">
-              <img v-if="asset.cdnUrl && asset.mime.startsWith('image/')" :src="asset.cdnUrl" :alt="asset.filename" class="size-full object-cover transition duration-300 group-hover:scale-[1.03]">
-              <div v-else class="grid size-full place-items-center">
-                <UIcon name="i-tabler-file" class="size-9 text-muted" />
-              </div>
-              <UCheckbox
-                class="absolute left-2 top-2 rounded-md bg-default/90 p-1 backdrop-blur"
-                :model-value="isSelected(asset.id)"
-                :aria-label="`选择素材：${asset.filename || asset.id}`"
-                @update:model-value="toggleOne(asset.id)"
-              />
-              <UDropdownMenu :items="assetActions(asset)">
-                <UButton icon="i-tabler-dots-vertical" color="neutral" variant="solid" square size="xs" class="absolute right-2 top-2" :aria-label="`素材操作：${asset.filename || asset.id}`" />
-              </UDropdownMenu>
-            </div>
-            <div class="min-w-0 p-3">
-              <h2 class="truncate text-sm font-semibold text-highlighted">{{ asset.filename || asset.id }}</h2>
-              <p class="mt-1 truncate text-xs text-muted">{{ siteName(asset.siteKey) }} · {{ asset.profileKey || 'default' }}</p>
-              <div class="mt-3 flex items-end justify-between gap-3 border-t border-default pt-2.5 text-xs text-muted">
-                <div class="min-w-0">
-                  <p class="truncate">{{ formatBytes(asset.size) }}<span v-if="asset.width && asset.height"> · {{ asset.width }}×{{ asset.height }}</span></p>
-                  <p class="mt-0.5 truncate">{{ asset.storageBackend || 'local' }}</p>
-                </div>
-                <span v-if="asset.refCount" class="shrink-0 text-warning">{{ asset.refCount }} 引用</span>
-              </div>
-            </div>
-          </article>
-        </div>
-
-        <div v-else class="overflow-hidden rounded-lg border border-default bg-default">
-          <ManageRowShell
-            v-for="asset in assets"
-            :key="asset.id"
-            :selected="isSelected(asset.id)"
-            :selection-label="`选择素材：${asset.filename || asset.id}`"
-            @select="toggleOne(asset.id)"
-          >
-            <template #media>
-              <div class="grid size-14 shrink-0 place-items-center overflow-hidden rounded-lg bg-elevated">
-                <img v-if="asset.cdnUrl && asset.mime.startsWith('image/')" :src="asset.cdnUrl" :alt="asset.filename" class="size-full object-cover">
-                <UIcon v-else name="i-tabler-file" class="size-5 text-muted" />
-              </div>
-            </template>
-            <div class="min-w-0">
-              <p class="truncate text-sm font-semibold text-highlighted">{{ asset.filename || asset.id }}</p>
-              <p class="mt-0.5 truncate text-xs text-muted">{{ asset.mime }} · {{ formatBytes(asset.size) }}<span v-if="asset.width && asset.height"> · {{ asset.width }}×{{ asset.height }}</span></p>
-              <p class="mt-1 truncate text-xs text-dimmed">空间 {{ asset.spaceKey || 'default' }} · {{ siteName(asset.siteKey) }} / {{ asset.profileKey }}</p>
-            </div>
-            <template #meta>
-              <div class="min-w-0 text-xs md:w-44 md:text-right">
-                <p class="truncate text-default">{{ asset.storageBackend || 'local' }}</p>
-                <p class="mt-0.5 truncate text-muted">{{ asset.visibility }} · {{ asset.deliveryPolicy || 'public' }}</p>
-                <p v-if="asset.refCount" class="mt-1 text-warning">{{ asset.refCount }} 个引用</p>
-              </div>
-            </template>
-            <template #actions>
-              <UDropdownMenu :items="assetActions(asset)">
-                <UButton icon="i-tabler-dots-vertical" color="neutral" variant="ghost" square size="sm" :aria-label="`素材操作：${asset.filename || asset.id}`" />
-              </UDropdownMenu>
-            </template>
-          </ManageRowShell>
-        </div>
-
-        <AssetMaintenanceDock
-          v-if="totalAssets > 0 || assets.length"
-          v-model:page="page"
-          v-model:page-size="size"
-          :total-pages="totalAssetPages"
-          :page-size-items="pageSizeItems"
-          :total="totalAssets"
-          :selected-count="selectionCount"
-          :page-selected="isPageSelected"
-          :page-indeterminate="isPageIndeterminate"
-          :queueing="queueingSelectedRebuild"
-          :queue-error="selectedRebuildError"
-          :task-id="selectedTaskId"
-          :task="selectedTask"
-          :controlling-task-id="controllingMaintenanceTaskId"
-          @toggle-page="togglePage"
-          @queue-selected="queueSelectedRebuild"
-          @clear-selection="clearSelection"
-          @task-action="controlSelectedTask"
-          @open-maintenance="openMaintenanceTaskList"
-          @dismiss-task="dismissSelectedTask"
-        />
-      </section>
+      <AssetLibraryPanel
+        v-if="tab === 'library'"
+        v-model:search="searchInput"
+        v-model:space-key="spaceKey"
+        v-model:site-key="siteKey"
+        v-model:profile-key="profileKey"
+        v-model:visibility="visibility"
+        v-model:mime="mime"
+        v-model:sort="sort"
+        v-model:direction="direction"
+        v-model:view="libraryView"
+        v-model:page="page"
+        v-model:page-size="size"
+        :assets="assets"
+        :total="totalAssets"
+        :filter-count="activeLibraryFilterCount"
+        :space-options="spaceOptions"
+        :site-options="siteOptions"
+        :profile-options="profileOptions"
+        :visibility-options="visibilityOptions"
+        :mime-options="mimeOptions"
+        :sort-options="sortOptions"
+        :selected-ids="selectedIds"
+        :page-selected="isPageSelected"
+        :page-indeterminate="isPageIndeterminate"
+        :page-size-items="pageSizeItems"
+        :total-pages="totalAssetPages"
+        :sites="sites"
+        :queueing="queueingSelectedRebuild"
+        :queue-error="selectedRebuildError"
+        :task-id="selectedTaskId"
+        :task="selectedTask"
+        :controlling-task-id="controllingMaintenanceTaskId"
+        :actions-for="assetActions"
+        @toggle-one="toggleOne"
+        @toggle-page="togglePage"
+        @queue-selected="queueSelectedRebuild"
+        @clear-selection="clearSelection"
+        @task-action="controlSelectedTask"
+        @open-maintenance="openMaintenanceTaskList"
+        @dismiss-task="dismissSelectedTask"
+      />
 
       <section v-else-if="tab === 'storage'" class="space-y-4">
         <div class="rounded-lg border border-default bg-default p-4">
