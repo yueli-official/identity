@@ -53,10 +53,10 @@ func main() {
 	accountBaseURL := g.Cfg().MustGet(ctx, "account.baseUrl", "http://localhost:3000").String()
 	assetBaseURL := g.Cfg().MustGet(ctx, "asset.baseUrl", "http://localhost:8082").String()
 	assetAudience := g.Cfg().MustGet(ctx, "asset.audience").String()
-	commerceBaseURL := g.Cfg().MustGet(ctx, "commerce.baseUrl", "http://localhost:8084").String()
-	commerceAudience := g.Cfg().MustGet(ctx, "commerce.audience", "commerce-api").String()
-	notificationBaseURL := g.Cfg().MustGet(ctx, "notification.baseUrl", "http://localhost:8089").String()
-	notificationAudience := g.Cfg().MustGet(ctx, "notification.audience", "notification-api").String()
+	commerceBaseURL := g.Cfg().MustGet(ctx, "commerce.baseUrl").String()
+	commerceAudience := g.Cfg().MustGet(ctx, "commerce.audience").String()
+	notificationBaseURL := g.Cfg().MustGet(ctx, "notification.baseUrl").String()
+	notificationAudience := g.Cfg().MustGet(ctx, "notification.audience").String()
 
 	// ── Data layer ──────────────────────────────────────────────────────────
 	daoPG := dao.NewPG(g.DB())
@@ -210,11 +210,16 @@ func main() {
 	// behalf of the cookie-authenticated caller (mints a short-lived user token).
 	avatarCtl := controller.NewAvatar(svc, mgr, assetclient.New(assetBaseURL), issuer, assetAudience)
 	assetAdminProxy := controller.NewAssetAdminProxy(authCtl, mgr, issuer, assetBaseURL, assetAudience)
-	platformCapabilityProxy, err := controller.NewPlatformCapabilityProxy(authCtl, mgr, issuer, map[string]controller.CapabilityProxyTarget{
-		"asset":        {BaseURL: assetBaseURL, Audience: assetAudience},
-		"commerce":     {BaseURL: commerceBaseURL, Audience: commerceAudience},
-		"notification": {BaseURL: notificationBaseURL, Audience: notificationAudience},
-	})
+	capabilityTargets := map[string]controller.CapabilityProxyTarget{
+		"asset": {BaseURL: assetBaseURL, Audience: assetAudience},
+	}
+	if commerceBaseURL != "" || commerceAudience != "" {
+		capabilityTargets["commerce"] = controller.CapabilityProxyTarget{BaseURL: commerceBaseURL, Audience: commerceAudience}
+	}
+	if notificationBaseURL != "" || notificationAudience != "" {
+		capabilityTargets["notification"] = controller.CapabilityProxyTarget{BaseURL: notificationBaseURL, Audience: notificationAudience}
+	}
+	platformCapabilityProxy, err := controller.NewPlatformCapabilityProxy(authCtl, mgr, issuer, capabilityTargets)
 	if err != nil {
 		panic(fmt.Sprintf("platform capability proxy: %v", err))
 	}
