@@ -10,7 +10,9 @@ export default defineNuxtConfig({
     // a relative /api on the server falls through to the SPA catch-all. Hitting
     // the backend by absolute URL fixes SSR auth (hard loads / deep links).
     // Override in prod with NUXT_API_BASE.
-    apiBase: process.env.NUXT_API_BASE || 'http://127.0.0.1:8081'
+    apiBase: process.env.NUXT_API_BASE || 'http://127.0.0.1:8081',
+    platformCatalogFingerprint: process.env.NUXT_PLATFORM_CATALOG_FINGERPRINT || 'local-unversioned',
+    platformEnvironment: process.env.NUXT_PLATFORM_ENVIRONMENT || 'local'
   },
   // Dev-only proxy to the Go backend so the app is same-origin in `nuxt dev`.
   // In Nuxt 4 this lives under `nitro.devProxy` (the top-level `devProxy`

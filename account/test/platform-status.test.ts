@@ -1,0 +1,89 @@
+import { describe, expect, it } from 'vitest'
+import { aggregatePlatformServices, capabilityManifestSchema, classifyPlatformServiceFailure, manifestAgeSeconds, parsePlatformManifest, platformProbeFailureStatus } from '../server/utils/platform-status'
+import type { PlatformServiceResult } from '../shared/types/platform'
+
+function envelope(value = manifest()) {
+  return { code: 'ok', data: { manifest: value } }
+}
+
+function manifest() {
+  return {
+    apiVersion: 'platform.yueli.dev/service-capability-manifest/v1',
+    kind: 'ServiceCapabilityManifest',
+    service: { name: 'asset', version: 'test', buildSha: 'sha', deployment: 'asset-test' },
+    generatedAt: '2026-07-12T00:00:00Z',
+    redaction: { policy: 'presence-only', version: '1' },
+    capabilities: [{
+      key: 'asset.object-storage', contractVersion: '1.0', support: 'supported',
+      configuration: 'complete', enablement: 'enabled', health: 'healthy', effective: true,
+      operations: ['put'], requiredConfig: [{ key: 'secret_key', state: 'present', secret: true }], links: [],
+    }],
+    providers: [], links: [],
+  }
+}
+
+describe('platform capability BFF schema', () => {
+  it('accepts a strict Manifest v1 response', () => {
+    const parsed = capabilityManifestSchema.parse(manifest())
+    expect(parsed.capabilities[0]?.requiredConfig[0]).toEqual({ key: 'secret_key', state: 'present', secret: true })
+  })
+
+  it('rejects undeclared config values instead of forwarding them', () => {
+    const value = manifest()
+    Object.assign(value.capabilities[0]!.requiredConfig[0]!, { value: 'must-not-pass' })
+    expect(capabilityManifestSchema.safeParse(value).success).toBe(false)
+  })
+
+  it('rejects incompatible manifest versions', () => {
+    const value = manifest()
+    value.apiVersion = 'platform.yueli.dev/service-capability-manifest/v2'
+    expect(capabilityManifestSchema.safeParse(value).success).toBe(false)
+  })
+
+  it('rejects a manifest returned by the wrong service', () => {
+    expect(parsePlatformManifest('identity', envelope())).toBeUndefined()
+  })
+
+  it('rejects invalid snapshot and provider timestamps', () => {
+    const snapshot = manifest()
+    snapshot.generatedAt = 'yesterday'
+    expect(capabilityManifestSchema.safeParse(snapshot).success).toBe(false)
+
+    const runtime = manifest()
+    Object.assign(runtime.capabilities[0], { lastCheckedAt: 'soon' })
+    Object.assign(runtime.capabilities[0]!.requiredConfig[0], { rotatedAt: 'recently' })
+    expect(capabilityManifestSchema.safeParse(runtime).success).toBe(false)
+  })
+
+  it('computes stable snapshot age and clamps future timestamps', () => {
+    expect(manifestAgeSeconds('2026-07-12T00:00:00Z', Date.parse('2026-07-12T00:01:40Z'))).toBe(100)
+    expect(manifestAgeSeconds('2026-07-12T00:01:40Z', Date.parse('2026-07-12T00:00:00Z'))).toBe(0)
+  })
+
+  it('keeps partial results and starts all service reads concurrently', async () => {
+    const started: string[] = []
+    const pending = new Map<string, (value: PlatformServiceResult) => void>()
+    const result = aggregatePlatformServices(key => new Promise((resolve) => {
+      started.push(key)
+      pending.set(key, resolve)
+    }))
+    expect(started).toEqual(['identity', 'asset', 'commerce', 'notification'])
+    for (const [key, resolve] of pending) {
+      resolve({
+        key: key as PlatformServiceResult['key'],
+        status: key === 'commerce' ? 'unavailable' : 'available',
+        observedAt: '2026-07-12T00:00:00Z',
+        latencyMs: 1,
+        ...(key === 'commerce' ? { error: { code: 'unavailable', message: 'deadline' } } : { manifest: manifest() }),
+      })
+    }
+    expect((await result).map(item => item.status)).toEqual(['available', 'available', 'unavailable', 'available'])
+  })
+
+  it('preserves forbidden, timeout, rate-limit, and probe failure semantics', () => {
+    expect(classifyPlatformServiceFailure(Object.assign(new Error('denied'), { statusCode: 403 })).status).toBe('forbidden')
+    expect(classifyPlatformServiceFailure(Object.assign(new Error('deadline'), { statusCode: 504 })).status).toBe('unavailable')
+    expect(platformProbeFailureStatus(Object.assign(new Error('limited'), { response: { status: 429 } }))).toBe(429)
+    expect(platformProbeFailureStatus(new Error('audit failed'))).toBe(502)
+  })
+})

@@ -18,6 +18,7 @@ const userItems = computed(() => [
   ]
 ])
 const navItems = [
+  { label: '平台', to: '/admin/platform', icon: 'i-tabler-activity-heartbeat' },
   { label: '用户', to: '/admin/users', icon: 'i-tabler-users' },
   { label: '资源', to: '/admin/assets', icon: 'i-tabler-photo-cog' }
 ]
@@ -29,7 +30,7 @@ const navItems = [
       <div class="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 lg:px-6">
         <div class="flex items-center gap-2">
           <NuxtLink
-            to="/admin/users"
+            to="/admin/platform"
             class="font-display flex items-center gap-2 text-base font-semibold text-highlighted"
           >
             <span class="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary">
