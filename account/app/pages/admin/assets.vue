@@ -475,14 +475,6 @@ function siteDefaultBackend(key: string) {
     || 'local'
 }
 
-function profileStorageText(profile: Profile) {
-  return profile.storageBackend || `继承 ${siteDefaultBackend(profile.siteKey)}`
-}
-
-function profileAccessText(profile: Profile) {
-  return profile.defaultVisibility === 'private' ? '私有签名链接' : '公开直链'
-}
-
 const siteOpen = ref(false)
 const siteForm = reactive<Site>({
   siteKey: '',
@@ -1112,17 +1104,6 @@ function formatBytes(n: number) {
 function briefDate(s: string) {
   return s ? s.replace('T', ' ').slice(0, 16) : '-'
 }
-function variantsFor(p: Profile) {
-  return variants.value.filter(v => v.siteKey === p.siteKey && v.profileKey === p.profileKey)
-}
-function siteName(key: string) {
-  return sites.value.find(s => s.siteKey === key)?.name || key
-}
-function siteActions(site: Site): DropdownMenuItem[][] {
-  return [[
-    { label: '编辑站点', icon: 'i-tabler-pencil', onSelect: () => editSite(site) }
-  ]]
-}
 function profileActions(profile: Profile): DropdownMenuItem[][] {
   const inUse = profile.assetCount > 0 || profile.variantCount > 0
   return [[
@@ -1152,16 +1133,6 @@ function grantStatus(grant: Grant): { label: string, color: 'success' | 'warning
   if (grant.expiresAt && new Date(grant.expiresAt).getTime() <= Date.now()) return { label: '已过期', color: 'warning' }
   if (grant.maxUses > 0 && grant.usedCount >= grant.maxUses) return { label: '已用完', color: 'warning' }
   return { label: '有效', color: 'success' }
-}
-function grantPurposeLabel(grant: Grant) {
-  return grant.purpose || 'delivery'
-}
-function grantLastUsedText(grant: Grant) {
-  return grant.lastUsedAt ? `最近 ${briefDate(grant.lastUsedAt)}` : '尚未使用'
-}
-function grantAuditText(grant: Grant) {
-  if (grant.revokedBy) return `撤销 ${grant.revokedBy}`
-  return grant.createdByService ? `签发 ${grant.createdByService}` : '系统签发'
 }
 function canRevokeGrant(grant: Grant) {
   return grantStatus(grant).label === '有效'
@@ -1293,33 +1264,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
         @dismiss-task="dismissSelectedTask"
       />
 
-      <section v-else-if="tab === 'storage'" class="space-y-4">
-        <div class="rounded-lg border border-default bg-default p-4">
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <h2 class="text-sm font-semibold text-highlighted">存储后端</h2>
-              <p class="mt-1 text-xs text-muted">站点上传会落到自己的默认后端；不存在的后端不能保存。</p>
-            </div>
-            <div class="flex items-center gap-2">
-              <UBadge :label="`${storageBackends.length} 个可用`" color="neutral" variant="soft" />
-            </div>
-          </div>
-          <ManageEmpty v-if="!storageBackends.length" icon="i-tabler-database-off" text="还没有存储后端" />
-          <div v-else class="mt-3 flex flex-wrap gap-2">
-            <UButton
-              v-for="backend in storageBackends"
-              :key="backend.name"
-              :label="`${backend.name}${backend.type ? ` · ${backend.type}` : ''}${backend.isDefault ? ' · 默认' : ''}${backend.enabled === false ? ' · 停用' : ''} · ${backend.assetCount || 0} 素材 / ${backend.siteCount || 0} 站点 / ${backend.profileCount || 0} Profile${backend.healthy ? '' : ' · 异常'}`"
-              :color="backend.enabled === false ? 'neutral' : (backend.healthy ? (backend.isDefault ? 'primary' : 'neutral') : 'error')"
-              :icon="backend.managed ? 'i-tabler-pencil' : 'i-tabler-database'"
-              variant="soft"
-              size="xs"
-              :disabled="!backend.managed"
-              @click="editStorageBackend(backend)"
-            />
-          </div>
-        </div>
-      </section>
+      <AssetStoragePanel v-else-if="tab === 'storage'" :backends="storageBackends" @edit="editStorageBackend" />
 
       <AssetMaintenancePanel
         v-else-if="tab === 'maintenance'"
@@ -1335,141 +1280,26 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
         @control="controlMaintenanceTask"
       />
 
-      <section v-else-if="tab === 'sites'" class="space-y-4">
-        <div>
-          <h2 class="text-sm font-semibold text-highlighted">站点</h2>
-          <p class="mt-1 text-xs text-muted">每个站点拥有自己的默认存储后端和 Profile/Variant 计数。</p>
-        </div>
-        <ManageEmpty v-if="!sites.length" icon="i-tabler-world-off" text="还没有站点配置" />
-        <div v-else class="grid gap-3 lg:grid-cols-2">
-          <div v-for="site in sites" :key="site.siteKey" class="rounded-lg border border-default bg-default p-4">
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <div class="flex items-center gap-2">
-                  <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-                    <UIcon name="i-tabler-world" class="size-4" />
-                  </span>
-                  <div class="min-w-0">
-                    <h3 class="truncate text-sm font-semibold text-highlighted">{{ site.name }}</h3>
-                    <p class="truncate font-mono text-xs text-muted">{{ site.siteKey }}</p>
-                  </div>
-                </div>
-              </div>
-              <div class="flex items-center gap-2">
-                <UBadge :label="site.enabled ? '启用' : '停用'" :color="site.enabled ? 'success' : 'neutral'" variant="soft" />
-                <UDropdownMenu :items="siteActions(site)">
-                  <UButton icon="i-tabler-dots-vertical" color="neutral" variant="ghost" square size="xs" />
-                </UDropdownMenu>
-              </div>
-            </div>
-            <div class="mt-4 grid grid-cols-3 gap-2 text-xs">
-              <div class="rounded-md bg-elevated/40 px-3 py-2">
-                <div class="text-muted">素材</div>
-                <div class="mt-0.5 font-semibold text-highlighted tabular-nums">{{ site.assetCount }}</div>
-              </div>
-              <div class="rounded-md bg-elevated/40 px-3 py-2">
-                <div class="text-muted">Profile</div>
-                <div class="mt-0.5 font-semibold text-highlighted tabular-nums">{{ site.profileCount }}</div>
-              </div>
-              <div class="rounded-md bg-elevated/40 px-3 py-2">
-                <div class="text-muted">Variant</div>
-                <div class="mt-0.5 font-semibold text-highlighted tabular-nums">{{ site.variantCount }}</div>
-              </div>
-            </div>
-            <div class="mt-3 text-xs text-muted">默认后端 <span class="font-mono text-default">{{ site.defaultStorageBackend }}</span></div>
-          </div>
-        </div>
+      <AssetSitesPanel v-else-if="tab === 'sites'" :sites="sites" @edit="editSite" />
 
-      </section>
+      <AssetProfilesPanel
+        v-else-if="tab === 'profiles'"
+        :profiles="profiles"
+        :variants="variants"
+        :sites="sites"
+        :profile-actions="profileActions"
+        :variant-actions="variantActions"
+        @add-variant="profile => editVariant(undefined, profile)"
+      />
 
-      <section v-else-if="tab === 'profiles'" class="space-y-4">
-        <div>
-          <h2 class="text-sm font-semibold text-highlighted">Profile 与派生规格</h2>
-          <p class="mt-1 text-xs text-muted">按站点管理上传用途、文件限制、访问级别和命名派生规格。</p>
-        </div>
-
-        <ManageEmpty v-if="!profiles.length" icon="i-tabler-folder-off" text="还没有 Profile" />
-        <div v-else class="grid gap-4 lg:grid-cols-2">
-          <div v-for="profile in profiles" :key="`${profile.siteKey}:${profile.profileKey}`" class="rounded-lg border border-default bg-default">
-            <div class="flex items-start justify-between gap-3 border-b border-default p-4">
-              <div class="min-w-0">
-                <div class="flex items-center gap-2">
-                  <UIcon name="i-tabler-folder-cog" class="size-4 text-primary" />
-                  <h3 class="truncate text-sm font-semibold text-highlighted">{{ profile.profileKey }}</h3>
-                </div>
-                <p class="mt-1 text-xs text-muted">{{ siteName(profile.siteKey) }} · {{ profile.purpose || '未填写用途' }}</p>
-              </div>
-              <div class="flex items-center gap-2">
-                <UBadge :label="`${profile.assetCount} 素材`" color="neutral" variant="soft" />
-                <UDropdownMenu :items="profileActions(profile)">
-                  <UButton icon="i-tabler-dots-vertical" color="neutral" variant="ghost" square size="xs" />
-                </UDropdownMenu>
-              </div>
-            </div>
-            <div class="space-y-3 p-4 text-sm">
-              <div class="grid grid-cols-2 gap-3 text-xs text-muted">
-                <div>类型 <span class="text-default">{{ profile.allowedExt }}</span></div>
-                <div>上限 <span class="text-default">{{ formatBytes(profile.maxSizeBytes) }}</span></div>
-                <div>后端 <span class="text-default">{{ profileStorageText(profile) }}</span></div>
-                <div>访问级别 <span class="text-default">{{ profileAccessText(profile) }}</span></div>
-              </div>
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-medium text-muted">Variant · {{ profile.variantCount }}</span>
-                <UButton icon="i-tabler-plus" label="添加" color="neutral" variant="soft" size="xs" @click="editVariant(undefined, profile)" />
-              </div>
-              <div v-if="!variantsFor(profile).length" class="rounded-md border border-dashed border-default px-3 py-2 text-xs text-muted">还没有派生规格。</div>
-              <div v-else class="space-y-1.5">
-                <div
-                  v-for="variant in variantsFor(profile)"
-                  :key="variant.id"
-                  class="flex items-center justify-between rounded-md bg-elevated/40 px-3 py-2 text-xs"
-                >
-                  <span class="font-medium text-default">{{ variant.variantKey }}</span>
-                  <span class="text-muted">{{ variant.width }}x{{ variant.height }} · {{ variant.mode }} · v{{ variant.version }}</span>
-                  <UDropdownMenu :items="variantActions(variant)">
-                    <UButton icon="i-tabler-dots" color="neutral" variant="ghost" size="xs" />
-                  </UDropdownMenu>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section v-else-if="tab === 'grants'" class="space-y-4">
-        <ManageEmpty v-if="!grants.length" icon="i-tabler-key-off" text="还没有交付授权" />
-        <div v-else class="overflow-hidden rounded-lg border border-default bg-default">
-          <div v-for="grant in grants" :key="grant.id" class="flex items-center gap-4 border-b border-default px-4 py-3 last:border-b-0">
-            <span class="grid size-10 place-items-center rounded-lg bg-primary/10 text-primary">
-              <UIcon name="i-tabler-key" class="size-5" />
-            </span>
-            <div class="min-w-0 flex-1">
-              <div class="truncate text-sm font-medium text-highlighted">{{ grant.reason || grant.policy }}</div>
-              <div class="mt-0.5 truncate font-mono text-xs text-muted">{{ grant.assetId }}</div>
-            </div>
-            <div class="hidden text-right text-xs text-muted sm:block">
-              <div>{{ grant.usedCount }} / {{ grant.maxUses }}</div>
-              <div>过期 {{ briefDate(grant.expiresAt) }}</div>
-              <div>{{ grantLastUsedText(grant) }}</div>
-              <div class="truncate">{{ grantAuditText(grant) }}</div>
-            </div>
-            <UBadge :label="grantStatus(grant).label" :color="grantStatus(grant).color" variant="soft" />
-            <UBadge :label="grantPurposeLabel(grant)" color="info" variant="soft" />
-            <UBadge :label="grant.policy" color="neutral" variant="soft" />
-            <UDropdownMenu :items="grantActions(grant)">
-              <UButton icon="i-tabler-dots-vertical" color="neutral" variant="ghost" square size="xs" />
-            </UDropdownMenu>
-          </div>
-        </div>
-        <div class="flex items-center justify-between text-sm text-muted">
-          <span>共 {{ totalGrants }} 条授权</span>
-          <div class="flex items-center gap-2">
-            <UButton icon="i-tabler-chevron-left" color="neutral" variant="ghost" :disabled="grantPage <= 1" @click="() => { grantPage-- }" />
-            <span>{{ grantPage }}</span>
-            <UButton icon="i-tabler-chevron-right" color="neutral" variant="ghost" :disabled="grantPage * GRANT_PAGE_SIZE >= totalGrants" @click="() => { grantPage++ }" />
-          </div>
-        </div>
-      </section>
+      <AssetGrantsPanel
+        v-else-if="tab === 'grants'"
+        v-model:page="grantPage"
+        :grants="grants"
+        :total="totalGrants"
+        :page-size="GRANT_PAGE_SIZE"
+        :actions-for="grantActions"
+      />
     </template>
 
     <UModal v-model:open="profileOpen" title="Profile 配置">
