@@ -2,7 +2,7 @@
 import { ManageEmpty } from '@platform/manage/components'
 import type { AssetStorageBackend } from '~/types/asset-admin'
 
-defineProps<{ backends: AssetStorageBackend[] }>()
+defineProps<{ backends: readonly AssetStorageBackend[] }>()
 const emit = defineEmits<{ edit: [backend: AssetStorageBackend] }>()
 
 function health(backend: AssetStorageBackend) {

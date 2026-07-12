@@ -15,7 +15,7 @@ const props = withDefaults(defineProps<{
   initialValue: AssetStorageBackendForm
   editingName?: string
   detail?: AssetStorageBackendDetail | null
-  events?: AssetStorageBackendEvent[]
+  events?: readonly AssetStorageBackendEvent[]
   typeOptions: SelectOption[]
   loading?: boolean
   saving?: boolean
