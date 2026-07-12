@@ -55,6 +55,21 @@ export interface AssetStorageBackendDetail {
   lastHealthCheckedAt?: string
 }
 
+export interface AssetStorageBackendForm {
+  name: string
+  type: string
+  enabled: boolean
+  endpoint: string
+  region: string
+  bucketPublic: string
+  bucketPrivate: string
+  accessKey: string
+  secretKey: string
+  publicBaseUrl: string
+  pathStyle: boolean
+  useSsl: boolean
+}
+
 export interface AssetStorageBackendEvent {
   id: string
   backendName: string

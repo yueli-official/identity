@@ -32,6 +32,7 @@ import type {
   AssetStorageBackend as StorageBackend,
   AssetStorageBackendDetail as StorageBackendDetail,
   AssetStorageBackendEvent as StorageBackendEvent,
+  AssetStorageBackendForm as StorageBackendForm,
   AssetStorageMigrationResult as StorageMigrationResult,
   AssetSweepResult as SweepResult,
   AssetVariant as Variant,
@@ -517,10 +518,9 @@ const storageBackendEvents = ref<StorageBackendEvent[]>([])
 const checkingStorageBackend = ref(false)
 const rotatingStorageBackend = ref(false)
 const rotateStorageBackendOpen = ref(false)
-const rotateStorageBackendSecret = ref('')
 const deleteStorageBackendOpen = ref(false)
 const deletingStorageBackend = ref(false)
-const storageBackendForm = reactive({
+const storageBackendForm = reactive<StorageBackendForm>({
   name: '',
   type: 's3',
   enabled: true,
@@ -559,7 +559,6 @@ async function editStorageBackend(backend?: StorageBackend) {
   storageBackendEditingName.value = backend?.managed ? backend.name : ''
   storageBackendDetail.value = null
   storageBackendEvents.value = []
-  rotateStorageBackendSecret.value = ''
   assignStorageBackendForm({
     name: backend?.name || '',
     type: backend?.type || 's3',
@@ -579,7 +578,8 @@ async function editStorageBackend(backend?: StorageBackend) {
     loadingStorageBackend.value = false
   }
 }
-async function saveStorageBackend() {
+async function saveStorageBackend(value: StorageBackendForm) {
+  Object.assign(storageBackendForm, value)
   savingStorageBackend.value = true
   try {
     await call('/api/v1/admin/assets-proxy/storage-backends', { method: 'POST', body: storageBackendForm })
@@ -638,16 +638,15 @@ async function checkStorageBackendHealth() {
     checkingStorageBackend.value = false
   }
 }
-async function confirmRotateStorageBackendSecret() {
-  if (!storageBackendEditingName.value || !rotateStorageBackendSecret.value) return
+async function confirmRotateStorageBackendSecret(secret: string) {
+  if (!storageBackendEditingName.value || !secret) return
   rotatingStorageBackend.value = true
   try {
     const data = await call<{ backend: StorageBackendDetail }>(
       `/api/v1/admin/assets-proxy/storage-backends/${encodeURIComponent(storageBackendEditingName.value)}/rotate-secret`,
-      { method: 'POST', body: { secretKey: rotateStorageBackendSecret.value } }
+      { method: 'POST', body: { secretKey: secret } }
     )
     storageBackendDetail.value = data.backend
-    rotateStorageBackendSecret.value = ''
     rotateStorageBackendOpen.value = false
     toast.add({ title: '密钥已轮换', color: 'success', icon: 'i-tabler-key' })
     await Promise.all([reloadStorageBackends(), fetchStorageBackendEvents()])
@@ -1143,26 +1142,6 @@ function grantStatus(grant: Grant): { label: string, color: 'success' | 'warning
 function canRevokeGrant(grant: Grant) {
   return grantStatus(grant).label === '有效'
 }
-function storageBackendEventTypeLabel(type: string) {
-  const labels: Record<string, string> = {
-    config_upserted: '配置保存',
-    config_deleted: '配置删除',
-    health_check: '健康检查',
-    secret_rotated: '密钥轮换'
-  }
-  return labels[type] || type
-}
-function storageBackendEventStatusColor(status: string): 'success' | 'warning' | 'error' | 'neutral' {
-  if (status === 'ok') return 'success'
-  if (status === 'error') return 'error'
-  if (status === 'warning') return 'warning'
-  return 'neutral'
-}
-function storageBackendHealthBadge(detail?: StorageBackendDetail | null): { label: string, color: 'success' | 'warning' | 'error' | 'neutral' } {
-  if (detail?.lastHealthOk === true) return { label: '正常', color: 'success' }
-  if (detail?.lastHealthOk === false) return { label: '异常', color: 'error' }
-  return { label: '未检查', color: 'neutral' }
-}
 function openExternal(url: string) {
   if (url) window.open(url, '_blank')
 }
@@ -1327,137 +1306,36 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       @save="saveSite"
     />
 
-    <UModal v-model:open="storageBackendOpen" title="S3-compatible 存储后端">
-      <template #body>
-        <div class="space-y-4">
-          <div v-if="storageBackendEditingName" class="rounded-lg border border-default bg-elevated/30 p-3">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-              <div class="min-w-0">
-                <div class="flex items-center gap-2">
-                  <span class="truncate text-sm font-medium text-highlighted">{{ storageBackendEditingName }}</span>
-                  <UBadge :label="storageBackendHealthBadge(storageBackendDetail).label" :color="storageBackendHealthBadge(storageBackendDetail).color" variant="soft" size="sm" />
-                </div>
-                <div class="mt-1 text-xs text-muted">
-                  Secret v{{ storageBackendDetail?.secretVersion || 1 }}
-                  <span v-if="storageBackendDetail?.secretRotatedAt"> · 轮换 {{ briefDate(storageBackendDetail.secretRotatedAt) }}</span>
-                  <span v-if="storageBackendDetail?.lastHealthCheckedAt"> · 检查 {{ briefDate(storageBackendDetail.lastHealthCheckedAt) }}</span>
-                </div>
-                <p v-if="storageBackendDetail?.lastHealthError" class="mt-1 line-clamp-2 text-xs text-error">{{ storageBackendDetail.lastHealthError }}</p>
-              </div>
-              <div class="flex shrink-0 items-center gap-2">
-                <UButton icon="i-tabler-heartbeat" label="健康检查" color="neutral" variant="soft" size="xs" :loading="checkingStorageBackend" @click="checkStorageBackendHealth" />
-                <UButton icon="i-tabler-key" label="轮换密钥" color="neutral" variant="soft" size="xs" :disabled="loadingStorageBackend" @click="() => { rotateStorageBackendOpen = true }" />
-              </div>
-            </div>
-          </div>
+    <AssetStorageBackendModal
+      v-model:open="storageBackendOpen"
+      :initial-value="storageBackendForm"
+      :editing-name="storageBackendEditingName"
+      :detail="storageBackendDetail"
+      :events="storageBackendEvents"
+      :type-options="storageBackendTypeItems"
+      :loading="loadingStorageBackend"
+      :saving="savingStorageBackend"
+      :checking="checkingStorageBackend"
+      @save="saveStorageBackend"
+      @check-health="checkStorageBackendHealth"
+      @refresh-events="fetchStorageBackendEvents()"
+      @rotate-secret="rotateStorageBackendOpen = true"
+      @delete="deleteStorageBackendOpen = true"
+    />
 
-          <div class="grid gap-4 sm:grid-cols-2">
-            <UFormField label="后端名称">
-              <UInput v-model="storageBackendForm.name" placeholder="s3main" :disabled="!!storageBackendEditingName || loadingStorageBackend" />
-            </UFormField>
-            <UFormField label="后端类型">
-              <USelectMenu v-model="storageBackendForm.type" :items="storageBackendTypeItems" value-key="value" class="w-full" :disabled="!!storageBackendEditingName || loadingStorageBackend" />
-            </UFormField>
-            <UFormField label="Region">
-              <UInput v-model="storageBackendForm.region" placeholder="us-east-1" />
-            </UFormField>
-            <UFormField label="Endpoint">
-              <UInput v-model="storageBackendForm.endpoint" placeholder="localhost:9000" />
-            </UFormField>
-            <UFormField label="公开访问 Base URL">
-              <UInput v-model="storageBackendForm.publicBaseUrl" placeholder="https://cdn.example.com" />
-            </UFormField>
-            <UFormField label="Public Bucket">
-              <UInput v-model="storageBackendForm.bucketPublic" placeholder="asset-public" />
-            </UFormField>
-            <UFormField label="Private Bucket">
-              <UInput v-model="storageBackendForm.bucketPrivate" placeholder="asset-private" />
-            </UFormField>
-            <UFormField label="Access Key">
-              <UInput v-model="storageBackendForm.accessKey" autocomplete="off" />
-            </UFormField>
-            <UFormField label="Secret Key">
-              <UInput v-model="storageBackendForm.secretKey" type="password" autocomplete="new-password" :placeholder="storageBackendEditingName ? '留空沿用已有密钥' : ''" />
-            </UFormField>
-            <UCheckbox v-model="storageBackendForm.pathStyle" label="Path-style endpoint" />
-            <UCheckbox v-model="storageBackendForm.useSsl" label="使用 HTTPS" />
-            <UCheckbox v-model="storageBackendForm.enabled" label="启用后端" />
-            <p class="text-xs text-muted sm:col-span-2">
-              保存时会先连接并注册后端；如果配置不可用，不会写入运行时。编辑已有后端时 Secret Key 留空会沿用旧密钥。
-            </p>
-          </div>
+    <AssetStorageBackendDeleteModal
+      v-model:open="deleteStorageBackendOpen"
+      :backend-name="storageBackendEditingName"
+      :deleting="deletingStorageBackend"
+      @confirm="confirmDeleteStorageBackend"
+    />
 
-          <div v-if="storageBackendEditingName" class="rounded-lg border border-default bg-default">
-            <div class="flex items-center justify-between border-b border-default px-3 py-2">
-              <h3 class="text-xs font-medium text-muted">最近事件</h3>
-              <UButton icon="i-tabler-refresh" color="neutral" variant="ghost" square size="xs" @click="fetchStorageBackendEvents()" />
-            </div>
-            <ManageEmpty v-if="!storageBackendEvents.length" icon="i-tabler-history" text="还没有后端事件" />
-            <div v-else class="max-h-56 divide-y divide-default overflow-y-auto">
-              <div v-for="event in storageBackendEvents" :key="event.id" class="px-3 py-2.5">
-                <div class="flex min-w-0 items-center gap-2">
-                  <span class="truncate text-sm font-medium text-highlighted">{{ storageBackendEventTypeLabel(event.eventType) }}</span>
-                  <UBadge :label="event.status" :color="storageBackendEventStatusColor(event.status)" variant="soft" size="sm" />
-                  <span class="ml-auto shrink-0 text-xs text-muted">{{ briefDate(event.createdAt) }}</span>
-                </div>
-                <div class="mt-0.5 truncate text-xs text-muted">{{ event.actor || 'system' }}<span v-if="event.message"> · {{ event.message }}</span></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </template>
-      <template #footer>
-        <div class="flex w-full items-center justify-between gap-2">
-          <UButton
-            v-if="storageBackendEditingName"
-            label="删除后端"
-            icon="i-tabler-trash"
-            color="error"
-            variant="ghost"
-            :disabled="savingStorageBackend"
-            @click="() => { deleteStorageBackendOpen = true }"
-          />
-          <span v-else />
-          <div class="flex items-center gap-2">
-            <UButton label="取消" color="neutral" variant="ghost" :disabled="savingStorageBackend" @click="() => { storageBackendOpen = false }" />
-            <UButton label="保存" icon="i-tabler-device-floppy" :loading="savingStorageBackend" @click="saveStorageBackend" />
-          </div>
-        </div>
-      </template>
-    </UModal>
-
-    <UModal v-model:open="deleteStorageBackendOpen" title="删除存储后端?">
-      <template #body>
-        <p class="text-sm text-muted">
-          将删除 <span class="font-medium text-default">{{ storageBackendEditingName }}</span>。只有没有站点默认使用、没有 Profile 指定、也没有素材落在该后端时才允许删除。
-        </p>
-      </template>
-      <template #footer>
-        <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="取消" :disabled="deletingStorageBackend" @click="() => { deleteStorageBackendOpen = false }" />
-          <UButton color="error" label="确认删除" :loading="deletingStorageBackend" @click="confirmDeleteStorageBackend" />
-        </div>
-      </template>
-    </UModal>
-
-    <UModal v-model:open="rotateStorageBackendOpen" title="轮换存储后端密钥">
-      <template #body>
-        <div class="space-y-3">
-          <p class="text-sm text-muted">
-            为 <span class="font-medium text-default">{{ storageBackendEditingName }}</span> 写入新的 Secret Key，并记录一次密钥轮换事件。
-          </p>
-          <UFormField label="新的 Secret Key">
-            <UInput v-model="rotateStorageBackendSecret" type="password" autocomplete="new-password" autofocus />
-          </UFormField>
-        </div>
-      </template>
-      <template #footer>
-        <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="取消" :disabled="rotatingStorageBackend" @click="() => { rotateStorageBackendOpen = false }" />
-          <UButton color="primary" label="确认轮换" icon="i-tabler-key" :loading="rotatingStorageBackend" :disabled="!rotateStorageBackendSecret" @click="confirmRotateStorageBackendSecret" />
-        </div>
-      </template>
-    </UModal>
+    <AssetStorageBackendRotateModal
+      v-model:open="rotateStorageBackendOpen"
+      :backend-name="storageBackendEditingName"
+      :rotating="rotatingStorageBackend"
+      @confirm="confirmRotateStorageBackendSecret"
+    />
 
     <AssetVariantModal
       v-model:open="variantOpen"
