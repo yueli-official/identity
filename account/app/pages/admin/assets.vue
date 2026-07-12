@@ -18,6 +18,7 @@ import type {
   AssetAdminStats as Stats,
   AssetBatchRebuildResult as BatchRebuildResult,
   AssetGrant as Grant,
+  AssetGrantForm as GrantForm,
   AssetItem,
   AssetMaintenanceTask as MaintenanceTask,
   AssetOrphanObjectBackend as OrphanObjectBackend,
@@ -1044,7 +1045,7 @@ const createGrantOpen = ref(false)
 const creatingGrant = ref(false)
 const grantAsset = ref<AssetItem | null>(null)
 const createdGrant = ref<CreatedGrant | null>(null)
-const grantForm = reactive({
+const grantForm = reactive<GrantForm>({
   variantKey: 'original',
   policy: 'oneTime',
   subjectId: '',
@@ -1081,8 +1082,9 @@ function openCreateGrant(asset: AssetItem) {
   createGrantOpen.value = true
 }
 
-async function createGrant() {
+async function createGrant(value: GrantForm) {
   if (!grantAsset.value) return
+  Object.assign(grantForm, value)
   creatingGrant.value = true
   try {
     createdGrant.value = await call<CreatedGrant>('/api/v1/admin/assets-proxy/grants/create', {
@@ -1096,12 +1098,6 @@ async function createGrant() {
   } finally {
     creatingGrant.value = false
   }
-}
-
-async function copyCreatedGrant() {
-  if (!createdGrant.value?.url) return
-  await navigator.clipboard.writeText(createdGrant.value.url)
-  toast.add({ title: '链接已复制', color: 'success', icon: 'i-tabler-copy-check' })
 }
 
 function formatBytes(n: number) {
@@ -1767,62 +1763,21 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       </template>
     </UModal>
 
-    <UModal v-model:open="createGrantOpen" title="签发交付链接">
-      <template #body>
-        <div class="space-y-4">
-          <p class="truncate font-mono text-xs text-dimmed">{{ grantAsset?.id }}</p>
-          <div class="grid gap-4 sm:grid-cols-2">
-            <UFormField label="Variant">
-              <UInput v-model="grantForm.variantKey" placeholder="original / card / cover" />
-            </UFormField>
-            <UFormField label="策略">
-              <USelect v-model="grantForm.policy" :items="policyOptions" value-key="value" />
-            </UFormField>
-            <UFormField label="有效期(秒)">
-              <UInput v-model.number="grantForm.expiresIn" type="number" min="60" />
-            </UFormField>
-            <UFormField label="最大使用次数">
-              <UInput v-model.number="grantForm.maxUses" type="number" min="1" />
-            </UFormField>
-            <UFormField label="Subject ID" class="sm:col-span-2">
-              <UInput v-model="grantForm.subjectId" placeholder="留空表示不绑定用户" />
-            </UFormField>
-            <UFormField label="原因" class="sm:col-span-2">
-              <UInput v-model="grantForm.reason" />
-            </UFormField>
-          </div>
-          <p class="text-xs text-muted">有效期最多 24 小时，最大使用次数最多 100 次；服务端会自动收紧超出的值。</p>
-          <div v-if="createdGrant" class="rounded-lg border border-default bg-default p-3">
-            <div class="mb-2 flex items-center justify-between gap-2">
-              <div class="text-sm font-medium text-highlighted">交付链接</div>
-              <UButton icon="i-tabler-copy" label="复制" color="neutral" variant="soft" size="xs" @click="copyCreatedGrant" />
-            </div>
-            <p class="break-all font-mono text-xs text-muted">{{ createdGrant.url }}</p>
-            <p class="mt-2 text-xs text-muted">过期 {{ briefDate(createdGrant.expiresAt) }}</p>
-          </div>
-        </div>
-      </template>
-      <template #footer>
-        <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="关闭" :disabled="creatingGrant" @click="() => { createGrantOpen = false }" />
-          <UButton label="生成链接" icon="i-tabler-key" :loading="creatingGrant" @click="createGrant" />
-        </div>
-      </template>
-    </UModal>
+    <AssetGrantModal
+      v-model:open="createGrantOpen"
+      :asset-id="grantAsset?.id"
+      :initial-value="grantForm"
+      :created-grant="createdGrant"
+      :policy-options="policyOptions"
+      :creating="creatingGrant"
+      @create="createGrant"
+    />
 
-    <UModal v-model:open="revokeGrantOpen" title="撤销授权?">
-      <template #body>
-        <p class="text-sm text-muted">
-          将撤销这条交付授权。撤销后，已发出去的一次性或门禁链接会立即失效。
-        </p>
-        <p class="mt-2 truncate font-mono text-xs text-dimmed">{{ revokeGrantTarget?.assetId }}</p>
-      </template>
-      <template #footer>
-        <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="取消" :disabled="revokingGrant" @click="() => { revokeGrantTarget = null }" />
-          <UButton color="error" label="确认撤销" :loading="revokingGrant" @click="confirmRevokeGrant" />
-        </div>
-      </template>
-    </UModal>
+    <AssetRevokeGrantModal
+      v-model:open="revokeGrantOpen"
+      :asset-id="revokeGrantTarget?.assetId"
+      :revoking="revokingGrant"
+      @confirm="confirmRevokeGrant"
+    />
   </div>
 </template>

@@ -241,6 +241,15 @@ export interface AssetGrant {
   createdAt: string
 }
 
+export interface AssetGrantForm {
+  variantKey: string
+  policy: string
+  subjectId: string
+  expiresIn: number
+  maxUses: number
+  reason: string
+}
+
 export interface CreatedAssetGrant {
   grantId: string
   url: string
