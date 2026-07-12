@@ -2,17 +2,20 @@
 // @nuxt/fonts ships bundled inside @nuxt/ui v4, so it is not listed as a
 // separate module here (@nuxt/ui registers it automatically).
 export default defineNuxtConfig({
-  modules: ['@nuxt/ui'],
-  css: ['~/assets/css/main.css'],
+  modules: ["@nuxt/ui"],
+  css: ["~/assets/css/main.css"],
   runtimeConfig: {
     // Server-side base for backend calls during SSR. The dev proxy below only
     // covers real browser requests; Nitro's internal SSR $fetch bypasses it, so
     // a relative /api on the server falls through to the SPA catch-all. Hitting
     // the backend by absolute URL fixes SSR auth (hard loads / deep links).
     // Override in prod with NUXT_API_BASE.
-    apiBase: process.env.NUXT_API_BASE || 'http://127.0.0.1:8081',
-    platformCatalogFingerprint: process.env.NUXT_PLATFORM_CATALOG_FINGERPRINT || 'local-unversioned',
-    platformEnvironment: process.env.NUXT_PLATFORM_ENVIRONMENT || 'local'
+    apiBase: process.env.NUXT_API_BASE || "http://127.0.0.1:8081",
+    platformCatalogFingerprint:
+      process.env.NUXT_PLATFORM_CATALOG_FINGERPRINT || "local-unversioned",
+    platformEnvironment: process.env.NUXT_PLATFORM_ENVIRONMENT || "local",
+    platformCapabilityRequirementsB64:
+      process.env.NUXT_PLATFORM_CAPABILITY_REQUIREMENTS_B64 || "W10=",
   },
   // Dev-only proxy to the Go backend so the app is same-origin in `nuxt dev`.
   // In Nuxt 4 this lives under `nitro.devProxy` (the top-level `devProxy`
@@ -28,11 +31,21 @@ export default defineNuxtConfig({
     // icon (e.g. dropdown items that mount on open). Backend routes are all
     // under /api/v1.
     devProxy: {
-      '/api/v1': { target: 'http://127.0.0.1:8081/api/v1', changeOrigin: true },
-      '/oauth2': { target: 'http://127.0.0.1:8081/oauth2', changeOrigin: true },
-      '/.well-known': { target: 'http://127.0.0.1:8081/.well-known', changeOrigin: true }
-    }
+      "/api/v1": { target: "http://127.0.0.1:8081/api/v1", changeOrigin: true },
+      "/oauth2": { target: "http://127.0.0.1:8081/oauth2", changeOrigin: true },
+      "/.well-known": {
+        target: "http://127.0.0.1:8081/.well-known",
+        changeOrigin: true,
+      },
+    },
   },
-  fonts: { providers: { google: false, googleicons: false, bunny: false, fontshare: false } },
-  devtools: { enabled: true }
-})
+  fonts: {
+    providers: {
+      google: false,
+      googleicons: false,
+      bunny: false,
+      fontshare: false,
+    },
+  },
+  devtools: { enabled: true },
+});

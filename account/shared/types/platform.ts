@@ -61,6 +61,32 @@ export interface PlatformStatusResponse {
   observedAt: string
   environment: string
   catalogFingerprint: string
-  summary: { total: number, available: number, effectiveCapabilities: number, capabilityIssues: number }
+  summary: { total: number, available: number, effectiveCapabilities: number, capabilityIssues: number, applications: number, applicationGaps: number }
   services: PlatformServiceResult[]
+  applications: ApplicationCapabilityStatus[]
+}
+
+export interface SiteCapabilityRequirements {
+  site: string
+  productType: string
+  brand: string
+  capabilities: Record<string, string>
+}
+
+export type CapabilityGapReason = 'service_unavailable' | 'capability_missing' | 'unsupported' | 'version_incompatible' | 'configuration_incomplete' | 'disabled' | 'unhealthy'
+
+export interface CapabilityRequirementResult {
+  key: string
+  constraint: string
+  satisfied: boolean
+  actualVersion?: string
+  reason?: CapabilityGapReason
+}
+
+export interface ApplicationCapabilityStatus {
+  site: string
+  productType: string
+  brand: string
+  satisfied: boolean
+  requirements: CapabilityRequirementResult[]
 }

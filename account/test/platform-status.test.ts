@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aggregatePlatformServices, capabilityManifestSchema, classifyPlatformServiceFailure, manifestAgeSeconds, parsePlatformManifest, platformProbeFailureStatus } from '../server/utils/platform-status'
+import { aggregatePlatformServices, capabilityManifestSchema, capabilityVersionSatisfies, classifyPlatformServiceFailure, evaluateCapabilityRequirements, manifestAgeSeconds, parsePlatformManifest, platformProbeFailureStatus } from '../server/utils/platform-status'
 import type { PlatformServiceResult } from '../shared/types/platform'
 
 function envelope(value = manifest()) {
@@ -85,5 +85,46 @@ describe('platform capability BFF schema', () => {
     expect(classifyPlatformServiceFailure(Object.assign(new Error('deadline'), { statusCode: 504 })).status).toBe('unavailable')
     expect(platformProbeFailureStatus(Object.assign(new Error('limited'), { response: { status: 429 } }))).toBe(429)
     expect(platformProbeFailureStatus(new Error('audit failed'))).toBe(502)
+  })
+
+  it('evaluates application requirements against effective capabilities and versions', () => {
+    const assetManifest = manifest()
+    const services: PlatformServiceResult[] = [{
+      key: 'asset', status: 'available', observedAt: '2026-07-12T00:00:00Z', latencyMs: 1, manifest: assetManifest,
+    }]
+    const [application] = evaluateCapabilityRequirements([{
+      site: 'blog-ai', productType: 'blog', brand: 'AI Blog',
+      capabilities: { 'asset.object-storage': '>=1.0', 'identity.oidc': '>=1.0' },
+    }], services)
+    expect(application?.satisfied).toBe(false)
+    expect(application?.requirements).toEqual([
+      { key: 'asset.object-storage', constraint: '>=1.0', actualVersion: '1.0', satisfied: true },
+      { key: 'identity.oidc', constraint: '>=1.0', reason: 'service_unavailable', actualVersion: undefined, satisfied: false },
+    ])
+  })
+
+  it('distinguishes configuration, enablement, health, and contract version gaps', () => {
+    const states = [
+      { constraint: '>=2.0', reason: 'version_incompatible' },
+      { constraint: '>=1.0', configuration: 'partial', reason: 'configuration_incomplete' },
+      { constraint: '>=1.0', enablement: 'disabled', reason: 'disabled' },
+      { constraint: '>=1.0', effective: false, health: 'unhealthy', reason: 'unhealthy' },
+    ] as const
+    for (const state of states) {
+      const value = manifest()
+      Object.assign(value.capabilities[0]!, state)
+      const [application] = evaluateCapabilityRequirements([{
+        site: 'docs-ae', productType: 'docs', brand: 'Docs', capabilities: { 'asset.object-storage': state.constraint },
+      }], [{ key: 'asset', status: 'available', observedAt: value.generatedAt, latencyMs: 1, manifest: value }])
+      expect(application?.requirements[0]?.reason).toBe(state.reason)
+    }
+  })
+
+  it('supports exact and minimum capability contract versions', () => {
+    expect(capabilityVersionSatisfies('1.2', '>=1.1')).toBe(true)
+    expect(capabilityVersionSatisfies('1.0', '>=1.0.1')).toBe(false)
+    expect(capabilityVersionSatisfies('2.0.0', '=2.0')).toBe(true)
+    expect(capabilityVersionSatisfies('2.1', '2.0')).toBe(false)
+    expect(capabilityVersionSatisfies('latest', '>=1.0')).toBe(false)
   })
 })

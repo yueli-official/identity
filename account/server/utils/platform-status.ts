@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { H3Event } from 'h3'
-import type { CapabilityManifest, PlatformServiceKey, PlatformServiceResult, ProviderItem } from '../../shared/types/platform'
+import type { ApplicationCapabilityStatus, CapabilityItem, CapabilityManifest, CapabilityRequirementResult, PlatformServiceKey, PlatformServiceResult, ProviderItem, SiteCapabilityRequirements } from '../../shared/types/platform'
 
 export const platformServiceKeys = ['identity', 'asset', 'commerce', 'notification'] as const
 
@@ -68,6 +68,14 @@ const sessionEnvelopeSchema = z.object({
   data: z.object({ roles: z.array(z.string()) }).strict(),
 }).strict()
 
+const capabilityConstraintSchema = z.string().regex(/^(?:>=|=)?\d+\.\d+(?:\.\d+)?$/)
+const siteCapabilityRequirementsSchema = z.array(z.object({
+  site: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
+  productType: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
+  brand: z.string(),
+  capabilities: z.record(z.string().regex(/^[a-z][a-z0-9-]*\.[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/), capabilityConstraintSchema),
+}).strict())
+
 function identityHeaders(event: H3Event): Record<string, string> {
   const cookie = getRequestHeader(event, 'cookie')
   return cookie ? { cookie } : {}
@@ -134,6 +142,58 @@ export function manifestAgeSeconds(generatedAt: string, now = Date.now()): numbe
 
 export async function aggregatePlatformServices(fetcher: (key: PlatformServiceKey) => Promise<PlatformServiceResult>): Promise<PlatformServiceResult[]> {
   return Promise.all(platformServiceKeys.map(key => fetcher(key)))
+}
+
+export function readCapabilityRequirements(event: H3Event): SiteCapabilityRequirements[] {
+  const encoded = useRuntimeConfig(event).platformCapabilityRequirementsB64
+  try {
+    return siteCapabilityRequirementsSchema.parse(JSON.parse(Buffer.from(encoded, 'base64').toString('utf8')))
+  } catch {
+    throw createError({ statusCode: 503, statusMessage: 'Platform capability requirements are invalid' })
+  }
+}
+
+export function evaluateCapabilityRequirements(requirements: SiteCapabilityRequirements[], services: PlatformServiceResult[]): ApplicationCapabilityStatus[] {
+  const serviceMap = new Map(services.map(service => [service.key, service]))
+  return requirements.map(application => {
+    const results = Object.entries(application.capabilities).sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, constraint]) => evaluateCapabilityRequirement(key, constraint, serviceMap))
+    return { ...application, satisfied: results.every(result => result.satisfied), requirements: results }
+  })
+}
+
+function evaluateCapabilityRequirement(key: string, constraint: string, services: Map<PlatformServiceKey, PlatformServiceResult>): CapabilityRequirementResult {
+  const serviceKey = key.split('.', 1)[0] as PlatformServiceKey
+  const service = services.get(serviceKey)
+  if (!service || service.status !== 'available' || !service.manifest) return gap(key, constraint, 'service_unavailable')
+  const capability = service.manifest.capabilities.find(item => item.key === key)
+  if (!capability) return gap(key, constraint, 'capability_missing')
+  if (capability.support !== 'supported') return gap(key, constraint, 'unsupported', capability)
+  if (!capabilityVersionSatisfies(capability.contractVersion, constraint)) return gap(key, constraint, 'version_incompatible', capability)
+  if (capability.configuration !== 'complete') return gap(key, constraint, 'configuration_incomplete', capability)
+  if (capability.enablement !== 'enabled') return gap(key, constraint, 'disabled', capability)
+  if (!capability.effective) return gap(key, constraint, 'unhealthy', capability)
+  return { key, constraint, actualVersion: capability.contractVersion, satisfied: true }
+}
+
+function gap(key: string, constraint: string, reason: CapabilityRequirementResult['reason'], capability?: CapabilityItem): CapabilityRequirementResult {
+  return { key, constraint, reason, actualVersion: capability?.contractVersion, satisfied: false }
+}
+
+export function capabilityVersionSatisfies(actual: string, constraint: string): boolean {
+  const actualVersion = parseCapabilityVersion(actual)
+  const operator = constraint.startsWith('>=') ? '>=' : '='
+  const requiredVersion = parseCapabilityVersion(constraint.replace(/^(?:>=|=)/, ''))
+  if (!actualVersion || !requiredVersion) return false
+  const comparison = actualVersion.findIndex((part, index) => part !== requiredVersion[index])
+  if (comparison === -1) return true
+  return operator === '>=' && actualVersion[comparison]! > requiredVersion[comparison]!
+}
+
+function parseCapabilityVersion(value: string): [number, number, number] | undefined {
+  if (!/^\d+\.\d+(?:\.\d+)?$/.test(value)) return undefined
+  const parts = value.split('.').map(Number)
+  return [parts[0]!, parts[1]!, parts[2] ?? 0]
 }
 
 export function classifyPlatformServiceFailure(error: unknown): { status: 'forbidden' | 'unavailable', code: string, message: string } {
