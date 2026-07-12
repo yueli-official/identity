@@ -167,6 +167,23 @@ export interface AssetPruneResult {
   task?: AssetMaintenanceTask
 }
 
+export interface AssetPruneForm {
+  olderThanDays: number
+  limit: number
+}
+
+export interface AssetOrphanObjectForm {
+  olderThanDays: number
+  limit: number
+  backend: string
+}
+
+export interface AssetStorageMigrationForm {
+  sourceBackend: string
+  targetBackend: string
+  limit: number
+}
+
 export interface AssetBatchRebuildResult {
   candidates: number
   rebuilt: number

@@ -21,11 +21,12 @@ import type {
   AssetGrantForm as GrantForm,
   AssetItem,
   AssetMaintenanceTask as MaintenanceTask,
-  AssetOrphanObjectBackend as OrphanObjectBackend,
+  AssetOrphanObjectForm as OrphanObjectForm,
   AssetOrphanObjectItem as OrphanObjectItem,
   AssetOrphanObjectResult as OrphanObjectResult,
   AssetProfile as Profile,
   AssetPruneResult as PruneResult,
+  AssetPruneForm as PruneForm,
   AssetReference,
   AssetSite as Site,
   AssetSpaceUsage,
@@ -34,6 +35,7 @@ import type {
   AssetStorageBackendEvent as StorageBackendEvent,
   AssetStorageBackendForm as StorageBackendForm,
   AssetStorageMigrationResult as StorageMigrationResult,
+  AssetStorageMigrationForm as StorageMigrationForm,
   AssetSweepResult as SweepResult,
   AssetVariant as Variant,
   CreatedAssetGrant as CreatedGrant
@@ -710,15 +712,15 @@ const sweepingStaging = ref(false)
 const pruneOpen = ref(false)
 const pruningUnreferenced = ref(false)
 const prunePreview = ref<PruneResult | null>(null)
-const pruneForm = reactive({ olderThanDays: 30, limit: 50 })
+const pruneForm = reactive<PruneForm>({ olderThanDays: 30, limit: 50 })
 const orphanObjectsOpen = ref(false)
 const auditingOrphanObjects = ref(false)
 const orphanObjectsPreview = ref<OrphanObjectResult | null>(null)
-const orphanObjectsForm = reactive({ olderThanDays: 7, limit: 100, backend: ALL })
+const orphanObjectsForm = reactive<OrphanObjectForm>({ olderThanDays: 7, limit: 100, backend: ALL })
 const storageMigrationOpen = ref(false)
 const migratingStorage = ref(false)
 const storageMigrationPreview = ref<StorageMigrationResult | null>(null)
-const storageMigrationForm = reactive({ sourceBackend: '', targetBackend: '', limit: 50 })
+const storageMigrationForm = reactive<StorageMigrationForm>({ sourceBackend: '', targetBackend: '', limit: 50 })
 const batchRebuildOpen = ref(false)
 const batchRebuilding = ref(false)
 const batchRebuildProfile = ref<Profile | null>(null)
@@ -751,9 +753,10 @@ async function rebuildDerivatives(asset: AssetItem) {
   }
 }
 
-async function previewBatchRebuild(profile: Profile) {
+async function previewBatchRebuild(profile: Profile, limit = batchRebuildLimit.value) {
   batchRebuildProfile.value = profile
   batchRebuildPreview.value = null
+  batchRebuildLimit.value = limit
   batchRebuilding.value = true
   try {
     batchRebuildPreview.value = await call<BatchRebuildResult>('/api/v1/admin/assets-proxy/maintenance/rebuild-derivatives', {
@@ -769,8 +772,14 @@ async function previewBatchRebuild(profile: Profile) {
   }
 }
 
-async function confirmBatchRebuild() {
+async function refreshBatchRebuildPreview(limit: number) {
   if (!batchRebuildProfile.value) return
+  await previewBatchRebuild(batchRebuildProfile.value, limit)
+}
+
+async function confirmBatchRebuild(limit = batchRebuildLimit.value) {
+  if (!batchRebuildProfile.value) return
+  batchRebuildLimit.value = limit
   batchRebuilding.value = true
   try {
     const profile = batchRebuildProfile.value
@@ -822,7 +831,9 @@ async function sweepStaging() {
   }
 }
 
-async function previewPruneUnreferenced() {
+async function previewPruneUnreferenced(value?: PruneForm) {
+  if (value) Object.assign(pruneForm, value)
+  prunePreview.value = null
   pruningUnreferenced.value = true
   try {
     prunePreview.value = await call<PruneResult>('/api/v1/admin/assets-proxy/maintenance/prune-unreferenced', {
@@ -838,7 +849,8 @@ async function previewPruneUnreferenced() {
   }
 }
 
-async function confirmPruneUnreferenced() {
+async function confirmPruneUnreferenced(value?: PruneForm) {
+  if (value) Object.assign(pruneForm, value)
   pruningUnreferenced.value = true
   try {
     const data = await call<PruneResult>('/api/v1/admin/assets-proxy/maintenance/prune-unreferenced', {
@@ -869,7 +881,9 @@ async function confirmPruneUnreferenced() {
   }
 }
 
-async function previewOrphanObjects() {
+async function previewOrphanObjects(value?: OrphanObjectForm) {
+  if (value) Object.assign(orphanObjectsForm, value)
+  orphanObjectsPreview.value = null
   auditingOrphanObjects.value = true
   try {
     orphanObjectsPreview.value = await call<OrphanObjectResult>('/api/v1/admin/assets-proxy/maintenance/orphan-objects', {
@@ -890,7 +904,8 @@ async function previewOrphanObjects() {
   }
 }
 
-async function confirmPruneOrphanObjects() {
+async function confirmPruneOrphanObjects(value?: OrphanObjectForm) {
+  if (value) Object.assign(orphanObjectsForm, value)
   auditingOrphanObjects.value = true
   try {
     const data = await call<OrphanObjectResult>('/api/v1/admin/assets-proxy/maintenance/orphan-objects', {
@@ -935,7 +950,9 @@ function openStorageMigration() {
   storageMigrationOpen.value = true
 }
 
-async function previewStorageMigration() {
+async function previewStorageMigration(value?: StorageMigrationForm) {
+  if (value) Object.assign(storageMigrationForm, value)
+  storageMigrationPreview.value = null
   migratingStorage.value = true
   try {
     storageMigrationPreview.value = await call<StorageMigrationResult>('/api/v1/admin/assets-proxy/maintenance/migrate-storage', {
@@ -950,7 +967,8 @@ async function previewStorageMigration() {
   }
 }
 
-async function confirmStorageMigration() {
+async function confirmStorageMigration(value?: StorageMigrationForm) {
+  if (value) Object.assign(storageMigrationForm, value)
   migratingStorage.value = true
   try {
     const data = await call<StorageMigrationResult>('/api/v1/admin/assets-proxy/maintenance/migrate-storage', {
@@ -1105,9 +1123,6 @@ function formatBytes(n: number) {
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
   if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`
   return `${(n / 1024 / 1024 / 1024).toFixed(1)} GB`
-}
-function briefDate(s: string) {
-  return s ? s.replace('T', ' ').slice(0, 16) : '-'
 }
 function profileActions(profile: Profile): DropdownMenuItem[][] {
   const inUse = profile.assetCount > 0 || profile.variantCount > 0
@@ -1373,181 +1388,34 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       </template>
     </UModal>
 
-    <UModal v-model:open="pruneOpen" title="清理无引用素材">
-      <template #body>
-        <div class="space-y-4">
-          <div class="grid gap-3 sm:grid-cols-2">
-            <UFormField label="保留天数">
-              <UInput v-model.number="pruneForm.olderThanDays" type="number" min="1" />
-            </UFormField>
-            <UFormField label="单次上限">
-              <UInput v-model.number="pruneForm.limit" type="number" min="1" max="200" />
-            </UFormField>
-          </div>
-          <p class="text-sm text-muted">
-            将只处理超过 {{ pruneForm.olderThanDays }} 天、且没有任何业务引用的素材。删除前后端仍会再次检查引用。
-          </p>
-          <div class="rounded-lg border border-default bg-default">
-            <div class="border-b border-default px-3 py-2 text-sm text-muted">
-              候选 {{ prunePreview?.candidates ?? 0 }} 个，本次最多处理 {{ pruneForm.limit }} 个
-            </div>
-            <ManageEmpty v-if="!prunePreview?.items?.length" icon="i-tabler-unlink" text="没有可清理的无引用素材" />
-            <div v-else class="max-h-72 overflow-auto">
-              <div v-for="asset in prunePreview.items" :key="asset.id" class="flex items-center gap-3 border-b border-default px-3 py-2.5 last:border-b-0">
-                <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-elevated text-muted">
-                  <UIcon name="i-tabler-file" class="size-4" />
-                </span>
-                <div class="min-w-0 flex-1">
-                  <div class="truncate text-sm font-medium text-highlighted">{{ asset.filename || asset.id }}</div>
-                  <div class="truncate text-xs text-muted">{{ asset.spaceKey || 'default' }} / {{ asset.siteKey }} / {{ asset.profileKey }} · {{ formatBytes(asset.size) }} · {{ briefDate(asset.createdAt) }}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </template>
-      <template #footer>
-        <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="取消" :disabled="pruningUnreferenced" @click="() => { pruneOpen = false }" />
-          <UButton
-            color="error"
-            label="确认清理"
-            icon="i-tabler-trash"
-            :loading="pruningUnreferenced"
-            :disabled="!prunePreview?.items?.length"
-            @click="confirmPruneUnreferenced"
-          />
-        </div>
-      </template>
-    </UModal>
+    <AssetPruneModal
+      v-model:open="pruneOpen"
+      :initial-value="pruneForm"
+      :preview="prunePreview"
+      :running="pruningUnreferenced"
+      @preview="previewPruneUnreferenced"
+      @confirm="confirmPruneUnreferenced"
+    />
 
-    <UModal v-model:open="orphanObjectsOpen" title="扫描孤儿对象">
-      <template #body>
-        <div class="space-y-4">
-          <div class="grid gap-3 sm:grid-cols-3">
-            <UFormField label="存储后端">
-              <USelectMenu
-                v-model="orphanObjectsForm.backend"
-                :items="[{ label: '全部后端', value: ALL }, ...storageBackendOptions]"
-                value-key="value"
-                class="w-full"
-              />
-            </UFormField>
-            <UFormField label="保留天数">
-              <UInput v-model.number="orphanObjectsForm.olderThanDays" type="number" min="1" />
-            </UFormField>
-            <UFormField label="返回上限">
-              <UInput v-model.number="orphanObjectsForm.limit" type="number" min="1" max="500" />
-            </UFormField>
-          </div>
-          <p class="text-sm text-muted">
-            会扫描 public/private 对象,和数据库里的原文件及当前派生图 key 对比。只处理超过 {{ orphanObjectsForm.olderThanDays }} 天的多余对象。
-          </p>
-          <div class="space-y-3">
-            <div
-              v-for="backend in orphanObjectsPreview?.items ?? []"
-              :key="backend.backend"
-              class="rounded-lg border border-default bg-default"
-            >
-              <div class="flex flex-wrap items-center justify-between gap-2 border-b border-default px-3 py-2">
-                <div class="text-sm font-medium text-highlighted">{{ backend.backend }}</div>
-                <div class="flex flex-wrap items-center gap-2">
-                  <UBadge :label="backend.skipped ? '不支持扫描' : `扫描 ${backend.scanned}`" :color="backend.skipped ? 'neutral' : 'primary'" variant="soft" />
-                  <UBadge :label="`期望 ${backend.expected}`" color="neutral" variant="soft" />
-                  <UBadge :label="`孤儿 ${backend.orphans}`" :color="backend.orphans ? 'warning' : 'success'" variant="soft" />
-                </div>
-              </div>
-              <div v-if="backend.error" class="px-3 py-2 text-sm text-error">{{ backend.error }}</div>
-              <ManageEmpty v-else-if="!backend.items?.length" icon="i-tabler-database-check" text="没有发现可清理对象" />
-              <div v-else class="max-h-64 overflow-auto">
-                <div v-for="item in backend.items" :key="item.key" class="flex items-center gap-3 border-b border-default px-3 py-2.5 last:border-b-0">
-                  <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-elevated text-muted">
-                    <UIcon name="i-tabler-file-database" class="size-4" />
-                  </span>
-                  <div class="min-w-0 flex-1">
-                    <div class="truncate font-mono text-xs text-highlighted">{{ item.key }}</div>
-                    <div class="mt-0.5 text-xs text-muted">{{ formatBytes(item.size) }} · {{ briefDate(item.modTime || '') }}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <ManageEmpty v-if="!(orphanObjectsPreview?.items?.length)" icon="i-tabler-database-search" text="还没有扫描结果" />
-          </div>
-        </div>
-      </template>
-      <template #footer>
-        <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="取消" :disabled="auditingOrphanObjects" @click="() => { orphanObjectsOpen = false }" />
-          <UButton
-            color="error"
-            label="确认清理"
-            icon="i-tabler-trash"
-            :loading="auditingOrphanObjects"
-            :disabled="!(orphanObjectsPreview?.orphans)"
-            @click="confirmPruneOrphanObjects"
-          />
-        </div>
-      </template>
-    </UModal>
+    <AssetOrphanObjectsModal
+      v-model:open="orphanObjectsOpen"
+      :initial-value="orphanObjectsForm"
+      :preview="orphanObjectsPreview"
+      :backend-options="[{ label: '全部后端', value: ALL }, ...storageBackendOptions]"
+      :running="auditingOrphanObjects"
+      @preview="previewOrphanObjects"
+      @confirm="confirmPruneOrphanObjects"
+    />
 
-    <UModal v-model:open="storageMigrationOpen" title="迁移存储后端">
-      <template #body>
-        <div class="space-y-4">
-          <div class="grid gap-3 sm:grid-cols-3">
-            <UFormField label="源后端">
-              <USelectMenu v-model="storageMigrationForm.sourceBackend" :items="storageBackendOptions" value-key="value" class="w-full" />
-            </UFormField>
-            <UFormField label="目标后端">
-              <USelectMenu v-model="storageMigrationForm.targetBackend" :items="storageBackendOptions" value-key="value" class="w-full" />
-            </UFormField>
-            <UFormField label="单次上限">
-              <UInput v-model.number="storageMigrationForm.limit" type="number" min="1" max="200" />
-            </UFormField>
-          </div>
-          <p class="text-sm text-muted">
-            会把源后端中的原文件和当前派生图复制到目标后端，成功后更新素材所属后端。旧后端对象不会立即删除，可再用孤儿对象扫描清理。
-          </p>
-          <div class="rounded-lg border border-default bg-default">
-            <div class="border-b border-default px-3 py-2 text-sm text-muted">
-              候选 {{ storageMigrationPreview?.candidates ?? 0 }} 个，本次最多处理 {{ storageMigrationForm.limit }} 个
-            </div>
-            <ManageEmpty v-if="!storageMigrationPreview?.items?.length" icon="i-tabler-database-off" text="还没有预检结果" />
-            <div v-else class="max-h-72 overflow-auto">
-              <div v-for="asset in storageMigrationPreview.items" :key="asset.id" class="flex items-center gap-3 border-b border-default px-3 py-2.5 last:border-b-0">
-                <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-elevated text-muted">
-                  <UIcon name="i-tabler-file-database" class="size-4" />
-                </span>
-                <div class="min-w-0 flex-1">
-                  <div class="truncate text-sm font-medium text-highlighted">{{ asset.filename || asset.id }}</div>
-                  <div class="truncate text-xs text-muted">{{ asset.storageBackend }} · {{ asset.mime }} · {{ formatBytes(asset.size) }}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </template>
-      <template #footer>
-        <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="取消" :disabled="migratingStorage" @click="() => { storageMigrationOpen = false }" />
-          <UButton
-            color="neutral"
-            variant="soft"
-            label="预检"
-            icon="i-tabler-search"
-            :loading="migratingStorage"
-            :disabled="!storageMigrationForm.sourceBackend || !storageMigrationForm.targetBackend || storageMigrationForm.sourceBackend === storageMigrationForm.targetBackend"
-            @click="previewStorageMigration"
-          />
-          <UButton
-            label="确认迁移"
-            icon="i-tabler-transfer"
-            :loading="migratingStorage"
-            :disabled="!storageMigrationPreview?.items?.length || storageMigrationForm.sourceBackend === storageMigrationForm.targetBackend"
-            @click="confirmStorageMigration"
-          />
-        </div>
-      </template>
-    </UModal>
+    <AssetStorageMigrationModal
+      v-model:open="storageMigrationOpen"
+      :initial-value="storageMigrationForm"
+      :preview="storageMigrationPreview"
+      :backend-options="storageBackendOptions"
+      :running="migratingStorage"
+      @preview="previewStorageMigration"
+      @confirm="confirmStorageMigration"
+    />
 
     <UModal v-model:open="referencesOpen" title="素材引用">
       <template #body>
@@ -1593,53 +1461,15 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       </template>
     </UModal>
 
-    <UModal v-model:open="batchRebuildOpen" title="批量重建派生图">
-      <template #body>
-        <div class="space-y-4">
-          <div class="grid gap-3 sm:grid-cols-[1fr_140px]">
-            <UFormField label="Profile">
-              <UInput :model-value="batchRebuildProfile ? `${batchRebuildProfile.siteKey} / ${batchRebuildProfile.profileKey}` : ''" disabled />
-            </UFormField>
-            <UFormField label="单次上限">
-              <UInput v-model.number="batchRebuildLimit" type="number" min="1" max="200" />
-            </UFormField>
-          </div>
-          <p class="text-sm text-muted">
-            会删除并重新生成该 Profile 下图片素材的当前 Variant。建议先小批量执行，确认规则无误后再继续。
-          </p>
-          <div class="rounded-lg border border-default bg-default">
-            <div class="border-b border-default px-3 py-2 text-sm text-muted">
-              候选 {{ batchRebuildPreview?.candidates ?? 0 }} 个，本次最多处理 {{ batchRebuildLimit }} 个
-            </div>
-            <ManageEmpty v-if="!batchRebuildPreview?.items?.length" icon="i-tabler-photo-off" text="没有可重建的图片素材" />
-            <div v-else class="max-h-72 overflow-auto">
-              <div v-for="asset in batchRebuildPreview.items" :key="asset.id" class="flex items-center gap-3 border-b border-default px-3 py-2.5 last:border-b-0">
-                <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-elevated text-muted">
-                  <UIcon name="i-tabler-photo" class="size-4" />
-                </span>
-                <div class="min-w-0 flex-1">
-                  <div class="truncate text-sm font-medium text-highlighted">{{ asset.filename || asset.id }}</div>
-                  <div class="truncate text-xs text-muted">{{ asset.mime }} · {{ formatBytes(asset.size) }} · {{ briefDate(asset.createdAt) }}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </template>
-      <template #footer>
-        <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="取消" :disabled="batchRebuilding" @click="() => { batchRebuildOpen = false }" />
-          <UButton
-            color="primary"
-            label="确认重建"
-            icon="i-tabler-refresh-dot"
-            :loading="batchRebuilding"
-            :disabled="!batchRebuildPreview?.items?.length"
-            @click="confirmBatchRebuild"
-          />
-        </div>
-      </template>
-    </UModal>
+    <AssetBatchRebuildModal
+      v-model:open="batchRebuildOpen"
+      :profile="batchRebuildProfile"
+      :preview="batchRebuildPreview"
+      :preview-limit="batchRebuildLimit"
+      :running="batchRebuilding"
+      @preview="refreshBatchRebuildPreview"
+      @confirm="confirmBatchRebuild"
+    />
 
     <AssetGrantModal
       v-model:open="createGrantOpen"
