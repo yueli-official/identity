@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {
-  ManageHeader, ManageTabs, ManageEmpty, ManagePagination, ManageCollectionToolbar, ManageCollectionDock, SkeletonList
+  ManageHeader, ManageTabs, ManageEmpty, ManagePagination, ManageCollectionToolbar, ManageCollectionDock, ManagePageSelection, SkeletonList
 } from '@platform/manage/components'
 import { manageCollectionQueryFingerprint, serializeManageCollectionQuery, type ManageCollectionDefinition } from '@platform/manage/collection'
 import { useManageCollectionState } from '@platform/manage/use-manage-collection-state'
@@ -352,7 +352,7 @@ function initialOf(u: AdminUser) { return (u.displayName || u.email || '?').char
 
     <ManageCollectionDock v-if="users.length" label="用户选择、批量操作与分页">
       <template #selection>
-        <UCheckbox :model-value="isPageSelected" :indeterminate="isPageIndeterminate" @update:model-value="togglePage" />
+        <ManagePageSelection :model-value="isPageSelected" :indeterminate="isPageIndeterminate" label="选择当前页用户" @update:model-value="togglePage" />
         <template v-if="selectionCount">
           <span>已选 {{ selectionCount }}</span>
           <USeparator orientation="vertical" class="h-4" />

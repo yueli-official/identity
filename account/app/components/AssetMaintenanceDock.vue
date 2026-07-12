@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ManageCollectionDock, ManagePagination } from '@platform/manage/components'
+import { ManageCollectionDock, ManagePageSelection, ManagePagination } from '@platform/manage/components'
 import type { AssetMaintenanceTask as MaintenanceTask } from '~/types/asset-admin'
 
 interface MaintenanceTaskError {
@@ -159,7 +159,7 @@ function taskIconClass(taskValue?: MaintenanceTask) {
       </template>
 
       <template v-else>
-        <UCheckbox :model-value="pageSelected" :indeterminate="pageIndeterminate" aria-label="选择当前页素材" @update:model-value="emit('togglePage', $event === true)" />
+        <ManagePageSelection :model-value="pageSelected" :indeterminate="pageIndeterminate" label="选择当前页素材" @update:model-value="emit('togglePage', $event)" />
         <template v-if="selectedCount">
           <span class="text-sm text-default">已选 {{ selectedCount }}</span>
           <UButton icon="i-tabler-refresh-dot" label="后台重建派生图" color="primary" variant="soft" size="sm" :loading="queueing" @click="emit('queueSelected')" />
