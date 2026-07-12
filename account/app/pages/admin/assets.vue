@@ -1,6 +1,22 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
-import { ManageHeader, ManageEmpty, SkeletonList } from '@platform/manage/components'
+import {
+  ManageCollectionDock,
+  ManageCollectionToolbar,
+  ManageEmpty,
+  ManageHeader,
+  ManagePagination,
+  ManageRowShell,
+  ManageViewToggle,
+  SkeletonList
+} from '@platform/manage/components'
+import {
+  manageCollectionQueryFingerprint,
+  serializeManageCollectionQuery,
+  type ManageCollectionDefinition
+} from '@platform/manage/collection'
+import { useManageCollectionState } from '@platform/manage/use-manage-collection-state'
+import { useManageSelection } from '@platform/manage/use-manage-selection'
 import { useMinLoading } from '@platform/ui/use-min-loading'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
@@ -8,6 +24,8 @@ useSeoMeta({ title: '资源管理 · 控制台' })
 
 const { call } = useApi()
 const toast = useToast()
+const route = useRoute()
+const router = useRouter()
 const ALL = '__all__'
 
 interface Stats {
@@ -234,7 +252,49 @@ interface CreatedGrant {
 const mounted = ref(false)
 const loading = ref(true)
 type AssetAdminSection = 'library' | 'sites' | 'profiles' | 'storage' | 'maintenance' | 'grants'
-const tab = ref<AssetAdminSection>('library')
+const collectionDefinition = {
+  resourceKind: 'asset',
+  statuses: [''],
+  views: ['grid', 'list'],
+  sortKeys: ['createdAt', 'filename', 'size'],
+  pageSizes: [12, 24, 48, 96],
+  defaultStatus: '',
+  defaultView: 'grid',
+  defaultSort: 'createdAt',
+  defaultDirection: 'desc',
+  defaultPageSize: 24,
+  pagination: 'server',
+  selection: 'page',
+  filters: ['section', 'spaceKey', 'siteKey', 'profileKey', 'visibility', 'mime']
+} as const satisfies ManageCollectionDefinition
+
+const {
+  searchInput,
+  q,
+  sort,
+  direction,
+  page,
+  size,
+  view: libraryView,
+  state: collectionState,
+  filterModel
+} = useManageCollectionState({
+  definition: collectionDefinition,
+  routeQuery: computed(() => route.query),
+  replaceQuery: query => router.replace({ query })
+})
+const section = filterModel('section', 'library')
+const tab = computed<AssetAdminSection>({
+  get: () => ['library', 'sites', 'profiles', 'storage', 'maintenance', 'grants'].includes(section.value)
+    ? section.value as AssetAdminSection
+    : 'library',
+  set: value => { section.value = value }
+})
+const siteKey = filterModel('siteKey', ALL)
+const spaceKey = filterModel('spaceKey', ALL)
+const profileKey = filterModel('profileKey', ALL)
+const visibility = filterModel('visibility', ALL)
+const mime = filterModel('mime', ALL)
 const stats = ref<Stats>({ assets: 0, publicAssets: 0, privateAssets: 0, sites: 0, profiles: 0, activeGrants: 0 })
 const sites = ref<Site[]>([])
 const storageBackends = ref<StorageBackend[]>([])
@@ -248,14 +308,8 @@ const maintenanceTasks = ref<MaintenanceTask[]>([])
 const controllingMaintenanceTaskId = ref('')
 const totalAssets = ref(0)
 const totalGrants = ref(0)
-const page = ref(1)
 const grantPage = ref(1)
-const SIZE = 20
-
-const siteKey = ref(ALL)
-const spaceKey = ref(ALL)
-const profileKey = ref(ALL)
-const visibility = ref(ALL)
+const GRANT_PAGE_SIZE = 20
 const showSkeleton = useMinLoading(computed(() => !mounted.value || loading.value))
 const enabledStorageBackends = computed(() => storageBackends.value.filter(b => b.enabled !== false))
 const activeMaintenanceCount = computed(() => maintenanceTasks.value.filter(task =>
@@ -285,6 +339,23 @@ const visibilityOptions = [
   { label: '公开', value: 'public' },
   { label: '私有', value: 'private' }
 ]
+const mimeOptions = [
+  { label: '全部类型', value: ALL },
+  { label: '图片', value: 'image/' },
+  { label: '视频', value: 'video/' },
+  { label: '音频', value: 'audio/' },
+  { label: 'PDF', value: 'application/pdf' },
+  { label: '其它文件', value: 'application/' }
+]
+const sortOptions = [
+  { label: '按上传时间', value: 'createdAt' },
+  { label: '按文件名', value: 'filename' },
+  { label: '按文件大小', value: 'size' }
+]
+const pageSizeItems = [12, 24, 48, 96].map(value => ({ label: `${value}/页`, value }))
+const totalAssetPages = computed(() => Math.max(1, Math.ceil(totalAssets.value / size.value)))
+const activeLibraryFilterCount = computed(() => [spaceKey.value, siteKey.value, profileKey.value, visibility.value, mime.value]
+  .filter(value => value !== ALL).length)
 const storageBackendOptions = computed(() => storageBackends.value
   .filter(b => b.enabled !== false)
   .map(b => ({
@@ -325,16 +396,36 @@ let maintenanceTasksPollTimer: ReturnType<typeof setInterval> | undefined
 let maintenanceTasksPollInFlight = false
 let maintenanceTasksPollErrorShown = false
 
+function toggleSortDirection() {
+  direction.value = direction.value === 'desc' ? 'asc' : 'desc'
+}
+
+const selectionResetKey = computed(() => manageCollectionQueryFingerprint(
+  serializeManageCollectionQuery(collectionState.value, collectionDefinition)
+))
+const {
+  selectionCount,
+  isPageSelected,
+  isPageIndeterminate,
+  isSelected,
+  toggleOne,
+  togglePage,
+  clear: clearSelection
+} = useManageSelection({
+  visibleIds: computed(() => assets.value.map(asset => asset.id)),
+  filteredTotal: computed(() => totalAssets.value),
+  resetKey: selectionResetKey
+})
+
 onMounted(async () => {
   mounted.value = true
   await reloadAll()
 })
 
-watch([siteKey, spaceKey, profileKey, visibility], async () => {
-  page.value = 1
-  await fetchAssets()
-})
-watch(page, fetchAssets)
+watch([q, sort, direction, page, size, siteKey, spaceKey, profileKey, visibility, mime], fetchAssets)
+watch(totalAssetPages, (lastPage) => {
+  if (page.value > lastPage) page.value = lastPage
+}, { flush: 'sync' })
 watch(grantPage, fetchGrants)
 watch(() => profileForm.defaultVisibility, (visibility) => {
   if (visibility === 'public') {
@@ -391,12 +482,16 @@ async function reloadAll() {
 async function fetchAssets() {
   const data = await call<{ items: AssetItem[], total: number }>('/api/v1/admin/assets-proxy/library', {
     params: {
+      q: q.value || undefined,
       page: page.value,
-      size: SIZE,
+      size: size.value,
       spaceKey: spaceKey.value !== ALL ? spaceKey.value : undefined,
       siteKey: siteKey.value !== ALL ? siteKey.value : undefined,
       profileKey: profileKey.value !== ALL ? profileKey.value : undefined,
-      visibility: visibility.value !== ALL ? visibility.value : undefined
+      visibility: visibility.value !== ALL ? visibility.value : undefined,
+      mime: mime.value !== ALL ? mime.value : undefined,
+      sortBy: sort.value,
+      sortOrder: direction.value
     }
   })
   assets.value = data.items ?? []
@@ -405,7 +500,7 @@ async function fetchAssets() {
 
 async function fetchGrants() {
   const data = await call<{ items: Grant[], total: number }>('/api/v1/admin/assets-proxy/grants', {
-    params: { page: grantPage.value, size: SIZE }
+    params: { page: grantPage.value, size: GRANT_PAGE_SIZE }
   })
   grants.value = data.items ?? []
   totalGrants.value = data.total ?? 0
@@ -1347,54 +1442,120 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
 
     <template v-else>
       <section v-if="tab === 'library'" class="space-y-4">
-        <div class="flex flex-wrap items-center gap-3 rounded-lg border border-default bg-default p-3">
-          <USelectMenu v-model="spaceKey" :items="spaceOptions" value-key="value" class="w-64" :search-input="{ placeholder: '搜索资源空间…' }" />
-          <USelectMenu v-model="siteKey" :items="siteOptions" value-key="value" class="w-56" :search-input="{ placeholder: '搜索站点…' }" />
-          <USelectMenu v-model="profileKey" :items="profileOptions" value-key="value" class="w-56" :search-input="{ placeholder: '搜索 Profile…' }" />
-          <USelect v-model="visibility" :items="visibilityOptions" value-key="value" class="w-36" />
-        </div>
+        <ManageCollectionToolbar
+          v-model:search="searchInput"
+          search-placeholder="搜索文件名、标题、替代文本或 ID…"
+          :filter-count="activeLibraryFilterCount"
+        >
+          <template #filters>
+            <USelectMenu v-model="spaceKey" :items="spaceOptions" value-key="value" :search-input="{ placeholder: '搜索资源空间…' }" />
+            <USelectMenu v-model="siteKey" :items="siteOptions" value-key="value" :search-input="{ placeholder: '搜索站点…' }" />
+            <USelectMenu v-model="profileKey" :items="profileOptions" value-key="value" :search-input="{ placeholder: '搜索 Profile…' }" />
+            <USelect v-model="visibility" :items="visibilityOptions" value-key="value" />
+            <USelect v-model="mime" :items="mimeOptions" value-key="value" />
+            <USelect v-model="sort" :items="sortOptions" value-key="value" icon="i-tabler-arrows-sort" />
+            <UButton
+              :icon="direction === 'desc' ? 'i-tabler-sort-descending' : 'i-tabler-sort-ascending'"
+              :label="direction === 'desc' ? '降序' : '升序'"
+              color="neutral"
+              variant="outline"
+              @click="toggleSortDirection"
+            />
+          </template>
+          <template #actions>
+            <ManageViewToggle v-model="libraryView" :items="[
+              { key: 'grid', label: '网格', icon: 'i-tabler-layout-grid' },
+              { key: 'list', label: '列表', icon: 'i-tabler-list' }
+            ]" />
+          </template>
+        </ManageCollectionToolbar>
 
         <ManageEmpty v-if="!assets.length" icon="i-tabler-photo-off" text="没有匹配的资源" />
-        <div v-else class="overflow-hidden rounded-lg border border-default bg-default">
-          <div
+        <div v-else-if="libraryView === 'grid'" class="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(14rem,100%),1fr))]">
+          <article
             v-for="asset in assets"
             :key="asset.id"
-            class="flex items-center gap-4 border-b border-default px-4 py-3 last:border-b-0"
+            class="group relative overflow-hidden rounded-xl border border-default bg-default transition hover:-translate-y-0.5 hover:shadow-sm"
+            :class="isSelected(asset.id) ? 'ring-2 ring-primary' : ''"
           >
-            <div class="grid size-12 shrink-0 place-items-center overflow-hidden rounded-lg bg-elevated">
-              <img v-if="asset.cdnUrl && asset.mime.startsWith('image/')" :src="asset.cdnUrl" :alt="asset.filename" class="size-full object-cover">
-              <UIcon v-else name="i-tabler-file" class="size-5 text-muted" />
+            <div class="relative aspect-[4/3] overflow-hidden border-b border-default bg-elevated">
+              <img v-if="asset.cdnUrl && asset.mime.startsWith('image/')" :src="asset.cdnUrl" :alt="asset.filename" class="size-full object-cover transition duration-300 group-hover:scale-[1.03]">
+              <div v-else class="grid size-full place-items-center">
+                <UIcon name="i-tabler-file" class="size-9 text-muted" />
+              </div>
+              <UCheckbox
+                class="absolute left-2 top-2 rounded-md bg-default/90 p-1 backdrop-blur"
+                :model-value="isSelected(asset.id)"
+                :aria-label="`选择素材：${asset.filename || asset.id}`"
+                @update:model-value="toggleOne(asset.id)"
+              />
+              <UDropdownMenu :items="assetActions(asset)">
+                <UButton icon="i-tabler-dots-vertical" color="neutral" variant="solid" square size="xs" class="absolute right-2 top-2" :aria-label="`素材操作：${asset.filename || asset.id}`" />
+              </UDropdownMenu>
             </div>
-            <div class="min-w-0 flex-1">
-              <div class="truncate text-sm font-medium text-highlighted">{{ asset.filename || asset.id }}</div>
-              <div class="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted">
-                <span>空间 {{ asset.spaceKey || 'default' }}</span>
-                <span>{{ siteName(asset.siteKey) }}</span>
-                <span>/ {{ asset.profileKey }}</span>
-                <span>{{ asset.mime }}</span>
-                <span>{{ formatBytes(asset.size) }}</span>
-                <span>{{ asset.storageBackend || 'local' }}</span>
-                <span v-if="asset.width && asset.height">{{ asset.width }}x{{ asset.height }}</span>
+            <div class="min-w-0 p-3">
+              <h2 class="truncate text-sm font-semibold text-highlighted">{{ asset.filename || asset.id }}</h2>
+              <p class="mt-1 truncate text-xs text-muted">{{ siteName(asset.siteKey) }} · {{ asset.profileKey || 'default' }}</p>
+              <div class="mt-3 flex items-end justify-between gap-3 border-t border-default pt-2.5 text-xs text-muted">
+                <div class="min-w-0">
+                  <p class="truncate">{{ formatBytes(asset.size) }}<span v-if="asset.width && asset.height"> · {{ asset.width }}×{{ asset.height }}</span></p>
+                  <p class="mt-0.5 truncate">{{ asset.storageBackend || 'local' }}</p>
+                </div>
+                <span v-if="asset.refCount" class="shrink-0 text-warning">{{ asset.refCount }} 引用</span>
               </div>
             </div>
-            <div class="hidden items-center gap-2 sm:flex">
-              <UBadge v-if="asset.refCount" :label="`${asset.refCount} 引用`" color="warning" variant="soft" />
-              <UBadge :label="asset.visibility" :color="asset.visibility === 'public' ? 'success' : 'warning'" variant="soft" />
-              <UBadge :label="asset.deliveryPolicy || 'public'" color="neutral" variant="soft" />
+          </article>
+        </div>
+
+        <div v-else class="overflow-hidden rounded-lg border border-default bg-default">
+          <ManageRowShell
+            v-for="asset in assets"
+            :key="asset.id"
+            :selected="isSelected(asset.id)"
+            :selection-label="`选择素材：${asset.filename || asset.id}`"
+            @select="toggleOne(asset.id)"
+          >
+            <template #media>
+              <div class="grid size-14 shrink-0 place-items-center overflow-hidden rounded-lg bg-elevated">
+                <img v-if="asset.cdnUrl && asset.mime.startsWith('image/')" :src="asset.cdnUrl" :alt="asset.filename" class="size-full object-cover">
+                <UIcon v-else name="i-tabler-file" class="size-5 text-muted" />
+              </div>
+            </template>
+            <div class="min-w-0">
+              <p class="truncate text-sm font-semibold text-highlighted">{{ asset.filename || asset.id }}</p>
+              <p class="mt-0.5 truncate text-xs text-muted">{{ asset.mime }} · {{ formatBytes(asset.size) }}<span v-if="asset.width && asset.height"> · {{ asset.width }}×{{ asset.height }}</span></p>
+              <p class="mt-1 truncate text-xs text-dimmed">空间 {{ asset.spaceKey || 'default' }} · {{ siteName(asset.siteKey) }} / {{ asset.profileKey }}</p>
             </div>
-            <UDropdownMenu :items="assetActions(asset)">
-              <UButton icon="i-tabler-dots-vertical" color="neutral" variant="ghost" square size="xs" />
-            </UDropdownMenu>
-          </div>
+            <template #meta>
+              <div class="min-w-0 text-xs md:w-44 md:text-right">
+                <p class="truncate text-default">{{ asset.storageBackend || 'local' }}</p>
+                <p class="mt-0.5 truncate text-muted">{{ asset.visibility }} · {{ asset.deliveryPolicy || 'public' }}</p>
+                <p v-if="asset.refCount" class="mt-1 text-warning">{{ asset.refCount }} 个引用</p>
+              </div>
+            </template>
+            <template #actions>
+              <UDropdownMenu :items="assetActions(asset)">
+                <UButton icon="i-tabler-dots-vertical" color="neutral" variant="ghost" square size="sm" :aria-label="`素材操作：${asset.filename || asset.id}`" />
+              </UDropdownMenu>
+            </template>
+          </ManageRowShell>
         </div>
-        <div class="flex items-center justify-between text-sm text-muted">
-          <span>共 {{ totalAssets }} 个资源</span>
-          <div class="flex items-center gap-2">
-            <UButton icon="i-tabler-chevron-left" color="neutral" variant="ghost" :disabled="page <= 1" @click="() => { page-- }" />
-            <span>{{ page }}</span>
-            <UButton icon="i-tabler-chevron-right" color="neutral" variant="ghost" :disabled="page * SIZE >= totalAssets" @click="() => { page++ }" />
-          </div>
-        </div>
+
+        <ManageCollectionDock v-if="totalAssets > 0 || assets.length" :with-sidebar="false" label="素材库选择与分页">
+          <template #selection>
+            <UCheckbox :model-value="isPageSelected" :indeterminate="isPageIndeterminate" aria-label="选择当前页素材" @update:model-value="togglePage" />
+            <template v-if="selectionCount">
+              <span class="text-sm text-default">已选 {{ selectionCount }}</span>
+              <span class="text-xs text-muted">批量维护将在后台任务接入后开放</span>
+              <UButton label="取消选择" color="neutral" variant="ghost" size="sm" @click="clearSelection" />
+            </template>
+            <span v-else class="text-xs">共 {{ totalAssets }} 个素材</span>
+          </template>
+          <template #pagination>
+            <USelect v-model="size" :items="pageSizeItems" value-key="value" size="sm" class="w-20" />
+            <ManagePagination v-model="page" :total-pages="totalAssetPages" class="!mt-0" />
+          </template>
+        </ManageCollectionDock>
       </section>
 
       <section v-else-if="tab === 'storage'" class="space-y-4">
@@ -1652,7 +1813,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
           <div class="flex items-center gap-2">
             <UButton icon="i-tabler-chevron-left" color="neutral" variant="ghost" :disabled="grantPage <= 1" @click="() => { grantPage-- }" />
             <span>{{ grantPage }}</span>
-            <UButton icon="i-tabler-chevron-right" color="neutral" variant="ghost" :disabled="grantPage * SIZE >= totalGrants" @click="() => { grantPage++ }" />
+            <UButton icon="i-tabler-chevron-right" color="neutral" variant="ghost" :disabled="grantPage * GRANT_PAGE_SIZE >= totalGrants" @click="() => { grantPage++ }" />
           </div>
         </div>
       </section>
