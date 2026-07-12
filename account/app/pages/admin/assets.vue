@@ -161,10 +161,6 @@ const storageBackendOptions = computed(() => storageBackends.value
     label: b.isDefault ? `${b.name} · 默认` : b.name,
     value: b.name
   })))
-const profileStorageBackendOptions = computed(() => [
-  { label: `继承站点默认 (${siteDefaultBackend(profileForm.siteKey)})`, value: '' },
-  ...storageBackendOptions.value
-])
 const spaceOptions = computed(() => [
   { label: '全部资源空间', value: ALL },
   ...spaces.value.map(space => ({
@@ -421,6 +417,7 @@ async function controlMaintenanceTask(task: MaintenanceTask, action: 'pause' | '
 }
 
 const profileOpen = ref(false)
+const savingProfile = ref(false)
 const profileForm = reactive<Profile>({
   siteKey: 'platform',
   profileKey: '',
@@ -450,32 +447,32 @@ function editProfile(p?: Profile) {
   })
   profileOpen.value = true
 }
-async function saveProfile() {
+async function saveProfile(value: Profile) {
+  Object.assign(profileForm, value)
   if (profileForm.defaultVisibility === 'public') {
     profileForm.defaultDeliveryPolicy = 'public'
   } else if (profileForm.defaultDeliveryPolicy !== 'signed') {
     profileForm.defaultDeliveryPolicy = 'signed'
   }
-  await call('/api/v1/admin/assets-proxy/profiles', {
-    method: 'POST',
-    body: {
-      ...profileForm,
-      defaultDeliveryPolicy: profileForm.defaultVisibility === 'public' ? 'public' : profileForm.defaultDeliveryPolicy
-    }
-  })
-  toast.add({ title: 'Profile 已保存', color: 'success', icon: 'i-tabler-check' })
-  profileOpen.value = false
-  await reloadAll()
-}
-
-function siteDefaultBackend(key: string) {
-  return sites.value.find(s => s.siteKey === key)?.defaultStorageBackend
-    || storageBackends.value.find(b => b.isDefault)?.name
-    || storageBackends.value[0]?.name
-    || 'local'
+  savingProfile.value = true
+  try {
+    await call('/api/v1/admin/assets-proxy/profiles', {
+      method: 'POST',
+      body: {
+        ...profileForm,
+        defaultDeliveryPolicy: profileForm.defaultVisibility === 'public' ? 'public' : profileForm.defaultDeliveryPolicy
+      }
+    })
+    toast.add({ title: 'Profile 已保存', color: 'success', icon: 'i-tabler-check' })
+    profileOpen.value = false
+    await reloadAll()
+  } finally {
+    savingProfile.value = false
+  }
 }
 
 const siteOpen = ref(false)
+const savingSite = ref(false)
 const siteForm = reactive<Site>({
   siteKey: '',
   name: '',
@@ -497,11 +494,17 @@ function editSite(site?: Site) {
   })
   siteOpen.value = true
 }
-async function saveSite() {
-  await call('/api/v1/admin/assets-proxy/sites', { method: 'POST', body: siteForm })
-  toast.add({ title: '站点已保存', color: 'success', icon: 'i-tabler-check' })
-  siteOpen.value = false
-  await reloadAll()
+async function saveSite(value: Site) {
+  Object.assign(siteForm, value)
+  savingSite.value = true
+  try {
+    await call('/api/v1/admin/assets-proxy/sites', { method: 'POST', body: siteForm })
+    toast.add({ title: '站点已保存', color: 'success', icon: 'i-tabler-check' })
+    siteOpen.value = false
+    await reloadAll()
+  } finally {
+    savingSite.value = false
+  }
 }
 
 const storageBackendOpen = ref(false)
@@ -655,6 +658,7 @@ async function confirmRotateStorageBackendSecret() {
 }
 
 const variantOpen = ref(false)
+const savingVariant = ref(false)
 const variantForm = reactive<Variant>({
   id: '',
   siteKey: 'platform',
@@ -685,11 +689,17 @@ function editVariant(v?: Variant, p?: Profile) {
   })
   variantOpen.value = true
 }
-async function saveVariant() {
-  await call('/api/v1/admin/assets-proxy/variants', { method: 'POST', body: variantForm })
-  toast.add({ title: 'Variant 已保存', color: 'success', icon: 'i-tabler-check' })
-  variantOpen.value = false
-  await reloadAll()
+async function saveVariant(value: Variant) {
+  Object.assign(variantForm, value)
+  savingVariant.value = true
+  try {
+    await call('/api/v1/admin/assets-proxy/variants', { method: 'POST', body: variantForm })
+    toast.add({ title: 'Variant 已保存', color: 'success', icon: 'i-tabler-check' })
+    variantOpen.value = false
+    await reloadAll()
+  } finally {
+    savingVariant.value = false
+  }
 }
 
 const deleteAssetTarget = ref<AssetItem | null>(null)
@@ -1302,67 +1312,24 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       />
     </template>
 
-    <UModal v-model:open="profileOpen" title="Profile 配置">
-      <template #body>
-        <div class="grid gap-4 sm:grid-cols-2">
-          <UFormField label="站点"><USelectMenu v-model="profileForm.siteKey" :items="siteOptions.filter(i => i.value !== ALL)" value-key="value" class="w-full" /></UFormField>
-          <UFormField label="Profile Key"><UInput v-model="profileForm.profileKey" placeholder="blog-cover" /></UFormField>
-          <UFormField label="用途" class="sm:col-span-2"><UInput v-model="profileForm.purpose" placeholder="文章封面 / 正文图片 / 付费资源" /></UFormField>
-          <UFormField label="存储后端" class="sm:col-span-2">
-            <USelectMenu
-              v-model="profileForm.storageBackend"
-              :items="profileStorageBackendOptions"
-              value-key="value"
-              class="w-full"
-              :search-input="{ placeholder: '搜索后端…' }"
-            />
-          </UFormField>
-          <UFormField label="允许后缀"><UInput v-model="profileForm.allowedExt" placeholder="jpg,jpeg,png,webp" /></UFormField>
-          <UFormField label="大小上限(bytes)"><UInput v-model.number="profileForm.maxSizeBytes" type="number" /></UFormField>
-          <UFormField label="访问级别" help="公开资源返回稳定公开地址；私有资源由业务授权后生成签名链接。">
-            <USelect v-model="profileForm.defaultVisibility" :items="profileAccessLevelOptions" value-key="value" />
-          </UFormField>
-          <UCheckbox v-model="profileForm.keepOriginal" label="保留原图/原文件" />
-        </div>
-      </template>
-      <template #footer>
-        <div class="flex w-full justify-end gap-2">
-          <UButton label="取消" color="neutral" variant="ghost" @click="() => { profileOpen = false }" />
-          <UButton label="保存" icon="i-tabler-device-floppy" @click="saveProfile" />
-        </div>
-      </template>
-    </UModal>
+    <AssetProfileModal
+      v-model:open="profileOpen"
+      :initial-value="profileForm"
+      :sites="sites"
+      :site-options="siteOptions.filter(item => item.value !== ALL)"
+      :storage-backend-options="storageBackendOptions"
+      :access-level-options="profileAccessLevelOptions"
+      :saving="savingProfile"
+      @save="saveProfile"
+    />
 
-    <UModal v-model:open="siteOpen" title="站点配置">
-      <template #body>
-        <div class="grid gap-4 sm:grid-cols-2">
-          <UFormField label="Site Key">
-            <UInput v-model="siteForm.siteKey" placeholder="blog" />
-          </UFormField>
-          <UFormField label="站点名称">
-            <UInput v-model="siteForm.name" placeholder="Blog" />
-          </UFormField>
-          <UFormField label="默认存储后端">
-            <USelectMenu
-              v-model="siteForm.defaultStorageBackend"
-              :items="storageBackendOptions"
-              value-key="value"
-              class="w-full"
-              :search-input="{ placeholder: '搜索后端…' }"
-            />
-          </UFormField>
-          <UFormField label="状态">
-            <USwitch v-model="siteForm.enabled" label="允许上传" />
-          </UFormField>
-        </div>
-      </template>
-      <template #footer>
-        <div class="flex w-full justify-end gap-2">
-          <UButton label="取消" color="neutral" variant="ghost" @click="() => { siteOpen = false }" />
-          <UButton label="保存" icon="i-tabler-device-floppy" @click="saveSite" />
-        </div>
-      </template>
-    </UModal>
+    <AssetSiteModal
+      v-model:open="siteOpen"
+      :initial-value="siteForm"
+      :storage-backend-options="storageBackendOptions"
+      :saving="savingSite"
+      @save="saveSite"
+    />
 
     <UModal v-model:open="storageBackendOpen" title="S3-compatible 存储后端">
       <template #body>
@@ -1496,27 +1463,13 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       </template>
     </UModal>
 
-    <UModal v-model:open="variantOpen" title="Variant 规则">
-      <template #body>
-        <div class="grid gap-4 sm:grid-cols-2">
-          <UFormField label="站点"><UInput v-model="variantForm.siteKey" disabled /></UFormField>
-          <UFormField label="Profile"><UInput v-model="variantForm.profileKey" disabled /></UFormField>
-          <UFormField label="Variant Key"><UInput v-model="variantForm.variantKey" placeholder="card / og / content" /></UFormField>
-          <UFormField label="模式"><USelect v-model="variantForm.mode" :items="modeOptions" value-key="value" /></UFormField>
-          <UFormField label="宽度"><UInput v-model.number="variantForm.width" type="number" /></UFormField>
-          <UFormField label="高度"><UInput v-model.number="variantForm.height" type="number" /></UFormField>
-          <UFormField label="质量"><UInput v-model.number="variantForm.quality" type="number" /></UFormField>
-          <UFormField label="版本"><UInput v-model.number="variantForm.version" type="number" /></UFormField>
-          <UCheckbox v-model="variantForm.enabled" label="启用" />
-        </div>
-      </template>
-      <template #footer>
-        <div class="flex w-full justify-end gap-2">
-          <UButton label="取消" color="neutral" variant="ghost" @click="() => { variantOpen = false }" />
-          <UButton label="保存" icon="i-tabler-device-floppy" @click="saveVariant" />
-        </div>
-      </template>
-    </UModal>
+    <AssetVariantModal
+      v-model:open="variantOpen"
+      :initial-value="variantForm"
+      :mode-options="modeOptions"
+      :saving="savingVariant"
+      @save="saveVariant"
+    />
 
     <UModal v-model:open="deleteProfileOpen" title="删除 Profile?">
       <template #body>
