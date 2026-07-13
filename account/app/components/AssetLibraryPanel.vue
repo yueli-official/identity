@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
-import { ManageCollectionToolbar, ManageEmpty, ManageRowShell, ManageSortControl, ManageViewToggle } from '@platform/manage/components'
+import { ManageCollectionToolbar, ManageEmpty, ManageRowShell, ManageSortDirectionButton, ManageViewToggle } from '@platform/manage/components'
 import type { AssetItem, AssetMaintenanceTask, AssetSite } from '~/types/asset-admin'
 
 type SelectOption = { label: string, value: string }
@@ -100,9 +100,8 @@ function formatBytes(value: number) {
         <USelectMenu v-model="profileKey" :items="profileOptions" value-key="value" :search-input="{ placeholder: '搜索 Profile…' }" />
         <USelect v-model="visibility" :items="visibilityOptions" value-key="value" />
         <USelect v-model="mime" :items="mimeOptions" value-key="value" />
-        <ManageSortControl v-model="direction">
-          <USelect v-model="sort" :items="sortOptions" value-key="value" icon="i-tabler-arrows-sort" />
-        </ManageSortControl>
+        <USelect v-model="sort" :items="sortOptions" value-key="value" icon="i-tabler-arrows-sort" />
+        <ManageSortDirectionButton v-model="direction" />
       </template>
       <template #actions>
         <ManageViewToggle v-model="view" :items="[

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {
-  ManageHeader, ManageTabs, ManageEmpty, ManagePagination, ManageCollectionToolbar, ManageCollectionDock, ManagePageSelection, ManageSortControl, SkeletonList
+  ManageHeader, ManageTabs, ManageEmpty, ManagePagination, ManageCollectionToolbar, ManageCollectionDock, ManagePageSelection, ManageSortDirectionButton, SkeletonList
 } from '@platform/manage/components'
 import { manageCollectionQueryFingerprint, serializeManageCollectionQuery, type ManageCollectionDefinition } from '@platform/manage/collection'
 import { useManageCollectionState } from '@platform/manage/use-manage-collection-state'
@@ -304,9 +304,8 @@ function initialOf(u: AdminUser) { return (u.displayName || u.email || '?').char
     >
       <template #filters>
         <USelect v-model="role" :items="roleFilterItems" value-key="value" class="w-full" />
-        <ManageSortControl v-model="direction">
-          <USelect v-model="sort" :items="sortItems" value-key="value" />
-        </ManageSortControl>
+        <USelect v-model="sort" :items="sortItems" value-key="value" class="w-full" />
+        <ManageSortDirectionButton v-model="direction" />
       </template>
     </ManageCollectionToolbar>
 
