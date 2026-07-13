@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
-import { ManageCollectionToolbar, ManageEmpty, ManageRowShell, ManageViewToggle } from '@platform/manage/components'
+import { ManageCollectionToolbar, ManageEmpty, ManageRowShell, ManageSortDirectionButton, ManageViewToggle } from '@platform/manage/components'
 import type { AssetItem, AssetMaintenanceTask, AssetSite } from '~/types/asset-admin'
 
 type SelectOption = { label: string, value: string }
@@ -79,10 +79,6 @@ function isSelected(id: string) {
   return selected.value.has(id)
 }
 
-function toggleSortDirection() {
-  direction.value = direction.value === 'desc' ? 'asc' : 'desc'
-}
-
 function siteName(key: string) {
   return sites.find(site => site.siteKey === key)?.name || key
 }
@@ -105,13 +101,7 @@ function formatBytes(value: number) {
         <USelect v-model="visibility" :items="visibilityOptions" value-key="value" />
         <USelect v-model="mime" :items="mimeOptions" value-key="value" />
         <USelect v-model="sort" :items="sortOptions" value-key="value" icon="i-tabler-arrows-sort" />
-        <UButton
-          :icon="direction === 'desc' ? 'i-tabler-sort-descending' : 'i-tabler-sort-ascending'"
-          :label="direction === 'desc' ? '降序' : '升序'"
-          color="neutral"
-          variant="outline"
-          @click="toggleSortDirection"
-        />
+        <ManageSortDirectionButton v-model="direction" />
       </template>
       <template #actions>
         <ManageViewToggle v-model="view" :items="[

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {
-  ManageHeader, ManageTabs, ManageEmpty, ManagePagination, ManageCollectionToolbar, ManageCollectionDock, ManagePageSelection, SkeletonList
+  ManageHeader, ManageTabs, ManageEmpty, ManagePagination, ManageCollectionToolbar, ManageCollectionDock, ManagePageSelection, ManageSortDirectionButton, SkeletonList
 } from '@platform/manage/components'
 import { manageCollectionQueryFingerprint, serializeManageCollectionQuery, type ManageCollectionDefinition } from '@platform/manage/collection'
 import { useManageCollectionState } from '@platform/manage/use-manage-collection-state'
@@ -305,13 +305,7 @@ function initialOf(u: AdminUser) { return (u.displayName || u.email || '?').char
       <template #filters>
         <USelect v-model="role" :items="roleFilterItems" value-key="value" class="w-full" />
         <USelect v-model="sort" :items="sortItems" value-key="value" class="w-full" />
-        <UButton
-          color="neutral"
-          variant="outline"
-          :icon="direction === 'asc' ? 'i-tabler-sort-ascending' : 'i-tabler-sort-descending'"
-          :label="direction === 'asc' ? '升序' : '降序'"
-          @click="() => { direction = direction === 'asc' ? 'desc' : 'asc' }"
-        />
+        <ManageSortDirectionButton v-model="direction" />
       </template>
     </ManageCollectionToolbar>
 
