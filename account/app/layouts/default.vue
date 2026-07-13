@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { PlatformUserMenu } from '@platform/ui/components'
 import type { PlatformUserMenuAction } from '@platform/ui/components'
-import { BackToTop } from '@platform/manage/components'
+import BackToTop from '@platform/manage/back-to-top'
 
 const { me, logout, isAdmin } = useSession()
 
