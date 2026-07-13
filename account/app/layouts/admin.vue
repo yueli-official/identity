@@ -23,7 +23,6 @@ const handleLogout = async () => {
     :context-label="contextLabel"
     home-to="/admin/platform"
     storage-key="account-admin"
-    content-class="max-w-6xl"
     :show-back-to-top="route.path.startsWith('/admin/platform')"
   >
     <template #sidebar><AdminSidebar /></template>
