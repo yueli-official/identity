@@ -2,5 +2,19 @@
   "name": "@platform/auth",
   "private": true,
   "type": "module",
-  "main": "./nuxt.config.ts"
+  "main": "./nuxt.config.ts",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@platform/manage": "workspace:*",
+    "@platform/ui": "workspace:*",
+    "vue": "catalog:"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "catalog:",
+    "@vue/test-utils": "catalog:",
+    "happy-dom": "catalog:",
+    "vitest": "catalog:"
+  }
 }
