@@ -117,7 +117,7 @@ describe('platform capability BFF schema', () => {
       const value = manifest()
       Object.assign(value.capabilities[0]!, state)
       const [application] = evaluateCapabilityRequirements([{
-        site: 'docs-ae', productType: 'docs', brand: 'Docs', capabilities: { 'asset.object-storage': state.constraint },
+        site: 'docs-main', productType: 'docs', brand: 'Docs', capabilities: { 'asset.object-storage': state.constraint },
       }], [{ key: 'asset', status: 'available', observedAt: value.generatedAt, latencyMs: 1, manifest: value }])
       expect(application?.requirements[0]?.reason).toBe(state.reason)
     }
@@ -133,7 +133,7 @@ describe('platform capability BFF schema', () => {
 
   it('merges attached composition requirements deterministically and rejects conflicts', () => {
     const blog = { site: 'blog-ai', productType: 'blog', brand: 'AI Blog', capabilities: { 'identity.oidc': '>=1.0' } }
-    const docs = { site: 'docs-ae', productType: 'docs', brand: 'Docs', capabilities: { 'identity.oidc': '>=1.0' } }
+    const docs = { site: 'docs-main', productType: 'docs', brand: 'Docs', capabilities: { 'identity.oidc': '>=1.0' } }
     expect(mergeCapabilityRequirements([[docs], [blog], [blog]])).toEqual([blog, docs])
     expect(() => mergeCapabilityRequirements([[blog], [{ ...blog, capabilities: { 'identity.oidc': '>=2.0' } }]])).toThrow('conflicting')
   })
@@ -141,7 +141,7 @@ describe('platform capability BFF schema', () => {
   it('loads strict attach registrations from the Core control directory', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'account-compositions-'))
     const base = [{ site: 'blog-ai', productType: 'blog', brand: 'AI Blog', capabilities: { 'identity.oidc': '>=1.0' } }]
-    const attached = [{ site: 'docs-ae', productType: 'docs', brand: 'Docs', capabilities: { 'asset.object-storage': '>=1.0' } }]
+    const attached = [{ site: 'docs-main', productType: 'docs', brand: 'Docs', capabilities: { 'asset.object-storage': '>=1.0' } }]
     await writeFile(join(directory, 'docs.json'), JSON.stringify(attached))
     vi.stubGlobal('useRuntimeConfig', () => ({
       platformCapabilityRequirementsB64: Buffer.from(JSON.stringify(base)).toString('base64'),
