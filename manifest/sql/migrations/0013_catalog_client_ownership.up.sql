@@ -6,7 +6,7 @@ ALTER TABLE oidc_clients
 UPDATE oidc_clients
 SET managed_by = 'catalog'
 WHERE id IN (
-    'shop-ae-web', 'resource-ae-web', 'docs-ae-web', 'blog-ai-web', 'blog-ui-web',
-    'shop-ae-staging-web', 'resource-ae-staging-web', 'docs-ae-staging-web',
+    'shop-main-web', 'resource-main-web', 'docs-main-web', 'blog-ai-web', 'blog-ui-web',
+    'shop-main-staging-web', 'resource-main-staging-web', 'docs-main-staging-web',
     'blog-ai-staging-web', 'blog-ui-staging-web'
 );

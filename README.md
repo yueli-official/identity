@@ -152,7 +152,7 @@ starts the real PG+Redis identity service, provisions the shared test account,
 and registers each site's OIDC client from the resolved local catalog:
 
 ```sh
-go run ./cmd/platformctl dev up --file catalog/overlays/local.yaml --root . docs-ae
+go run ./cmd/platformctl dev up --file catalog/overlays/local.yaml --root . docs-main
 ```
 
 The shared local login is `test@example.com` / `Test12345`.
