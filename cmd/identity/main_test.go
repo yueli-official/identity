@@ -1,0 +1,27 @@
+package main
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"platform/services/identity/internal/oidc"
+	"platform/services/identity/internal/repo"
+)
+
+func TestOpenAPIRepositoriesAreHermetic(t *testing.T) {
+	dependencies := newRuntimeRepositories(true)
+	memory, ok := dependencies.store.(*repo.Memory)
+	if !ok {
+		t.Fatalf("OpenAPI store = %T, want *repo.Memory", dependencies.store)
+	}
+	if dependencies.clients != memory || dependencies.signingKeys != memory || dependencies.audit != memory {
+		t.Fatal("OpenAPI repositories must share the hermetic memory store")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if _, err := oidc.NewManager(ctx, dependencies.signingKeys); err != nil {
+		t.Fatalf("initialize OpenAPI signing keys without PostgreSQL: %v", err)
+	}
+}

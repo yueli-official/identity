@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/gogf/gf/v2/frame/g"
@@ -34,13 +35,47 @@ import (
 	"platform/services/identity/internal/repo"
 )
 
+type runtimeRepositories struct {
+	store       repo.Store
+	clients     repo.ClientRepo
+	signingKeys repo.SigningKeyRepo
+	audit       repo.AuditRepo
+	oidcBackend oidc.Backend
+}
+
+func newRuntimeRepositories(openAPIExport bool) runtimeRepositories {
+	if openAPIExport {
+		memory := repo.NewMemory()
+		return runtimeRepositories{
+			store:       memory,
+			clients:     memory,
+			signingKeys: memory,
+			audit:       memory,
+			oidcBackend: oidc.NewMemBackend(),
+		}
+	}
+
+	postgres := dao.NewPG(g.DB())
+	redis := cache.NewRedis(g.Redis())
+	return runtimeRepositories{
+		store:       repo.NewComposite(postgres, repo.NewRecoveringSessionStore(redis, postgres), redis),
+		clients:     postgres,
+		signingKeys: postgres,
+		audit:       postgres,
+		oidcBackend: oidc.NewPGBackend(g.DB()),
+	}
+}
+
 func main() {
 	ctx := gctx.New()
-	shutdown, err := observability.StartFromEnvironment(ctx, "identity-api")
-	if err != nil {
-		panic(err)
+	openAPIExport := os.Getenv(openapiexport.OutputEnv) != ""
+	if !openAPIExport {
+		shutdown, err := observability.StartFromEnvironment(ctx, "identity-api")
+		if err != nil {
+			panic(err)
+		}
+		defer observability.ShutdownWithTimeout(shutdown)
 	}
-	defer observability.ShutdownWithTimeout(shutdown)
 
 	// ── Config ──────────────────────────────────────────────────────────────
 	issuer := g.Cfg().MustGet(ctx, "oidc.issuer").String()
@@ -58,18 +93,13 @@ func main() {
 	notificationBaseURL := g.Cfg().MustGet(ctx, "notification.baseUrl").String()
 	notificationAudience := g.Cfg().MustGet(ctx, "notification.audience").String()
 
-	// ── Data layer ──────────────────────────────────────────────────────────
-	daoPG := dao.NewPG(g.DB())
-	rdb := cache.NewRedis(g.Redis())
-
 	// ── Business auth ───────────────────────────────────────────────────────
 	cfg := logic.DefaultConfig()
 	cfg.AccountBaseURL = accountBaseURL // base for verify-email / reset links
 	if sessionIdleTTL := g.Cfg().MustGet(ctx, "auth.sessionIdleTtl").Duration(); sessionIdleTTL > 0 {
 		cfg.SessionIdleTTL = sessionIdleTTL
 	}
-	sessionStore := repo.NewRecoveringSessionStore(rdb, daoPG)
-	store := repo.NewComposite(daoPG, sessionStore, rdb)
+	repositories := newRuntimeRepositories(openAPIExport)
 
 	// PAT HMAC secret: warn at startup when falling back to the insecure dev key.
 	cfg.PATHMACSecret = g.Cfg().MustGet(ctx, "pat.hmacSecret").String()
@@ -80,14 +110,14 @@ func main() {
 		cfg.PATMaxPerUser = maxPerUser
 	}
 
-	svc := logic.New(store, cfg)
+	svc := logic.New(repositories.store, cfg)
 	authCtl := controller.New(svc, secureCookie, cfg.SessionIdleTTL)
 
 	// ── Bootstrap admin (RBAC) ───────────────────────────────────────────────
 	// If rbac.bootstrapAdminEmail is set and that identity already exists, grant
 	// it the admin role. Best-effort + idempotent (GrantRole is a no-op on a
 	// repeat grant); silent if the identity hasn't registered yet.
-	if bootstrapEmail := g.Cfg().MustGet(ctx, "rbac.bootstrapAdminEmail").String(); bootstrapEmail != "" {
+	if bootstrapEmail := g.Cfg().MustGet(ctx, "rbac.bootstrapAdminEmail").String(); !openAPIExport && bootstrapEmail != "" {
 		id, err := svc.GetByEmail(ctx, bootstrapEmail)
 		switch {
 		case errors.Is(err, repo.ErrIdentityMissing):
@@ -121,7 +151,7 @@ func main() {
 	svc.SetMailer(mlr)
 
 	// ── OIDC / OAuth2 ───────────────────────────────────────────────────────
-	mgr, err := oidc.NewManager(ctx, daoPG)
+	mgr, err := oidc.NewManager(ctx, repositories.signingKeys)
 	if err != nil {
 		panic(fmt.Sprintf("oidc.NewManager: %v", err))
 	}
@@ -133,7 +163,7 @@ func main() {
 	}
 	// Durable PG-backed OIDC store: persists OAuth requests and refresh tokens
 	// across restarts. Access tokens remain stateless JWTs.
-	oidcStore := oidc.NewStore(oidc.NewPGBackend(g.DB()), daoPG)
+	oidcStore := oidc.NewStore(repositories.oidcBackend, repositories.clients)
 	// Wire passive logout: logic.Service calls RevokeRefreshBySession on logout,
 	// which revokes all refresh tokens belonging to that identity session.
 	svc.SetRefreshRevoker(oidcStore)
@@ -145,7 +175,7 @@ func main() {
 		IDTTL:        10 * time.Minute,
 		RefreshTTL:   refreshTTL,
 	}, mgr.KeyGetter)
-	oidcCtl := controller.NewOIDC(provider, mgr, svc, daoPG, issuer, loginURL)
+	oidcCtl := controller.NewOIDC(provider, mgr, svc, repositories.clients, issuer, loginURL)
 
 	// ── Google OAuth login ──────────────────────────────────────────────────
 	// Provider stays nil when credentials are unconfigured; the controller then
@@ -204,7 +234,7 @@ func main() {
 	if err != nil {
 		panic(fmt.Sprintf("identity capability registry: %v", err))
 	}
-	capabilityCtl := controller.NewCapability(authCtl, capabilityRegistry, daoPG, identitycap.ServiceMetadata())
+	capabilityCtl := controller.NewCapability(authCtl, capabilityRegistry, repositories.audit, identitycap.ServiceMetadata())
 
 	// Avatar/cover upload proxy: the IdP drives the asset upload server-side on
 	// behalf of the cookie-authenticated caller (mints a short-lived user token).
