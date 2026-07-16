@@ -1,81 +1,59 @@
-# Identity service
+# 身份服务
 
-- Lifecycle: active platform service
-- Authority: Catalog `platformServices.identity`, migrations and generated OpenAPI
-- Consumers: Account, every product BFF/API, Asset and other platform services
-- Verify: `go test ./services/identity/...`
+- 生命周期：活跃的平台服务
+- 权威来源：Catalog `platformServices.identity`、迁移和生成的 OpenAPI
+- 消费者：Account、全部产品 BFF/API、Asset 及其他平台服务
+- 验证：`go test ./services/identity/...`
 
-Identity is the single identity provider for the site group. It owns accounts,
-credentials, public profiles, login sessions, roles, personal access tokens,
-OAuth2/OIDC clients and signing keys. Product services own their domain
-permissions and content; they consume Identity subjects and scopes instead of
-copying user records or implementing login.
+Identity 是站群唯一身份提供方，负责账户、凭据、公开资料、登录会话、角色、个人访问令牌、OAuth2/OIDC 客户端与签名密钥。产品服务拥有领域权限和内容；它们消费 Identity subject 与 scope，不能复制用户记录或自行实现登录。
 
-## Runtime model
+## 运行模型
 
-- PostgreSQL is the durable source for identities, credentials, profiles,
-  Identity sessions, OIDC protocol state, refresh tokens, clients and keys.
-- Redis is a session hot cache plus rate-limit/lockout dependency. A Redis miss
-  can recover a valid Identity session from PostgreSQL.
-- `ory/fosite` provides the OAuth2/OIDC protocol state machine. Public clients
-  use authorization code + PKCE S256. Access tokens are short-lived RS256 JWTs;
-  consumers validate them locally through JWKS.
-- Refresh tokens are persisted and rotated. Single-session logout, logout-all
-  and RP-initiated logout revoke the appropriate refresh-token scope.
-- Account is the one per-environment companion UI declared by Catalog; it is
-  not a second identity authority.
+- PostgreSQL 持久保存身份、凭据、资料、Identity 会话、OIDC 协议状态、刷新令牌、客户端和密钥。
+- Redis 是会话热缓存，也是限流与锁定依赖；Redis miss 时可从 PostgreSQL 恢复有效 Identity 会话。
+- `ory/fosite` 提供 OAuth2/OIDC 协议状态机。公共客户端使用授权码与 PKCE S256；短期访问令牌为 RS256 JWT，消费者通过 JWKS 本地验证。
+- 刷新令牌持久化并轮换；单会话退出、全部退出和 RP 发起退出会撤销对应刷新令牌范围。
+- Account 是 Catalog 声明的每环境唯一配套界面，不是第二个身份权威。
 
-The durable implementation contract is documented in
-`flightdeck/knowledge/auth/identity-oidc-provider-boundary.md` and
-`flightdeck/knowledge/auth/login-session-durability.md`.
+长期实现契约见 `flightdeck/knowledge/auth/identity-oidc-provider-boundary.md` 与 `flightdeck/knowledge/auth/login-session-durability.md`。
 
-## API surfaces
+## 接口面
 
-- `/api/v1/auth/*`: registration, password login/logout, verification, password
-  reset/change and optional Google login.
-- `/api/v1/session/*`: current identity, profile/media updates, credentials and
-  session/device management.
-- `/api/v1/profiles*`: public profile lookup.
-- `/api/v1/pat*`: personal access token lifecycle and verification.
-- `/api/v1/admin/*`: user, capability and provider operations plus scoped
-  platform-service proxies used by Account.
-- `/.well-known/openid-configuration`, `/oauth2/authorize`, `/oauth2/token`,
-  `/oauth2/userinfo`, `/oauth2/revoke`, `/oauth2/end_session` and
-  `/oauth2/jwks.json`: raw standards endpoints without the platform envelope.
-- `/healthz`, `/readyz`, `/api.json`, `/swagger`: operations and discovery.
+- `/api/v1/auth/*`：注册、密码登录/退出、验证、密码重置/修改和可选 Google 登录。
+- `/api/v1/session/*`：当前身份、资料与媒体更新、凭据和会话/设备管理。
+- `/api/v1/profiles*`：公开资料查询。
+- `/api/v1/pat*`：个人访问令牌生命周期和验证。
+- `/api/v1/admin/*`：用户、能力、provider 运维，以及 Account 使用的限域平台服务代理。
+- `/.well-known/openid-configuration`、`/oauth2/*` 与 `/oauth2/jwks.json`：不使用平台信封的标准协议端点。
+- `/healthz`、`/readyz`、`/api.json`、`/swagger`：运维与接口发现。
 
-Use generated OpenAPI as the field-level API authority.
+字段级接口真值以生成的 OpenAPI 为准。
 
-## Directory map
+## 目录地图
 
-- `api/v1/`: business request/response contracts.
-- `cmd/identity/`: dependency composition, routes and startup validation.
-- `internal/logic/`: identity/session/credential domain behavior.
-- `internal/oidc/`: Fosite store, PG transaction adapter, claims and keys.
-- `internal/dao/` and `internal/repo/`: durable persistence and cache seams.
-- `internal/controller/`: business, OIDC and OAuth-login HTTP boundaries.
-- `manifest/config/`: configuration template; real config is ignored.
-- `manifest/sql/migrations/`: the only schema history authority.
+- `api/v1/`：业务请求与响应契约。
+- `cmd/identity/`：依赖组合、路由和启动验证。
+- `internal/logic/`：身份、会话与凭据领域行为。
+- `internal/oidc/`：Fosite store、PG 事务 adapter、claims 和密钥。
+- `internal/dao/`、`internal/repo/`：持久化与缓存 seam。
+- `internal/controller/`：业务、OIDC 与 OAuth 登录 HTTP seam。
+- `manifest/config/`：配置模板，真实配置被 Git 忽略。
+- `manifest/sql/migrations/`：唯一 schema 历史权威。
 
-## Development
+## 开发
 
-Use the Catalog-driven lifecycle for normal work; it provisions OIDC clients
-and the shared local account (`test@example.com` / `Test12345`) consistently:
+正常开发使用 Catalog 生命周期，它会一致地 provision OIDC 客户端和共享本地账户（`test@example.com` / `Test12345`）：
 
 ```powershell
 pnpm platformctl dev up --file catalog/overlays/local.yaml --root . docs-main
 pnpm platformctl dev status --root .
 ```
 
-For isolated service work, copy `manifest/config/config.example.yaml` to the
-ignored `config.yaml`. Required runtime values include PostgreSQL, Redis and a
-stable `GF_OIDC_GLOBALSECRET` of at least 32 bytes. `oidc.issuer` must equal the
-externally reachable Identity origin.
+隔离开发时，把 `manifest/config/config.example.yaml` 复制为忽略的 `config.yaml`。必须提供 PostgreSQL、Redis 和至少 32 字节且稳定的 `GF_OIDC_GLOBALSECRET`；`oidc.issuer` 必须等于外部可访问的 Identity origin。
 
 ```powershell
 go run ./services/identity/cmd/identity
 go test ./services/identity/...
 ```
 
-Integration tests use `TEST_PG_LINK` and `TEST_REDIS_ADDR`. Never replace the PG
-session/OIDC stores with memory implementations in production wiring.
+集成测试使用 `TEST_PG_LINK` 和 `TEST_REDIS_ADDR`。生产 wiring 绝不能把 PG 会话/OIDC store 替换为内存实现。
