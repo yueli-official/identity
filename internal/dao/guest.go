@@ -38,7 +38,7 @@ func (p *PG) ClaimGuestSession(ctx context.Context, tokenHash, identityID string
 	var session model.GuestSession
 	err := p.db.Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
 		tx = tx.Ctx(ctx)
-		result, err := tx.Exec(`UPDATE guest_sessions
+		result, err := tx.Ctx(ctx).Exec(`UPDATE guest_sessions
 SET claimed_identity_id = COALESCE(claimed_identity_id, ?::uuid),
     claimed_at = COALESCE(claimed_at, ?)
 WHERE token_hash = ?
