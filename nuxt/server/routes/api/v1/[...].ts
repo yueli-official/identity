@@ -4,7 +4,11 @@
 // endpoints keep working logged-out.
 export default defineEventHandler(async (event) => {
   const cfg = oidcConfig(event);
-  const headers = platformProxyHeaders(event, await sessionAuthHeaders(event));
+  const method = getMethod(event).toUpperCase();
+  const authHeaders = ["GET", "HEAD", "OPTIONS"].includes(method)
+    ? await sessionAuthHeaders(event)
+    : await subjectAuthHeaders(event, cfg.clientId);
+  const headers = platformProxyHeaders(event, authHeaders);
   return await proxyRequest(event, cfg.downstreamBase + event.path, {
     headers,
     streamRequest: true,
