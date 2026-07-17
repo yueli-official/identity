@@ -19,6 +19,8 @@ var (
 	ErrProviderUIDTaken    = errors.New("provider uid already linked")
 	ErrVerificationInvalid = errors.New("verification token invalid, expired, or used")
 	ErrUnknownRole         = errors.New("unknown role slug")
+	ErrGuestSessionMissing = errors.New("guest session not found")
+	ErrGuestClaimConflict  = errors.New("guest session already claimed")
 )
 
 // Verification purpose scopes (a token issued for one purpose must not work for
@@ -178,6 +180,12 @@ type SessionStore interface {
 	DeleteSession(ctx context.Context, id string) error
 	ListSessionsByIdentity(ctx context.Context, identityID string) ([]model.Session, error)
 	DeleteSessionsByIdentity(ctx context.Context, identityID string) error
+}
+
+type GuestSessionStore interface {
+	CreateGuestSession(ctx context.Context, session model.GuestSession) error
+	GetGuestSession(ctx context.Context, tokenHash string) (model.GuestSession, error)
+	ClaimGuestSession(ctx context.Context, tokenHash, identityID string, claimedAt time.Time) (model.GuestSession, error)
 }
 
 // LoginThrottle tracks failed-login counters for rate-limit / lockout.

@@ -18,24 +18,25 @@ var memRoleCatalog = map[string]bool{"user": true, "admin": true}
 
 // Memory is a hermetic in-memory Store for unit tests and local dev.
 type Memory struct {
-	mu         sync.Mutex
-	byID       map[string]model.Identity
-	byEmail    map[string]string // email -> id
-	pwHash     map[string]string // id -> hash
-	profiles   map[string]model.Profile
-	sessions   map[string]model.Session
-	failCount  map[string]int
-	lockUntil  map[string]time.Time
-	now        func() time.Time
-	clients    map[string]model.OIDCClient
-	keys       []model.SigningKey
-	oauthLinks map[string]string          // provider+"\x00"+providerUID -> identity id
-	verifs     map[string]memVerification // token_hash -> verification record
-	roles      map[string]map[string]bool // identity id -> set of granted role slugs
-	audit      []AuditRow                 // append-only audit log (newest is highest index)
-	auditSeq   int64                      // monotonically incrementing ID counter
-	pats       map[int64]PATRow           // id -> PAT row
-	patSeq     int64                      // monotonically incrementing PAT ID counter
+	mu            sync.Mutex
+	byID          map[string]model.Identity
+	byEmail       map[string]string // email -> id
+	pwHash        map[string]string // id -> hash
+	profiles      map[string]model.Profile
+	sessions      map[string]model.Session
+	guestSessions map[string]model.GuestSession // sha256 token hash -> session
+	failCount     map[string]int
+	lockUntil     map[string]time.Time
+	now           func() time.Time
+	clients       map[string]model.OIDCClient
+	keys          []model.SigningKey
+	oauthLinks    map[string]string          // provider+"\x00"+providerUID -> identity id
+	verifs        map[string]memVerification // token_hash -> verification record
+	roles         map[string]map[string]bool // identity id -> set of granted role slugs
+	audit         []AuditRow                 // append-only audit log (newest is highest index)
+	auditSeq      int64                      // monotonically incrementing ID counter
+	pats          map[int64]PATRow           // id -> PAT row
+	patSeq        int64                      // monotonically incrementing PAT ID counter
 }
 
 // memVerification mirrors a single email_verifications row in memory.
@@ -51,7 +52,7 @@ func NewMemory() *Memory {
 	return &Memory{
 		byID: map[string]model.Identity{}, byEmail: map[string]string{},
 		pwHash: map[string]string{}, profiles: map[string]model.Profile{},
-		sessions: map[string]model.Session{}, failCount: map[string]int{},
+		sessions: map[string]model.Session{}, guestSessions: map[string]model.GuestSession{}, failCount: map[string]int{},
 		lockUntil: map[string]time.Time{}, now: time.Now,
 		clients: map[string]model.OIDCClient{}, keys: nil,
 		oauthLinks: map[string]string{},
@@ -64,6 +65,41 @@ func NewMemory() *Memory {
 // oauthKey builds the composite map key for an (provider, providerUID) pair.
 func oauthKey(provider, providerUID string) string {
 	return provider + "\x00" + providerUID
+}
+
+func (m *Memory) CreateGuestSession(_ context.Context, session model.GuestSession) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.guestSessions[session.TokenHash] = session
+	return nil
+}
+
+func (m *Memory) GetGuestSession(_ context.Context, tokenHash string) (model.GuestSession, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	session, ok := m.guestSessions[tokenHash]
+	if !ok {
+		return model.GuestSession{}, ErrGuestSessionMissing
+	}
+	return session, nil
+}
+
+func (m *Memory) ClaimGuestSession(_ context.Context, tokenHash, identityID string, claimedAt time.Time) (model.GuestSession, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	session, ok := m.guestSessions[tokenHash]
+	if !ok {
+		return model.GuestSession{}, ErrGuestSessionMissing
+	}
+	if session.ClaimedIdentityID != "" && session.ClaimedIdentityID != identityID {
+		return model.GuestSession{}, ErrGuestClaimConflict
+	}
+	if session.ClaimedIdentityID == "" {
+		session.ClaimedIdentityID = identityID
+		session.ClaimedAt = &claimedAt
+		m.guestSessions[tokenHash] = session
+	}
+	return session, nil
 }
 
 func (m *Memory) CreateIdentityWithProfile(_ context.Context, in NewIdentityInput) (model.Identity, error) {

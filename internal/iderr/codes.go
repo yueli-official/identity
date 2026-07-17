@@ -43,6 +43,10 @@ var (
 	CodeProviderNotFound         = errs.Register("identity.provider_not_found", http.StatusNotFound)
 	CodeCapabilityProbeRateLimit = errs.Register("identity.capability_probe_rate_limited", http.StatusTooManyRequests)
 	CodeCapabilityAudit          = errs.Register("identity.capability_audit_unavailable", http.StatusInternalServerError)
+	CodeInvalidGuestRequest      = errs.Register("identity.guest_request_invalid", http.StatusBadRequest)
+	CodeInvalidGuestSession      = errs.Register("identity.guest_session_invalid", http.StatusUnauthorized)
+	CodeInvalidGuestAudience     = errs.Register("identity.guest_audience_invalid", http.StatusForbidden)
+	CodeGuestClaimConflict       = errs.Register("identity.guest_claim_conflict", http.StatusConflict)
 )
 
 func EmailTaken(email string) *errs.Coded {
@@ -88,6 +92,22 @@ func CapabilityProbeRateLimited(key string) *errs.Coded {
 
 func CapabilityAuditUnavailable() *errs.Coded {
 	return errs.New(CodeCapabilityAudit, "identity capability audit is unavailable", nil)
+}
+
+func InvalidGuestRequest() *errs.Coded {
+	return errs.New(CodeInvalidGuestRequest, "invalid guest session request", nil)
+}
+
+func InvalidGuestSession() *errs.Coded {
+	return errs.New(CodeInvalidGuestSession, "guest session is invalid or expired", nil)
+}
+
+func InvalidGuestAudience() *errs.Coded {
+	return errs.New(CodeInvalidGuestAudience, "guest token audience is not allowed", nil)
+}
+
+func GuestClaimConflict() *errs.Coded {
+	return errs.New(CodeGuestClaimConflict, "guest session is already claimed", nil)
 }
 
 // OAuthEmailConflict: the provider's (unverified) email collides with an

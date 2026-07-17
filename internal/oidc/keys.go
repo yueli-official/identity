@@ -148,6 +148,27 @@ func (m *Manager) MintServiceToken(issuer, subject, audience, scope string, ttl 
 	return builder.CompactSerialize()
 }
 
+func (m *Manager) MintGuestToken(issuer, subject, clientID, audience string, ttl time.Duration, now time.Time) (string, error) {
+	if strings.TrimSpace(subject) == "" || strings.TrimSpace(clientID) == "" || strings.TrimSpace(audience) == "" {
+		return "", fmt.Errorf("guest token subject, client id and audience are required")
+	}
+	sig, err := jose.NewSigner(
+		jose.SigningKey{Algorithm: jose.RS256, Key: m.activeKey},
+		(&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", m.activeKID),
+	)
+	if err != nil {
+		return "", err
+	}
+	claims := jwt.Claims{
+		Issuer: issuer, Subject: subject, Audience: jwt.Audience{audience},
+		IssuedAt: jwt.NewNumericDate(now), NotBefore: jwt.NewNumericDate(now), Expiry: jwt.NewNumericDate(now.Add(ttl)),
+		ID: uuid.NewString(),
+	}
+	return jwt.Signed(sig).Claims(claims).Claims(map[string]interface{}{
+		"client_id": clientID, "subject_kind": "guest", "scope": "guest:access",
+	}).CompactSerialize()
+}
+
 func parseRSAPrivate(pemStr string) (*rsa.PrivateKey, error) {
 	block, _ := pem.Decode([]byte(pemStr))
 	if block == nil {

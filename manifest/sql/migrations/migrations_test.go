@@ -87,3 +87,25 @@ func TestIdentitySessionMigrationHasDurableLoginSessions(t *testing.T) {
 		t.Errorf("0011 down missing: %v", err)
 	}
 }
+
+func TestGuestSessionMigrationHasDurableClaimableSessions(t *testing.T) {
+	up, err := os.ReadFile("0015_guest_sessions.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(up)
+	for _, want := range []string{
+		"CREATE TABLE guest_sessions",
+		"token_hash",
+		"client_id",
+		"expires_at",
+		"claimed_identity_id",
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("0015 up missing %q", want)
+		}
+	}
+	if _, err := os.Stat("0015_guest_sessions.down.sql"); err != nil {
+		t.Errorf("0015 down missing: %v", err)
+	}
+}

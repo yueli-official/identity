@@ -26,6 +26,9 @@ redis:
     db: 0
 auth:
   sessionIdleTtl: "720h"  # 30 days; Redis is a cache, PG remains the durable session source
+guest:
+  maxSessionTtl: "720h"   # site BFF supplies its requested TTL; Identity enforces this ceiling
+  accessTokenTtl: "10m"   # short-lived resource JWT, independent of the durable guest session
 oidc:
   issuer: "http://localhost:8081"
   audience: "identity-api" # audience for scoped machine discovery tokens

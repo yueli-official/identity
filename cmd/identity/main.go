@@ -27,6 +27,7 @@ import (
 	"platform/services/identity/internal/cache"
 	"platform/services/identity/internal/controller"
 	"platform/services/identity/internal/dao"
+	"platform/services/identity/internal/guest"
 	"platform/services/identity/internal/identitycap"
 	"platform/services/identity/internal/logic"
 	"platform/services/identity/internal/mailer"
@@ -37,6 +38,7 @@ import (
 
 type runtimeRepositories struct {
 	store       repo.Store
+	guestStore  repo.GuestSessionStore
 	clients     repo.ClientRepo
 	signingKeys repo.SigningKeyRepo
 	audit       repo.AuditRepo
@@ -48,6 +50,7 @@ func newRuntimeRepositories(openAPIExport bool) runtimeRepositories {
 		memory := repo.NewMemory()
 		return runtimeRepositories{
 			store:       memory,
+			guestStore:  memory,
 			clients:     memory,
 			signingKeys: memory,
 			audit:       memory,
@@ -59,6 +62,7 @@ func newRuntimeRepositories(openAPIExport bool) runtimeRepositories {
 	redis := cache.NewRedis(g.Redis())
 	return runtimeRepositories{
 		store:       repo.NewComposite(postgres, repo.NewRecoveringSessionStore(redis, postgres), redis),
+		guestStore:  postgres,
 		clients:     postgres,
 		signingKeys: postgres,
 		audit:       postgres,
@@ -176,6 +180,11 @@ func main() {
 		RefreshTTL:   refreshTTL,
 	}, mgr.KeyGetter)
 	oidcCtl := controller.NewOIDC(provider, mgr, svc, repositories.clients, issuer, loginURL)
+	guestCtl := controller.NewGuest(guest.New(repositories.guestStore, repositories.clients, mgr, guest.Config{
+		Issuer:         issuer,
+		MaxSessionTTL:  g.Cfg().MustGet(ctx, "guest.maxSessionTtl", "720h").Duration(),
+		AccessTokenTTL: g.Cfg().MustGet(ctx, "guest.accessTokenTtl", "10m").Duration(),
+	}))
 
 	// ── Google OAuth login ──────────────────────────────────────────────────
 	// Provider stays nil when credentials are unconfigured; the controller then
@@ -258,6 +267,7 @@ func main() {
 	s := g.Server()
 	s.GetOpenApi().Components.SecuritySchemes = goai.SecuritySchemes{
 		"AdminAuth": {Value: &goai.SecurityScheme{Type: "http", Scheme: "bearer", BearerFormat: "JWT", Description: "Admin session cookie or an Identity access token with platform capability scope."}},
+		"UserAuth":  {Value: &goai.SecurityScheme{Type: "http", Scheme: "bearer", BearerFormat: "JWT", Description: "Identity user access token."}},
 	}
 	s.Use(ghttpx.TraceRouteMiddleware)
 
@@ -277,6 +287,7 @@ func main() {
 		grp.Bind(authCtl)
 		grp.Bind(avatarCtl)
 		grp.Bind(capabilityCtl)
+		grp.Bind(guestCtl)
 		grp.ALL("/api/v1/admin/assets-proxy/*", assetAdminProxy.Forward)
 		grp.ALL("/api/v1/admin/platform-proxy/*", platformCapabilityProxy.Forward)
 	})
