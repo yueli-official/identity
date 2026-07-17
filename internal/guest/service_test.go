@@ -83,7 +83,7 @@ func TestTokenIsShortLivedGuestAndResourceBound(t *testing.T) {
 }
 
 func TestClaimIsIdempotentForOneUserAndRejectsAnother(t *testing.T) {
-	service, _, _, _ := fixture(t)
+	service, _, keys, now := fixture(t)
 	created, err := service.Create(context.Background(), "gallery-main-web", time.Hour)
 	if err != nil {
 		t.Fatal(err)
@@ -98,6 +98,21 @@ func TestClaimIsIdempotentForOneUserAndRejectsAnother(t *testing.T) {
 	}
 	if first.SubjectID != second.SubjectID || first.UserID != second.UserID {
 		t.Fatalf("claim is not idempotent: %+v %+v", first, second)
+	}
+	assertion, err := service.ClaimForAudience(context.Background(), "gallery-main-web", created.SessionToken, first.UserID, "asset-api")
+	if err != nil {
+		t.Fatal(err)
+	}
+	verifier, err := authjwt.NewVerifier(authjwt.VerifierConfig{Keys: keys, Issuer: "https://identity.test", Audience: "asset-api", Clock: func() time.Time { return now }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	principal, err := verifier.Verify(context.Background(), assertion.ClaimToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if principal.Subject != first.UserID || !principal.HasScope("guest:claim") || principal.Claims["guest_subject"] != created.SubjectID {
+		t.Fatalf("claim principal = %+v", principal)
 	}
 	if _, err := service.Claim(context.Background(), "gallery-main-web", created.SessionToken, "22222222-2222-4222-8222-222222222222"); err == nil {
 		t.Fatal("guest session was claimed by a second user")

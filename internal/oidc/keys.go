@@ -169,6 +169,27 @@ func (m *Manager) MintGuestToken(issuer, subject, clientID, audience string, ttl
 	}).CompactSerialize()
 }
 
+func (m *Manager) MintGuestClaimToken(issuer, userID, guestSubject, clientID, audience string, ttl time.Duration, now time.Time) (string, error) {
+	if strings.TrimSpace(userID) == "" || strings.TrimSpace(guestSubject) == "" || strings.TrimSpace(clientID) == "" || strings.TrimSpace(audience) == "" {
+		return "", fmt.Errorf("guest claim token user, guest subject, client id and audience are required")
+	}
+	sig, err := jose.NewSigner(
+		jose.SigningKey{Algorithm: jose.RS256, Key: m.activeKey},
+		(&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", m.activeKID),
+	)
+	if err != nil {
+		return "", err
+	}
+	claims := jwt.Claims{
+		Issuer: issuer, Subject: userID, Audience: jwt.Audience{audience},
+		IssuedAt: jwt.NewNumericDate(now), NotBefore: jwt.NewNumericDate(now), Expiry: jwt.NewNumericDate(now.Add(ttl)),
+		ID: uuid.NewString(),
+	}
+	return jwt.Signed(sig).Claims(claims).Claims(map[string]interface{}{
+		"client_id": clientID, "subject_kind": "user", "guest_subject": guestSubject, "scope": "guest:claim",
+	}).CompactSerialize()
+}
+
 func parseRSAPrivate(pemStr string) (*rsa.PrivateKey, error) {
 	block, _ := pem.Decode([]byte(pemStr))
 	if block == nil {

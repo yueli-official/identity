@@ -52,9 +52,10 @@ type Issued struct {
 }
 
 type Claim struct {
-	SubjectID string
-	UserID    string
-	ClaimedAt time.Time
+	SubjectID  string
+	UserID     string
+	ClaimedAt  time.Time
+	ClaimToken string
 }
 
 func New(store repo.GuestSessionStore, clients repo.ClientRepo, keys *oidc.Manager, cfg Config) *Service {
@@ -128,6 +129,21 @@ func (s *Service) Claim(ctx context.Context, clientID, sessionToken, identityID 
 		return Claim{}, err
 	}
 	return Claim{SubjectID: session.ID, UserID: claimed.ClaimedIdentityID, ClaimedAt: *claimed.ClaimedAt}, nil
+}
+
+func (s *Service) ClaimForAudience(ctx context.Context, clientID, sessionToken, identityID, audience string) (Claim, error) {
+	client, err := s.clients.GetClient(ctx, strings.TrimSpace(clientID))
+	if err != nil || !slices.Contains(client.Audiences, strings.TrimSpace(audience)) {
+		return Claim{}, ErrInvalidAudience
+	}
+	claimed, err := s.Claim(ctx, client.ID, sessionToken, identityID)
+	if err != nil {
+		return Claim{}, err
+	}
+	claimed.ClaimToken, err = s.keys.MintGuestClaimToken(
+		s.cfg.Issuer, claimed.UserID, claimed.SubjectID, client.ID, audience, s.cfg.AccessTokenTTL, s.cfg.Now().UTC(),
+	)
+	return claimed, err
 }
 
 func (s *Service) active(ctx context.Context, clientID, sessionToken string) (model.GuestSession, error) {

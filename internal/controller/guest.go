@@ -46,11 +46,11 @@ func (controller *Guest) GuestSessionClaim(ctx context.Context, req *v1.GuestSes
 	if !ok || principal == nil || strings.TrimSpace(principal.Subject) == "" || principal.Claims["subject_kind"] == "guest" {
 		return nil, iderr.NotAuthenticated()
 	}
-	claimed, err := controller.service.Claim(ctx, req.ClientID, req.SessionToken, principal.Subject)
+	claimed, err := controller.service.ClaimForAudience(ctx, req.ClientID, req.SessionToken, principal.Subject, req.Audience)
 	if err != nil {
 		return nil, guestError(err)
 	}
-	return &v1.GuestSessionClaimRes{SubjectID: claimed.SubjectID, UserID: claimed.UserID, ClaimedAt: claimed.ClaimedAt}, nil
+	return &v1.GuestSessionClaimRes{SubjectID: claimed.SubjectID, UserID: claimed.UserID, ClaimedAt: claimed.ClaimedAt, ClaimToken: claimed.ClaimToken}, nil
 }
 
 func guestError(err error) error {

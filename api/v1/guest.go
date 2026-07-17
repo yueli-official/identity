@@ -35,10 +35,12 @@ type GuestSessionClaimReq struct {
 	g.Meta       `path:"/api/v1/guest/sessions/claim" method:"post" tags:"guest-session" summary:"Claim a guest session after sign-in" security:"UserAuth"`
 	ClientID     string `json:"clientId" v:"required"`
 	SessionToken string `json:"sessionToken" v:"required"`
+	Audience     string `json:"audience" v:"required"`
 }
 
 type GuestSessionClaimRes struct {
-	SubjectID string    `json:"subjectId"`
-	UserID    string    `json:"userId"`
-	ClaimedAt time.Time `json:"claimedAt"`
+	SubjectID  string    `json:"subjectId"`
+	UserID     string    `json:"userId"`
+	ClaimedAt  time.Time `json:"claimedAt"`
+	ClaimToken string    `json:"claimToken"`
 }
