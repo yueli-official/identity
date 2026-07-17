@@ -81,9 +81,22 @@ function cookieName(secure: boolean) {
   return secure ? SECURE_GUEST_COOKIE : DEV_GUEST_COOKIE;
 }
 
+function isInvalidGuestSession(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const failure = error as {
+    data?: { code?: unknown };
+    response?: { _data?: { code?: unknown } };
+  };
+  return (
+    failure.data?.code === "identity.guest_session_invalid" ||
+    failure.response?._data?.code === "identity.guest_session_invalid"
+  );
+}
+
 async function guestSessionToken(
   event: H3Event,
   createIfMissing: boolean,
+  ignoreExisting = false,
 ): Promise<string | null> {
   const cfg = guestConfig(event);
   if (
@@ -95,7 +108,7 @@ async function guestSessionToken(
     return null;
   }
   const name = cookieName(cfg.secureCookie);
-  const existing = getCookie(event, name);
+  const existing = ignoreExisting ? undefined : getCookie(event, name);
   if (existing) return existing;
   if (!createIfMissing) return null;
 
@@ -128,16 +141,28 @@ export async function guestSessionAuthHeaders(
   createIfMissing = true,
 ): Promise<Record<string, string>> {
   const cfg = guestConfig(event);
+  const name = cookieName(cfg.secureCookie);
+  const hadExistingSession = Boolean(getCookie(event, name));
   const sessionToken = await guestSessionToken(event, createIfMissing);
   if (!sessionToken) return {};
-  const issued = await identityRequest<GuestTokenIssued>(
-    `${cfg.issuer}/api/v1/guest/tokens`,
-    {
+  const issue = (token: string) =>
+    identityRequest<GuestTokenIssued>(`${cfg.issuer}/api/v1/guest/tokens`, {
       clientId: cfg.clientId,
-      sessionToken,
+      sessionToken: token,
       audience,
-    },
-  );
+    });
+  let issued: GuestTokenIssued;
+  try {
+    issued = await issue(sessionToken);
+  } catch (error) {
+    if (!hadExistingSession || !isInvalidGuestSession(error)) throw error;
+    deleteCookie(event, name, { path: "/" });
+    // Response cookie mutations do not change the immutable Cookie header on
+    // this request, so renewal must explicitly bypass the stale request value.
+    const replacement = await guestSessionToken(event, true, true);
+    if (!replacement) return {};
+    issued = await issue(replacement);
+  }
   return issued.accessToken
     ? { authorization: `Bearer ${issued.accessToken}` }
     : {};
