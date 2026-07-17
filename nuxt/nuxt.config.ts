@@ -9,6 +9,7 @@ export default defineNuxtConfig({
     downstreamBase: "", // NUXT_DOWNSTREAM_BASE — the backend service base URL
     guestSessionTtlSeconds: 0, // NUXT_GUEST_SESSION_TTL_SECONDS — consumer-selected; Identity clamps it
     guestCookieSecure: process.env.NODE_ENV === "production",
+    guestClaimTargets: [], // consumer-owned resource endpoints; each receives an Identity-signed claim assertion
     public: {
       oidcIssuer: "http://localhost:8081", // NUXT_PUBLIC_OIDC_ISSUER
       oidcClientId: "", // NUXT_PUBLIC_OIDC_CLIENT_ID

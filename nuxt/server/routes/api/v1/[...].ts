@@ -5,9 +5,12 @@
 export default defineEventHandler(async (event) => {
   const cfg = oidcConfig(event);
   const method = getMethod(event).toUpperCase();
-  const authHeaders = ["GET", "HEAD", "OPTIONS"].includes(method)
-    ? await sessionAuthHeaders(event)
-    : await subjectAuthHeaders(event, cfg.clientId);
+  let authHeaders = await sessionAuthHeaders(event);
+  if (!authHeaders.authorization) {
+    authHeaders = ["GET", "HEAD", "OPTIONS"].includes(method)
+      ? await guestSessionAuthHeaders(event, cfg.clientId, false)
+      : await guestSessionAuthHeaders(event, cfg.clientId);
+  }
   const headers = platformProxyHeaders(event, authHeaders);
   return await proxyRequest(event, cfg.downstreamBase + event.path, {
     headers,

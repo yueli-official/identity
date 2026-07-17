@@ -18,6 +18,18 @@ interface GuestTokenIssued {
   expiresInSeconds: number;
 }
 
+interface GuestClaimIssued {
+  subjectId: string;
+  userId: string;
+  claimToken: string;
+}
+
+interface GuestClaimTarget {
+  audience: string;
+  base: string;
+  path: string;
+}
+
 const DEV_GUEST_COOKIE = "yueli_guest";
 const SECURE_GUEST_COOKIE = "__Host-yueli_guest";
 
@@ -35,8 +47,13 @@ function guestConfig(event: H3Event) {
 async function identityRequest<T>(
   url: string,
   body: Record<string, unknown>,
+  headers: Record<string, string> = {},
 ): Promise<T> {
-  const response = await $fetch<Envelope<T>>(url, { method: "POST", body });
+  const response = await $fetch<Envelope<T>>(url, {
+    method: "POST",
+    body,
+    headers,
+  });
   if (response.code !== "ok" || !response.data) {
     throw createError({
       statusCode: 502,
@@ -47,11 +64,27 @@ async function identityRequest<T>(
   return response.data;
 }
 
+async function claimResource(target: GuestClaimTarget, claimToken: string) {
+  const response = await $fetch<Envelope<{ claimed: number }>>(
+    `${target.base.replace(/\/$/, "")}${target.path}`,
+    { method: "POST", headers: { authorization: `Bearer ${claimToken}` } },
+  );
+  if (response.code !== "ok") {
+    throw createError({
+      statusCode: 502,
+      statusMessage: response.message || "Guest resource claim failed",
+    });
+  }
+}
+
 function cookieName(secure: boolean) {
   return secure ? SECURE_GUEST_COOKIE : DEV_GUEST_COOKIE;
 }
 
-async function guestSessionToken(event: H3Event): Promise<string | null> {
+async function guestSessionToken(
+  event: H3Event,
+  createIfMissing: boolean,
+): Promise<string | null> {
   const cfg = guestConfig(event);
   if (
     !cfg.clientId ||
@@ -64,6 +97,7 @@ async function guestSessionToken(event: H3Event): Promise<string | null> {
   const name = cookieName(cfg.secureCookie);
   const existing = getCookie(event, name);
   if (existing) return existing;
+  if (!createIfMissing) return null;
 
   const created = await identityRequest<GuestSessionCreated>(
     `${cfg.issuer}/api/v1/guest/sessions`,
@@ -91,9 +125,10 @@ async function guestSessionToken(event: H3Event): Promise<string | null> {
 export async function guestSessionAuthHeaders(
   event: H3Event,
   audience: string,
+  createIfMissing = true,
 ): Promise<Record<string, string>> {
   const cfg = guestConfig(event);
-  const sessionToken = await guestSessionToken(event);
+  const sessionToken = await guestSessionToken(event, createIfMissing);
   if (!sessionToken) return {};
   const issued = await identityRequest<GuestTokenIssued>(
     `${cfg.issuer}/api/v1/guest/tokens`,
@@ -114,4 +149,41 @@ export async function subjectAuthHeaders(
 ): Promise<Record<string, string>> {
   const user = await sessionAuthHeaders(event);
   return user.authorization ? user : guestSessionAuthHeaders(event, audience);
+}
+
+export async function claimGuestSessionForEvent(
+  event: H3Event,
+  userAccessToken: string,
+): Promise<boolean> {
+  const runtime = useRuntimeConfig(event);
+  const cfg = guestConfig(event);
+  const targets = (runtime.guestClaimTargets || []) as GuestClaimTarget[];
+  if (!userAccessToken || !targets.length) return false;
+
+  const name = cookieName(cfg.secureCookie);
+  const sessionToken = getCookie(event, name);
+  if (!sessionToken) return false;
+
+  for (const target of targets) {
+    if (!target.audience || !target.base || !target.path) continue;
+    const claim = await identityRequest<GuestClaimIssued>(
+      `${cfg.issuer}/api/v1/guest/sessions/claim`,
+      {
+        clientId: cfg.clientId,
+        sessionToken,
+        audience: target.audience,
+      },
+      { authorization: `Bearer ${userAccessToken}` },
+    );
+    if (!claim.claimToken) {
+      throw createError({
+        statusCode: 502,
+        statusMessage: "Identity returned an invalid guest claim",
+      });
+    }
+    await claimResource(target, claim.claimToken);
+  }
+
+  deleteCookie(event, name, { path: "/" });
+  return true;
 }
