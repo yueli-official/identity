@@ -4,20 +4,20 @@ import (
 	"context"
 	"testing"
 
-	"platform/gokit/authjwt"
+	"github.com/yueli-official/foundation/go/jwks"
+	"platform/gokit/authsetup"
 )
 
-// TestAccessTokenVerifiableByGokitAuthjwt is the cross-service contract proof:
+// TestAccessTokenVerifiableByFoundation is the cross-service contract proof:
 // a REAL fosite-signed access token (issued by the live
-// IdP stack via authorization_code + PKCE) must pass verification by the shared
-// platform/gokit/authjwt verifier — the exact code path the resource services
-// (blog / shop / resources) will run when they adopt the JWT middleware.
+// IdP stack via authorization_code + PKCE) must pass verification by the public
+// Foundation verifier through Platform's deployment-config adapter.
 //
 // It closes the gap up front, before another service adopts the middleware:
-// it proves authjwt and fosite agree on issuer, the kid header ↔ JWKS lookup,
+// it proves Foundation auth and fosite agree on issuer, the kid header ↔ JWKS lookup,
 // RS256, the space-delimited "scope" claim, and the "roles" array — against a
 // token minted by the production signing path, not one hand-modeled in a test.
-func TestAccessTokenVerifiableByGokitAuthjwt(t *testing.T) {
+func TestAccessTokenVerifiableByFoundation(t *testing.T) {
 	const clientID = "demo-web"
 	env := setupE2E(t, clientID)
 	const scope = "openid profile email roles offline_access"
@@ -30,9 +30,12 @@ func TestAccessTokenVerifiableByGokitAuthjwt(t *testing.T) {
 
 	// Build the verifier exactly as a resource server would: a remote JWKS source
 	// pointed at the IdP, and the IdP base URL as the expected issuer.
-	v, err := authjwt.NewVerifier(authjwt.VerifierConfig{
-		Keys:   authjwt.NewRemoteKeySource(env.base + "/oauth2/jwks.json"),
-		Issuer: env.base,
+	v, err := authsetup.NewRemoteVerifier(authsetup.RemoteVerifierConfig{
+		JWKSURL: env.base + "/oauth2/jwks.json",
+		Issuer:  env.base,
+		Transport: jwks.RemoteOptions{
+			AllowLoopbackHTTP: true,
+		},
 	})
 	if err != nil {
 		t.Fatalf("NewVerifier: %v", err)
@@ -40,7 +43,7 @@ func TestAccessTokenVerifiableByGokitAuthjwt(t *testing.T) {
 
 	principal, err := v.Verify(context.Background(), ts.AccessToken)
 	if err != nil {
-		t.Fatalf("gokit/authjwt rejected a real IdP access token: %v", err)
+		t.Fatalf("Foundation rejected a real IdP access token: %v", err)
 	}
 	if principal.Subject != env.subject {
 		t.Fatalf("sub = %q, want %q", principal.Subject, env.subject)
@@ -59,6 +62,6 @@ func TestAccessTokenVerifiableByGokitAuthjwt(t *testing.T) {
 	if !principal.HasRole("user") {
 		t.Fatalf("roles = %v, want to include default 'user'", principal.Roles)
 	}
-	t.Logf("cross-contract OK: real fosite token verified by gokit/authjwt — sub=%s scopes=%v roles=%v",
+	t.Logf("cross-contract OK: real fosite token verified by Foundation — sub=%s scopes=%v roles=%v",
 		principal.Subject, principal.Scopes, principal.Roles)
 }

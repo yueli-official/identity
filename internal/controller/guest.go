@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"platform/gokit/authjwt"
+	foundationauth "github.com/yueli-official/foundation/go/auth"
 	v1 "platform/services/identity/api/v1"
 	"platform/services/identity/internal/guest"
 	"platform/services/identity/internal/iderr"
@@ -42,8 +42,9 @@ func (controller *Guest) GuestToken(ctx context.Context, req *v1.GuestTokenReq) 
 }
 
 func (controller *Guest) GuestSessionClaim(ctx context.Context, req *v1.GuestSessionClaimReq) (*v1.GuestSessionClaimRes, error) {
-	principal, ok := authjwt.From(ctx)
-	if !ok || principal == nil || strings.TrimSpace(principal.Subject) == "" || principal.Claims["subject_kind"] == "guest" {
+	principal, ok := foundationauth.FromContext(ctx)
+	subjectKind, _ := principal.Claim("subject_kind")
+	if !ok || principal == nil || strings.TrimSpace(principal.Subject) == "" || subjectKind == "guest" {
 		return nil, iderr.NotAuthenticated()
 	}
 	claimed, err := controller.service.ClaimForAudience(ctx, req.ClientID, req.SessionToken, principal.Subject, req.Audience)

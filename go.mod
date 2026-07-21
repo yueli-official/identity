@@ -13,6 +13,8 @@ require (
 	golang.org/x/crypto v0.51.0
 )
 
+require github.com/go-jose/go-jose/v4 v4.1.4 // indirect
+
 require (
 	github.com/BurntSushi/toml v1.5.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
@@ -69,6 +71,7 @@ require (
 	github.com/spf13/viper v1.16.0 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/subosito/gotenv v1.4.2 // indirect
+	github.com/yueli-official/foundation/go v0.0.0
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.46.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.65.0 // indirect

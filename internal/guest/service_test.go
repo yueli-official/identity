@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"platform/gokit/authjwt"
+	foundationauth "github.com/yueli-official/foundation/go/auth"
 	"platform/services/identity/internal/guest"
 	"platform/services/identity/internal/model"
 	"platform/services/identity/internal/oidc"
@@ -64,8 +64,8 @@ func TestTokenIsShortLivedGuestAndResourceBound(t *testing.T) {
 	if issued.ExpiresIn != 10*time.Minute || issued.AccessToken == "" {
 		t.Fatalf("issued = %+v", issued)
 	}
-	verifier, err := authjwt.NewVerifier(authjwt.VerifierConfig{
-		Keys: keys, Issuer: "https://identity.test", Audience: "asset-api", Clock: func() time.Time { return now },
+	verifier, err := foundationauth.NewVerifier(foundationauth.Config{
+		Keys: keys, Issuer: "https://identity.test", Audiences: []string{"asset-api"}, Clock: func() time.Time { return now },
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -74,7 +74,8 @@ func TestTokenIsShortLivedGuestAndResourceBound(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if principal.Subject != created.SubjectID || principal.ClientID != "gallery-main-web" || principal.Claims["subject_kind"] != "guest" {
+	subjectKind, _ := principal.Claim("subject_kind")
+	if principal.Subject != created.SubjectID || principal.ClientID != "gallery-main-web" || subjectKind != "guest" {
 		t.Fatalf("principal = %+v", principal)
 	}
 	if _, err := service.Token(context.Background(), "gallery-main-web", created.SessionToken, "commerce-api"); err == nil {
@@ -103,7 +104,7 @@ func TestClaimIsIdempotentForOneUserAndRejectsAnother(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	verifier, err := authjwt.NewVerifier(authjwt.VerifierConfig{Keys: keys, Issuer: "https://identity.test", Audience: "asset-api", Clock: func() time.Time { return now }})
+	verifier, err := foundationauth.NewVerifier(foundationauth.Config{Keys: keys, Issuer: "https://identity.test", Audiences: []string{"asset-api"}, Clock: func() time.Time { return now }})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +112,8 @@ func TestClaimIsIdempotentForOneUserAndRejectsAnother(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if principal.Subject != first.UserID || !principal.HasScope("guest:claim") || principal.Claims["guest_subject"] != created.SubjectID {
+	guestSubject, _ := principal.Claim("guest_subject")
+	if principal.Subject != first.UserID || !principal.HasScope("guest:claim") || guestSubject != created.SubjectID {
 		t.Fatalf("claim principal = %+v", principal)
 	}
 	if _, err := service.Claim(context.Background(), "gallery-main-web", created.SessionToken, "22222222-2222-4222-8222-222222222222"); err == nil {

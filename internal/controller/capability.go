@@ -8,7 +8,7 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/google/uuid"
 
-	"platform/gokit/authjwt"
+	foundationauth "github.com/yueli-official/foundation/go/auth"
 	"platform/gokit/capability"
 	"platform/gokit/ghttpx"
 	v1 "platform/services/identity/api/v1"
@@ -132,7 +132,7 @@ func (controller *Capability) snapshot(ctx context.Context) (*capability.Snapsho
 }
 
 func (controller *Capability) authorize(ctx context.Context, scope string) (capabilityActor, error) {
-	if principal, ok := authjwt.From(ctx); ok && principal != nil {
+	if principal, ok := foundationauth.FromContext(ctx); ok && principal != nil {
 		if principal.HasRole(logic.AdminRole) || principal.HasScope(scope) {
 			result := capabilityActor{rateKey: principal.ActorKey(), clientID: principal.ClientID}
 			if uuid.Validate(principal.Subject) == nil {

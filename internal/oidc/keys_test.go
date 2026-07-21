@@ -9,7 +9,7 @@ import (
 	jose "github.com/go-jose/go-jose/v3"
 	josejwt "github.com/go-jose/go-jose/v3/jwt"
 
-	"platform/gokit/authjwt"
+	foundationauth "github.com/yueli-official/foundation/go/auth"
 	"platform/services/identity/internal/oidc"
 	"platform/services/identity/internal/repo"
 )
@@ -37,8 +37,8 @@ func TestMintServiceTokenIdentifiesIdentityService(t *testing.T) {
 	if claims.ClientID != "identity-svc" {
 		t.Fatalf("client_id = %q, want identity-svc", claims.ClientID)
 	}
-	verifier, err := authjwt.NewVerifier(authjwt.VerifierConfig{
-		Keys: m, Issuer: "https://identity.test", Audience: "asset-api",
+	verifier, err := foundationauth.NewVerifier(foundationauth.Config{
+		Keys: m, Issuer: "https://identity.test", Audiences: []string{"asset-api"},
 	})
 	if err != nil {
 		t.Fatal(err)

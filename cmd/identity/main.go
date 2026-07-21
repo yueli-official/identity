@@ -17,7 +17,8 @@ import (
 	_ "github.com/gogf/gf/contrib/drivers/pgsql/v2"
 	_ "github.com/gogf/gf/contrib/nosql/redis/v2"
 
-	"platform/gokit/authjwt"
+	foundationauth "github.com/yueli-official/foundation/go/auth"
+	"platform/gokit/authhttp"
 	"platform/gokit/capability"
 	"platform/gokit/ghttpx"
 	"platform/gokit/healthcheck"
@@ -159,8 +160,8 @@ func main() {
 	if err != nil {
 		panic(fmt.Sprintf("oidc.NewManager: %v", err))
 	}
-	identityVerifier, err := authjwt.NewVerifier(authjwt.VerifierConfig{
-		Keys: mgr, Issuer: issuer, Audience: g.Cfg().MustGet(ctx, "oidc.audience", "identity-api").String(),
+	identityVerifier, err := foundationauth.NewVerifier(foundationauth.Config{
+		Keys: mgr, Issuer: issuer, Audiences: []string{g.Cfg().MustGet(ctx, "oidc.audience", "identity-api").String()},
 	})
 	if err != nil {
 		panic(fmt.Sprintf("identity capability token verifier: %v", err))
@@ -278,7 +279,7 @@ func main() {
 
 	// Business API: JSON envelope middleware applied to this group only.
 	s.Group("/", func(grp *ghttp.RouterGroup) {
-		grp.Middleware(ghttpx.Middleware, authjwt.OptionalMiddleware(identityVerifier))
+		grp.Middleware(ghttpx.Middleware, authhttp.Optional(identityVerifier))
 		grp.GET("/healthz", controller.Healthz)
 		grp.GET("/readyz", healthcheck.Handler(map[string]healthcheck.Check{
 			"database": healthcheck.Database,
