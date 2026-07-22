@@ -2,7 +2,7 @@
 // @nuxt/fonts ships bundled inside @nuxt/ui v4, so it is not listed as a
 // separate module here (@nuxt/ui registers it automatically).
 export default defineNuxtConfig({
-  modules: ["@nuxt/ui"],
+  modules: ["@nuxt/ui", "@yueli/ui"],
   css: ["~/assets/css/main.css"],
   runtimeConfig: {
     // Server-side base for backend calls during SSR. The dev proxy below only

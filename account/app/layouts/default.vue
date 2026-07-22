@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { PlatformUserMenu } from "@platform/ui/components";
-import type { PlatformUserMenuAction } from "@platform/ui/components";
+import { platformAccountMenuMessages } from "@platform/ui/account-menu";
+import {
+  AccountMenu,
+  type AccountMenuAction,
+} from "@yueli/ui/account-menu/pattern";
 import { BackToTop } from "@yueli/ui/navigation/back-to-top";
 
 const { me, logout, isAdmin } = useSession();
 
-const contextActions = computed<PlatformUserMenuAction[]>(() => [
+const utilityActions = computed<AccountMenuAction[]>(() => [
   ...(isAdmin.value
     ? [
         {
@@ -44,13 +47,14 @@ const handleLogout = async () => {
 
         <div class="flex items-center gap-1.5">
           <UColorModeButton />
-          <PlatformUserMenu
+          <AccountMenu
             v-if="me"
             :name="me.displayName"
             :email="me.email"
             :avatar-url="me.avatarUrl || ''"
-            :context-actions="contextActions"
+            :utility-actions="utilityActions"
             :logout="handleLogout"
+            :messages="platformAccountMenuMessages"
           />
         </div>
       </div>

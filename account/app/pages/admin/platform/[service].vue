@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ManageHeader } from '@platform/manage/components'
+import { PageHeader } from '@yueli/ui/dashboard/pattern'
 import { rel } from '@platform/ui/date'
 import type { PlatformServiceKey, PlatformStatusResponse, RuntimeHealth } from '#shared/types/platform'
 
@@ -69,7 +69,7 @@ async function probeProvider(provider: string) {
 
 <template>
   <div class="space-y-8">
-    <ManageHeader :title="labels[serviceKey]">
+    <PageHeader :title="labels[serviceKey]">
       <template #subtitle>
         运行时能力与 Provider 快照；这里只读展示状态，不复制领域配置真值。
       </template>
@@ -78,7 +78,7 @@ async function probeProvider(provider: string) {
         <UButton v-if="manageLinks[serviceKey]" :to="manageLinks[serviceKey]" icon="i-tabler-settings" label="领域管理" color="neutral" variant="soft" />
         <UButton icon="i-tabler-refresh" label="刷新" color="neutral" variant="soft" :loading="refreshing" @click="refreshStatus" />
       </template>
-    </ManageHeader>
+    </PageHeader>
 
     <UAlert v-if="error" color="error" variant="subtle" icon="i-tabler-alert-triangle" title="状态加载失败" description="请检查管理员会话与 Identity BFF。" />
     <div v-else-if="status === 'pending' && !data" class="space-y-4">

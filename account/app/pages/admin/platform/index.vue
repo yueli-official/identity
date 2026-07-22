@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ManageHeader } from '@platform/manage/components'
+import { PageHeader } from '@yueli/ui/dashboard/pattern'
 import { rel } from '@platform/ui/date'
 import type { CapabilityGapReason, PlatformStatusResponse } from '#shared/types/platform'
 
@@ -35,7 +35,7 @@ async function refreshStatus() {
 
 <template>
   <div class="space-y-8">
-    <ManageHeader title="平台状态">
+    <PageHeader title="平台状态">
       <template #subtitle>
         集中查看基础服务、运行时能力和 Provider 状态；配置修改仍由各领域管理页负责。
       </template>
@@ -49,7 +49,7 @@ async function refreshStatus() {
           @click="refreshStatus"
         />
       </template>
-    </ManageHeader>
+    </PageHeader>
 
     <UAlert
       v-if="error"

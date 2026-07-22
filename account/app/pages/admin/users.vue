@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import {
-  ManageHeader, ManageTabs, ManageEmpty, ManagePagination, ManageCollectionToolbar, ManageCollectionDock, ManagePageSelection, ManageSortDirectionButton, SkeletonList
+  ManageTabs, ManageEmpty, ManagePagination, ManageCollectionToolbar, ManageCollectionDock, ManagePageSelection, ManageSortDirectionButton, SkeletonList
 } from '@platform/manage/components'
+import { PageHeader } from '@yueli/ui/dashboard/pattern'
 import { manageCollectionQueryFingerprint, serializeManageCollectionQuery, type ManageCollectionDefinition } from '@platform/manage/collection'
 import { useManageCollectionState } from '@platform/manage/use-manage-collection-state'
 import { useManageSelection } from '@platform/manage/use-manage-selection'
-import { useMinLoading } from '@platform/ui/use-min-loading'
+import { useMinimumLoading } from '@yueli/ui/feedback'
 import { abs } from '@platform/ui/date'
 import { createPlatformNotifier } from '@platform/ui/feedback'
 
@@ -59,7 +60,7 @@ const stats = ref<UserStats>({ total: 0, active: 0, disabled: 0, deleted: 0 })
 const mounted = ref(false)
 const loading = ref(true)
 onMounted(() => { mounted.value = true; fetchUsers(); fetchStats() })
-const showSkeleton = useMinLoading(computed(() => !mounted.value || loading.value))
+const showSkeleton = useMinimumLoading(computed(() => !mounted.value || loading.value))
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / size.value)))
 
@@ -275,7 +276,7 @@ function initialOf(u: AdminUser) { return (u.displayName || u.email || '?').char
 
 <template>
   <div>
-    <ManageHeader title="用户管理">
+    <PageHeader title="用户管理">
       <template #subtitle>站群全局账户 —— 封禁、删除、重置密码、授予管理员</template>
       <template #actions>
         <div class="flex items-center gap-3">
@@ -292,7 +293,7 @@ function initialOf(u: AdminUser) { return (u.displayName || u.email || '?').char
           <UButton icon="i-tabler-user-plus" label="新建用户" @click="openCreate" />
         </div>
       </template>
-    </ManageHeader>
+    </PageHeader>
 
     <ManageTabs v-model="status" :items="statusTabs" class="mb-4" />
 

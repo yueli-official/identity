@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
-import {
-  ManageHeader,
-  SkeletonList
-} from '@platform/manage/components'
+import { SkeletonList } from '@platform/manage/components'
+import { PageHeader } from '@yueli/ui/dashboard/pattern'
 import {
   manageCollectionQueryFingerprint,
   serializeManageCollectionQuery,
@@ -11,7 +9,7 @@ import {
 } from '@platform/manage/collection'
 import { useManageCollectionState } from '@platform/manage/use-manage-collection-state'
 import { useManageSelection } from '@platform/manage/use-manage-selection'
-import { useMinLoading } from '@platform/ui/use-min-loading'
+import { useMinimumLoading } from '@yueli/ui/feedback'
 import { createPlatformNotifier } from '@platform/ui/feedback'
 import type {
   AssetAdminSection,
@@ -239,7 +237,7 @@ const {
   showQueuedTask: showQueuedMaintenanceTask,
   reloadAll
 })
-const showSkeleton = useMinLoading(computed(() => !mounted.value || loading.value))
+const showSkeleton = useMinimumLoading(computed(() => !mounted.value || loading.value))
 const enabledStorageBackends = computed(() => storageBackends.value.filter(b => b.enabled !== false))
 const sectionItems = computed<Array<{ label: string, icon: string, value: AssetAdminSection, count: number }>>(() => [
   { label: '素材库', icon: 'i-tabler-photo', value: 'library', count: stats.value.assets },
@@ -453,7 +451,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
 
 <template>
   <div>
-    <ManageHeader title="资源管理">
+    <PageHeader title="资源管理">
       <template #subtitle>站群共享素材控制面:站点、Profile、Variant、素材库和交付授权</template>
       <template #actions>
         <div class="flex items-center gap-2">
@@ -470,7 +468,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
           />
         </div>
       </template>
-    </ManageHeader>
+    </PageHeader>
 
     <div class="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
       <div

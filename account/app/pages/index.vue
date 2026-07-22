@@ -2,9 +2,9 @@
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import { SOCIAL_PLATFORMS, socialPlatform } from '@platform/ui/social'
-import { ActionFeedbackButton } from '@platform/manage/components'
-import { useActionFeedback } from '@platform/manage/use-action-feedback'
 import { createPlatformNotifier } from '@platform/ui/feedback'
+import { useActionFeedback } from '@yueli/ui/feedback'
+import { ActionFeedbackButton } from '@yueli/ui/feedback/pattern'
 import type { SocialLink } from '~/composables/useSession'
 
 definePageMeta({ middleware: 'auth' })
