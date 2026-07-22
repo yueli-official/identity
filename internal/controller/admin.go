@@ -3,9 +3,11 @@ package controller
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/gogf/gf/v2/net/ghttp"
+	foundationauth "github.com/yueli-official/foundation/go/auth"
 
 	v1 "platform/services/identity/api/v1"
 	"platform/services/identity/internal/actor"
@@ -15,17 +17,26 @@ import (
 	"platform/services/identity/internal/repo"
 )
 
-// requireAdmin resolves the caller from the session cookie and asserts the admin
+// requireAdmin resolves the caller from a verified Bearer Principal when one is
+// present, otherwise from the Identity session cookie, and asserts the admin
 // role. It returns the caller's identity ID on success so that callers can
 // inject it into ctx via actor.WithIdentity for correct audit attribution.
 //
 // Failure modes:
-//   - no / invalid session cookie  → whatever Me returns (iderr.NotAuthenticated, 401)
-//   - authenticated but not admin  → iderr.Forbidden (403)
+//   - no / invalid credential      → whatever Me returns (iderr.NotAuthenticated, 401)
+//   - verified caller not admin    → iderr.Forbidden (403)
 //
 // It never reveals whether a target identity exists: a non-admin is rejected
 // purely on the caller's own roles, before any target lookup or mutation.
 func (c *Controller) requireAdmin(ctx context.Context) (string, error) {
+	if principal, ok := foundationauth.FromContext(ctx); ok && principal != nil {
+		identityID := strings.TrimSpace(principal.Subject)
+		if identityID == "" || !principal.HasRole(logic.AdminRole) {
+			return "", iderr.Forbidden()
+		}
+		return identityID, nil
+	}
+
 	r := ghttp.RequestFromCtx(ctx)
 	id, err := c.svc.Me(ctx, r.Cookie.Get(sessionCookie, "").String())
 	if err != nil {
