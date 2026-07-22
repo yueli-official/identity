@@ -12,6 +12,7 @@
     "@nuxt/ui": "catalog:",
     "@platform/ui": "workspace:*",
     "@platform/manage": "workspace:*",
+    "@yueli/ui": "workspace:*",
     "nuxt": "catalog:",
     "tailwindcss": "catalog:",
     "zod": "catalog:"
