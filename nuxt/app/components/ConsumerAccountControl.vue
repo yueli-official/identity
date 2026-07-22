@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { PlatformUserMenu } from "@platform/ui/components";
-import type { PlatformUserMenuAction } from "@platform/ui/components";
+import { platformAccountMenuMessages } from "@platform/ui/account-menu";
+import {
+  AccountMenu,
+  type AccountMenuAction,
+} from "@yueli/ui/account-menu/pattern";
 
 const props = withDefaults(
   defineProps<{
-    contextActions?: readonly PlatformUserMenuAction[];
+    contextActions?: readonly AccountMenuAction[];
     manageTo?: string;
     manageLabel?: string;
     homeTo?: string;
@@ -27,7 +30,7 @@ const accountUrl = computed(
   () => useRuntimeConfig().public.accountUrl || "http://localhost:3000",
 );
 
-const resolvedContextActions = computed<PlatformUserMenuAction[]>(() => [
+const resolvedContextActions = computed<AccountMenuAction[]>(() => [
   ...props.contextActions,
   ...(props.manageTo && isAdmin.value
     ? [
@@ -40,7 +43,7 @@ const resolvedContextActions = computed<PlatformUserMenuAction[]>(() => [
     : []),
 ]);
 
-const utilityActions = computed<PlatformUserMenuAction[]>(() => [
+const utilityActions = computed<AccountMenuAction[]>(() => [
   ...(props.homeTo
     ? [
         {
@@ -65,7 +68,7 @@ async function handleLogin(): Promise<void> {
 </script>
 
 <template>
-  <PlatformUserMenu
+  <AccountMenu
     v-if="loggedIn"
     :name="user?.name"
     :email="user?.email"
@@ -73,6 +76,7 @@ async function handleLogin(): Promise<void> {
     :context-actions="resolvedContextActions"
     :utility-actions
     :logout
+    :messages="platformAccountMenuMessages"
   />
   <UButton
     v-else

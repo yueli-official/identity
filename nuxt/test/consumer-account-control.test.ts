@@ -3,8 +3,8 @@ import { mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ConsumerAccountControl from "../app/components/ConsumerAccountControl.vue";
 
-const PlatformUserMenu = defineComponent({
-  name: "PlatformUserMenu",
+const AccountMenu = defineComponent({
+  name: "AccountMenu",
   props: {
     name: String,
     email: String,
@@ -21,7 +21,8 @@ const UButton = defineComponent({
   inheritAttrs: false,
   props: { label: String },
   emits: ["click"],
-  template: '<button v-bind="$attrs" @click="$emit(\'click\')">{{ label }}</button>',
+  template:
+    '<button v-bind="$attrs" @click="$emit(\'click\')">{{ label }}</button>',
 });
 
 const user = ref<{
@@ -38,7 +39,7 @@ const navigateTo = vi.fn();
 function mountControl(props: Record<string, unknown> = {}) {
   return mount(ConsumerAccountControl, {
     props,
-    global: { stubs: { PlatformUserMenu, UButton } },
+    global: { stubs: { AccountMenu, UButton } },
   });
 }
 
@@ -87,7 +88,7 @@ describe("ConsumerAccountControl", () => {
         { label: "我的购买", icon: "i-tabler-shopping-bag", to: "/orders" },
       ],
     });
-    const menu = wrapper.getComponent(PlatformUserMenu);
+    const menu = wrapper.getComponent(AccountMenu);
 
     expect(menu.props()).toMatchObject({
       name: "月离",
@@ -98,10 +99,9 @@ describe("ConsumerAccountControl", () => {
       { label: "我的购买", icon: "i-tabler-shopping-bag", to: "/orders" },
       { label: "控制台", icon: "i-tabler-layout-dashboard", to: "/manage" },
     ]);
-    expect(menu.props("utilityActions").map((item: { label: string }) => item.label)).toEqual([
-      "返回主站",
-      "用户设置",
-    ]);
+    expect(
+      menu.props("utilityActions").map((item: { label: string }) => item.label),
+    ).toEqual(["返回主站", "用户设置"]);
   });
 
   it("does not expose the management entry without operator access", () => {
@@ -109,6 +109,8 @@ describe("ConsumerAccountControl", () => {
 
     const wrapper = mountControl({ manageTo: "/manage" });
 
-    expect(wrapper.getComponent(PlatformUserMenu).props("contextActions")).toEqual([]);
+    expect(wrapper.getComponent(AccountMenu).props("contextActions")).toEqual(
+      [],
+    );
   });
 });

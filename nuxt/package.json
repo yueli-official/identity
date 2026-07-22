@@ -9,6 +9,7 @@
   "dependencies": {
     "@platform/manage": "workspace:*",
     "@platform/ui": "workspace:*",
+    "@yueli/ui": "workspace:*",
     "vue": "catalog:"
   },
   "devDependencies": {
