@@ -11,6 +11,8 @@ const ManageUserMenu = defineComponent({
     avatarUrl: String,
     homeTo: String,
     settingsTo: String,
+    showAppearance: Boolean,
+    triggerMode: String,
     logout: Function,
   },
   template: '<div data-manage-account-menu="authenticated" />',
@@ -58,7 +60,11 @@ describe("ConsumerManageAccountControl", () => {
     };
 
     const wrapper = mount(ConsumerManageAccountControl, {
-      props: { homeTo: "/" },
+      props: {
+        homeTo: "",
+        showAppearance: true,
+        triggerMode: "sidebar",
+      },
       global: { stubs: { ManageUserMenu, UButton } },
     });
 
@@ -66,8 +72,10 @@ describe("ConsumerManageAccountControl", () => {
       name: "月离",
       email: "user@example.com",
       avatarUrl: "https://identity.example/avatar.png",
-      homeTo: "/",
+      homeTo: "",
       settingsTo: "https://account.example",
+      showAppearance: true,
+      triggerMode: "sidebar",
     });
   });
 
