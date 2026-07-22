@@ -238,7 +238,7 @@ func sessionCookieValue(jar http.CookieJar, base string) string {
 }
 
 // getMeIdentity calls GET /api/v1/session/me with the jar's cookies, asserts a
-// successful envelope with the expected email, and returns the identity id.
+// successful response with the expected email, and returns the identity id.
 func getMeIdentity(t *testing.T, client *http.Client, base, wantEmail string) string {
 	t.Helper()
 	resp, err := client.Get(base + "/api/v1/session/me")
@@ -248,13 +248,10 @@ func getMeIdentity(t *testing.T, client *http.Client, base, wantEmail string) st
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
 	j := gjson.New(body)
-	if code := j.Get("code").String(); code != "ok" {
-		t.Fatalf("me: expected code=ok, got %q (body=%s)", code, body)
-	}
-	if email := j.Get("data.email").String(); email != wantEmail {
+	if email := j.Get("email").String(); email != wantEmail {
 		t.Fatalf("me: email = %q, want %q (body=%s)", email, wantEmail, body)
 	}
-	id := j.Get("data.id").String()
+	id := j.Get("id").String()
 	if id == "" {
 		t.Fatalf("me: empty identity id (body=%s)", body)
 	}

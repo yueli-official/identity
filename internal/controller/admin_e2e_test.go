@@ -103,19 +103,16 @@ func TestAdminRoleEndpoint(t *testing.T) {
 
 		// 4. Admin grant of admin → 200; target now has admin.
 		{
-			body, status := do(http.MethodPost, grantPath+"?role=admin", adminHdr)
+			_, status := do(http.MethodPost, grantPath+"?role=admin", adminHdr)
 			t.Assert(status, 200)
-			j := gjson.New(body)
-			t.Assert(j.Get("code").String(), "ok")
 			roles, _ := svc.GetRoles(ctx, targetID)
 			t.Assert(len(roles), 2)
 		}
 
 		// 5. Admin revoke of admin → 200; target back to just "user".
 		{
-			body, status := do(http.MethodDelete, grantPath+"/admin", adminHdr)
+			_, status := do(http.MethodDelete, grantPath+"/admin", adminHdr)
 			t.Assert(status, 200)
-			t.Assert(gjson.New(body).Get("code").String(), "ok")
 			roles, _ := svc.GetRoles(ctx, targetID)
 			t.Assert(len(roles), 1)
 			t.Assert(roles[0], logic.DefaultRole)

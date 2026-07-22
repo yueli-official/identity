@@ -104,12 +104,9 @@ func TestE2E_Email(t *testing.T) {
 	postJSON(t, client, base+"/api/v1/auth/register", map[string]any{
 		"email": email, "password": oldPass, "displayName": "U",
 	})
-	loginBody := postJSON(t, client, base+"/api/v1/auth/login", map[string]any{
+	postJSON(t, client, base+"/api/v1/auth/login", map[string]any{
 		"email": email, "password": oldPass,
 	})
-	if code := gjson.New(loginBody).Get("code").String(); code != "ok" {
-		t.Fatalf("login: code=%q body=%s", code, loginBody)
-	}
 	identityID := getMeID(t, client, base, email, false)
 	oldSession := emailSessionCookie(jar, base)
 	if oldSession == "" {
@@ -143,12 +140,9 @@ func TestE2E_Email(t *testing.T) {
 	resetToken := tokenFromLink(cm.resetLink)
 
 	cm.resetTo, cm.resetLink = "", "" // reset the capture before the unknown-email probe
-	body := postJSON(t, client, base+"/api/v1/auth/password/forgot", map[string]any{
+	postJSON(t, client, base+"/api/v1/auth/password/forgot", map[string]any{
 		"email": "nobody@example.com",
 	})
-	if code := gjson.New(body).Get("code").String(); code != "ok" {
-		t.Fatalf("forgot(unknown): want code=ok (enumeration guard), got %q body=%s", code, body)
-	}
 	if cm.resetLink != "" || cm.resetTo != "" {
 		t.Fatalf("forgot(unknown): must NOT send mail, got to=%q link=%q", cm.resetTo, cm.resetLink)
 	}
@@ -165,8 +159,8 @@ func TestE2E_Email(t *testing.T) {
 	}
 	meBody, _ := io.ReadAll(meResp.Body)
 	meResp.Body.Close()
-	if code := gjson.New(meBody).Get("code").String(); code == "ok" {
-		t.Fatalf("reset: old session should be force-logged-out, /session/me still ok: %s", meBody)
+	if meResp.StatusCode >= 200 && meResp.StatusCode < 300 {
+		t.Fatalf("reset: old session should be force-logged-out, /session/me returned %d: %s", meResp.StatusCode, meBody)
 	}
 
 	// New password works on a fresh client.
@@ -174,12 +168,9 @@ func TestE2E_Email(t *testing.T) {
 	fresh := &http.Client{Jar: freshJar, CheckRedirect: func(*http.Request, []*http.Request) error {
 		return http.ErrUseLastResponse
 	}}
-	okBody := postJSON(t, fresh, base+"/api/v1/auth/login", map[string]any{
+	postJSON(t, fresh, base+"/api/v1/auth/login", map[string]any{
 		"email": email, "password": newPass,
 	})
-	if code := gjson.New(okBody).Get("code").String(); code != "ok" {
-		t.Fatalf("login(newPass): want code=ok, got %q body=%s", code, okBody)
-	}
 
 	// Old password fails.
 	failJar, _ := cookiejar.New(nil)
@@ -189,13 +180,13 @@ func TestE2E_Email(t *testing.T) {
 	failBody := postJSON(t, failClient, base+"/api/v1/auth/login", map[string]any{
 		"email": email, "password": oldPass,
 	})
-	if code := gjson.New(failBody).Get("code").String(); code == "ok" {
-		t.Fatalf("login(oldPass): old password must fail after reset, got ok: %s", failBody)
+	if code := gjson.New(failBody).Get("code").String(); code != "identity.invalid_credentials" {
+		t.Fatalf("login(oldPass): code=%q, want identity.invalid_credentials: %s", code, failBody)
 	}
 }
 
 // postJSON POSTs a JSON body and returns the response body, failing the test on
-// transport error. Envelope-level codes are asserted by the caller.
+// transport error. Problem codes are asserted by callers exercising failures.
 func postJSON(t *testing.T, client *http.Client, url string, payload map[string]any) []byte {
 	t.Helper()
 	buf, _ := json.Marshal(payload)
@@ -208,7 +199,7 @@ func postJSON(t *testing.T, client *http.Client, url string, payload map[string]
 	return body
 }
 
-// getMeID calls /session/me, asserts code=ok + email + emailVerified, returns id.
+// getMeID calls /session/me, asserts email + emailVerified, and returns id.
 func getMeID(t *testing.T, client *http.Client, base, wantEmail string, wantVerified bool) string {
 	t.Helper()
 	resp, err := client.Get(base + "/api/v1/session/me")
@@ -218,16 +209,13 @@ func getMeID(t *testing.T, client *http.Client, base, wantEmail string, wantVeri
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
 	j := gjson.New(body)
-	if code := j.Get("code").String(); code != "ok" {
-		t.Fatalf("me: code=%q body=%s", code, body)
-	}
-	if email := j.Get("data.email").String(); email != wantEmail {
+	if email := j.Get("email").String(); email != wantEmail {
 		t.Fatalf("me: email=%q want %q", email, wantEmail)
 	}
-	if v := j.Get("data.emailVerified").Bool(); v != wantVerified {
+	if v := j.Get("emailVerified").Bool(); v != wantVerified {
 		t.Fatalf("me: emailVerified=%v want %v (body=%s)", v, wantVerified, body)
 	}
-	return j.Get("data.id").String()
+	return j.Get("id").String()
 }
 
 // emailSessionCookie extracts the id_session value the jar holds for base.

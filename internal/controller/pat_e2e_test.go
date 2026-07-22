@@ -128,20 +128,18 @@ func TestE2E_PAT(t *testing.T) {
 		// registerAndLogin registers a user over HTTP and logs them in, returning
 		// their identity ID (resolved via service seam) and their session cookie.
 		registerAndLogin := func(email, password, displayName string) (identityID, sid string) {
-			regBody, _, _ := doPost("/api/v1/auth/register",
+			_, _, _ = doPost("/api/v1/auth/register",
 				fmt.Sprintf(`{"email":%q,"password":%q,"displayName":%q}`, email, password, displayName),
 				nil,
 			)
-			t.Assert(gjson.New(regBody).Get("code").String(), "ok")
 
 			ident, err := svc.GetByEmail(ctx, email)
 			t.AssertNil(err)
 
-			loginBody, loginHdr, _ := doPost("/api/v1/auth/login",
+			_, loginHdr, _ := doPost("/api/v1/auth/login",
 				fmt.Sprintf(`{"email":%q,"password":%q}`, email, password),
 				nil,
 			)
-			t.Assert(gjson.New(loginBody).Get("code").String(), "ok")
 			sessionID := extractSessionCookie(loginHdr)
 			t.AssertNE(sessionID, "")
 			return ident.ID, sessionID
@@ -163,12 +161,11 @@ func TestE2E_PAT(t *testing.T) {
 		)
 		t.Assert(createStatus, 200)
 		cj := gjson.New(createBody)
-		t.Assert(cj.Get("code").String(), "ok")
 
-		plaintext := cj.Get("data.token").String()
-		tokenPrefix := cj.Get("data.tokenPrefix").String()
-		patID := cj.Get("data.id").Int64()
-		patScopes := cj.Get("data.scopes").Strings()
+		plaintext := cj.Get("token").String()
+		tokenPrefix := cj.Get("tokenPrefix").String()
+		patID := cj.Get("id").Int64()
+		patScopes := cj.Get("scopes").Strings()
 
 		t.Assert(strings.HasPrefix(plaintext, "pat_"), true)
 		t.AssertNE(tokenPrefix, "")
@@ -189,9 +186,8 @@ func TestE2E_PAT(t *testing.T) {
 		listBody, listStatus := doGet("/api/v1/pat", cookieHdr(userASID))
 		t.Assert(listStatus, 200)
 		lj := gjson.New(listBody)
-		t.Assert(lj.Get("code").String(), "ok")
 
-		entries := lj.Get("data.entries").Array()
+		entries := lj.Get("entries").Array()
 		t.Assert(len(entries), 1)
 
 		entry0 := gjson.New(entries[0])
@@ -228,9 +224,8 @@ func TestE2E_PAT(t *testing.T) {
 		)
 		t.Assert(verifyStatus, 200)
 		vj := gjson.New(verifyBody)
-		t.Assert(vj.Get("code").String(), "ok")
-		t.Assert(vj.Get("data.identityId").String(), userAID)
-		verifyScopes := vj.Get("data.scopes").Strings()
+		t.Assert(vj.Get("identityId").String(), userAID)
+		verifyScopes := vj.Get("scopes").Strings()
 		verifyScopeSet := map[string]bool{}
 		for _, sc := range verifyScopes {
 			verifyScopeSet[sc] = true
@@ -241,12 +236,11 @@ func TestE2E_PAT(t *testing.T) {
 		// =====================================================================
 		// Step 5: RevokePAT then VerifyPAT → 401 identity.pat_invalid
 		// =====================================================================
-		revokeBody, revokeStatus := doDelete(
+		_, revokeStatus := doDelete(
 			fmt.Sprintf("/api/v1/pat/%d", patID),
 			cookieHdr(userASID),
 		)
 		t.Assert(revokeStatus, 200)
-		t.Assert(gjson.New(revokeBody).Get("code").String(), "ok")
 
 		// After revocation, the token must not verify.
 		verifyAfterRevokeBody, _, verifyAfterRevokeStatus := doPost("/api/v1/pat/verify", "",
@@ -281,8 +275,7 @@ func TestE2E_PAT(t *testing.T) {
 		)
 		t.Assert(freshCreateStatus, 200)
 		freshCJ := gjson.New(freshCreateBody)
-		t.Assert(freshCJ.Get("code").String(), "ok")
-		freshPATID := freshCJ.Get("data.id").Int64()
+		freshPATID := freshCJ.Get("id").Int64()
 		t.AssertGT(freshPATID, int64(0))
 
 		// User B attempts to delete user A's fresh token.
@@ -297,8 +290,7 @@ func TestE2E_PAT(t *testing.T) {
 		listAfterBody, listAfterStatus := doGet("/api/v1/pat", cookieHdr(userASID))
 		t.Assert(listAfterStatus, 200)
 		laj := gjson.New(listAfterBody)
-		t.Assert(laj.Get("code").String(), "ok")
-		entriesAfter := laj.Get("data.entries").Array()
+		entriesAfter := laj.Get("entries").Array()
 		t.Assert(len(entriesAfter), 1) // exactly the fresh token A created; the revoked one is gone
 
 		// =====================================================================

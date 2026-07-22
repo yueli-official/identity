@@ -94,7 +94,7 @@ func TestCapabilityEndpointsRequireAdminAndAuditProbes(t *testing.T) {
 		t.Assert(status, http.StatusForbidden)
 		body, status = request(http.MethodGet, "/api/v1/admin/capabilities", adminHeaders)
 		t.Assert(status, http.StatusOK)
-		t.Assert(gjson.New(body).Get("data.manifest.service.name").String(), "identity")
+		t.Assert(gjson.New(body).Get("manifest.service.name").String(), "identity")
 
 		auditStore.fail.Store(true)
 		body, status = request(http.MethodPost, "/api/v1/admin/providers/dev-mail/health-check", adminHeaders)
@@ -103,7 +103,7 @@ func TestCapabilityEndpointsRequireAdminAndAuditProbes(t *testing.T) {
 		auditStore.fail.Store(false)
 		body, status = request(http.MethodPost, "/api/v1/admin/providers/dev-mail/health-check", adminHeaders)
 		t.Assert(status, http.StatusOK)
-		t.Assert(gjson.New(body).Get("data.provider.health").String(), "healthy")
+		t.Assert(gjson.New(body).Get("provider.health").String(), "healthy")
 		rows, queryErr := store.QueryAudit(ctx, repo.AuditFilter{Event: "capability.provider_health_check", Limit: 10})
 		t.AssertNil(queryErr)
 		t.Assert(len(rows), 1)

@@ -88,10 +88,10 @@ func TestE2E_OAuthOnlyUnbindClosedLoop(t *testing.T) {
 
 	// --- Precondition: exactly one credential (google), no password -------------
 	creds := getEnvelope(t, client, base+"/api/v1/session/credentials")
-	if creds.Get("data.hasPassword").Bool() {
+	if creds.Get("hasPassword").Bool() {
 		t.Fatalf("precondition: hasPassword=true, want false (body=%s)", creds)
 	}
-	if n := len(creds.Get("data.oauth").Array()); n != 1 {
+	if n := len(creds.Get("oauth").Array()); n != 1 {
 		t.Fatalf("precondition: oauth count=%d, want 1 (body=%s)", n, creds)
 	}
 
@@ -102,26 +102,20 @@ func TestE2E_OAuthOnlyUnbindClosedLoop(t *testing.T) {
 	}
 
 	// --- Set an initial password via the new endpoint (no current password) -----
-	setBody := postJSON(t, client, base+"/api/v1/auth/password/set", map[string]any{"newPassword": "longenough123"})
-	if code := gjson.New(setBody).Get("code").String(); code != "ok" {
-		t.Fatalf("set password: code=%q, want ok (body=%s)", code, setBody)
-	}
+	postJSON(t, client, base+"/api/v1/auth/password/set", map[string]any{"newPassword": "longenough123"})
 
 	// --- Now google is no longer the last credential → unbind succeeds ----------
-	if creds2 := getEnvelope(t, client, base+"/api/v1/session/credentials"); !creds2.Get("data.hasPassword").Bool() {
+	if creds2 := getEnvelope(t, client, base+"/api/v1/session/credentials"); !creds2.Get("hasPassword").Bool() {
 		t.Fatalf("after set: hasPassword=false, want true (body=%s)", creds2)
 	}
-	del2 := deleteEnvelope(t, client, base+"/api/v1/session/credentials/google")
-	if code := del2.Get("code").String(); code != "ok" {
-		t.Fatalf("unbind after set password: code=%q, want ok (body=%s)", code, del2)
-	}
+	deleteEnvelope(t, client, base+"/api/v1/session/credentials/google")
 
 	// --- Final state: google gone, password remains -----------------------------
 	creds3 := getEnvelope(t, client, base+"/api/v1/session/credentials")
-	if n := len(creds3.Get("data.oauth").Array()); n != 0 {
+	if n := len(creds3.Get("oauth").Array()); n != 0 {
 		t.Fatalf("final: oauth count=%d, want 0 (body=%s)", n, creds3)
 	}
-	if !creds3.Get("data.hasPassword").Bool() {
+	if !creds3.Get("hasPassword").Bool() {
 		t.Fatalf("final: password should remain after unbind (body=%s)", creds3)
 	}
 
@@ -132,7 +126,7 @@ func TestE2E_OAuthOnlyUnbindClosedLoop(t *testing.T) {
 	}
 }
 
-// getEnvelope does a GET and returns the parsed gokit envelope.
+// getEnvelope does a GET and returns the parsed response document.
 func getEnvelope(t *testing.T, client *http.Client, url string) *gjson.Json {
 	t.Helper()
 	resp, err := client.Get(url)
@@ -144,7 +138,7 @@ func getEnvelope(t *testing.T, client *http.Client, url string) *gjson.Json {
 	return gjson.New(body)
 }
 
-// deleteEnvelope does a DELETE and returns the parsed gokit envelope.
+// deleteEnvelope does a DELETE and returns the parsed response document.
 func deleteEnvelope(t *testing.T, client *http.Client, url string) *gjson.Json {
 	t.Helper()
 	req, _ := http.NewRequest(http.MethodDelete, url, nil)

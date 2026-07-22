@@ -92,8 +92,8 @@ func TestAdminUserManagement(t *testing.T) {
 			body, status := do(http.MethodGet, "/api/v1/admin/users", "", adminHdr)
 			t.Assert(status, 200)
 			j := gjson.New(body)
-			t.Assert(j.Get("data.total").Int(), 3)
-			t.Assert(len(j.Get("data.list").Array()), 3)
+			t.Assert(j.Get("total").Int(), 3)
+			t.Assert(len(j.Get("list").Array()), 3)
 		}
 
 		// 3. Admin stats → total 3, active 3.
@@ -101,15 +101,15 @@ func TestAdminUserManagement(t *testing.T) {
 			body, status := do(http.MethodGet, "/api/v1/admin/users/stats", "", adminHdr)
 			t.Assert(status, 200)
 			j := gjson.New(body)
-			t.Assert(j.Get("data.total").Int(), 3)
-			t.Assert(j.Get("data.active").Int(), 3)
+			t.Assert(j.Get("total").Int(), 3)
+			t.Assert(j.Get("active").Int(), 3)
 		}
 
 		// 4. Keyword filter narrows to one.
 		{
 			body, status := do(http.MethodGet, "/api/v1/admin/users?keyword=target", "", adminHdr)
 			t.Assert(status, 200)
-			t.Assert(gjson.New(body).Get("data.total").Int(), 1)
+			t.Assert(gjson.New(body).Get("total").Int(), 1)
 		}
 
 		// 5. Self-ban → 403 (self-lockout guard).
@@ -133,7 +133,7 @@ func TestAdminUserManagement(t *testing.T) {
 			path := "/api/v1/admin/users/" + targetID + "/status"
 			body, status := do(http.MethodPut, path, `{"status":"disabled"}`, adminHdr)
 			t.Assert(status, 200)
-			t.Assert(gjson.New(body).Get("data.user.status").String(), "disabled")
+			t.Assert(gjson.New(body).Get("user.status").String(), "disabled")
 
 			_, err := svc.Login(ctx, logic.LoginInput{Email: "target@b.com", Password: "longenough123"})
 			t.Assert(errors.Is(err, iderr.AccountDisabled()) || err != nil, true)
@@ -143,8 +143,8 @@ func TestAdminUserManagement(t *testing.T) {
 		{
 			body, _ := do(http.MethodGet, "/api/v1/admin/users/stats", "", adminHdr)
 			j := gjson.New(body)
-			t.Assert(j.Get("data.active").Int(), 2)
-			t.Assert(j.Get("data.disabled").Int(), 1)
+			t.Assert(j.Get("active").Int(), 2)
+			t.Assert(j.Get("disabled").Int(), 1)
 		}
 
 		// 9. Admin reset target's password → 200; new password works after unban.
@@ -166,8 +166,8 @@ func TestAdminUserManagement(t *testing.T) {
 				`{"email":"created@b.com","password":"createdpw123","displayName":"Created","roles":["admin"]}`, adminHdr)
 			t.Assert(status, 200)
 			j := gjson.New(body)
-			t.Assert(j.Get("data.user.email").String(), "created@b.com")
-			roles := j.Get("data.user.roles").Strings()
+			t.Assert(j.Get("user.email").String(), "created@b.com")
+			roles := j.Get("user.roles").Strings()
 			t.Assert(contains(roles, "admin"), true)
 			_, err := svc.Login(ctx, logic.LoginInput{Email: "created@b.com", Password: "createdpw123"})
 			t.AssertNil(err)
@@ -179,7 +179,7 @@ func TestAdminUserManagement(t *testing.T) {
 			_, status := do(http.MethodDelete, path, "", adminHdr)
 			t.Assert(status, 200)
 			body, _ := do(http.MethodGet, "/api/v1/admin/users?keyword=target", "", adminHdr)
-			t.Assert(gjson.New(body).Get("data.total").Int(), 0)
+			t.Assert(gjson.New(body).Get("total").Int(), 0)
 			_, err := svc.Login(ctx, logic.LoginInput{Email: "target@b.com", Password: "brandnewpw99"})
 			t.AssertNE(err, nil)
 		}

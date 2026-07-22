@@ -11,7 +11,7 @@ import (
 	"platform/services/identity/internal/controller"
 )
 
-// TestHealthz verifies that GET /healthz returns a JSON envelope with code == "ok".
+// TestHealthz verifies that GET /healthz returns the raw health representation.
 func TestHealthz(t *testing.T) {
 	gtest.C(t, func(t *gtest.T) {
 		s := g.Server(t.Name())
@@ -28,6 +28,6 @@ func TestHealthz(t *testing.T) {
 		client.SetPrefix(fmt.Sprintf("http://127.0.0.1:%d", port))
 
 		resp := client.GetContent(nil, "/healthz")
-		t.Assert(g.NewVar(resp).MapStrAny()["code"], "ok")
+		t.Assert(g.NewVar(resp).MapStrAny()["status"], "up")
 	})
 }

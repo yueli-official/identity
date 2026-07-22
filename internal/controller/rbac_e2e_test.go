@@ -147,9 +147,8 @@ func TestE2E_RBAC(t *testing.T) {
 		grantResp.Body.Close()
 		t.Assert(grantResp.StatusCode, 200)
 		gj := gjson.New(grantBody)
-		t.Assert(gj.Get("code").String(), "ok")
 		// The endpoint response itself must list the updated roles incl. admin.
-		respRoles := gj.Get("data.roles").Strings()
+		respRoles := gj.Get("roles").Strings()
 		t.Assert(rbacRolesContain(respRoles, "admin"), true)
 		t.Assert(rbacRolesContain(respRoles, "user"), true)
 

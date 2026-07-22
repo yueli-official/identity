@@ -6,11 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gogf/gf/v2/encoding/gjson"
 	"github.com/gogf/gf/v2/frame/g"
+	"github.com/gogf/gf/v2/net/gclient"
 	"github.com/gogf/gf/v2/net/ghttp"
 
-	"platform/gokit/response"
 	"platform/services/identity/internal/oidc"
 )
 
@@ -53,33 +52,18 @@ func (p *AssetAdminProxy) Forward(r *ghttp.Request) {
 	cli := g.Client()
 	cli.SetHeader("Authorization", "Bearer "+bearer)
 	cli.ContentJson()
-	var raw string
+	var upstream *gclient.Response
 	switch r.Method {
 	case "GET":
-		resp, e := cli.Get(r.Context(), target)
-		err = e
-		if err == nil {
-			defer resp.Close()
-			raw = resp.ReadAllString()
-		}
+		upstream, err = cli.Get(r.Context(), target)
 	case "POST":
 		var body []byte
 		body, err = io.ReadAll(r.Request.Body)
 		if err == nil {
-			resp, e := cli.Post(r.Context(), target, body)
-			err = e
-			if err == nil {
-				defer resp.Close()
-				raw = resp.ReadAllString()
-			}
+			upstream, err = cli.Post(r.Context(), target, body)
 		}
 	case "DELETE":
-		resp, e := cli.Delete(r.Context(), target)
-		err = e
-		if err == nil {
-			defer resp.Close()
-			raw = resp.ReadAllString()
-		}
+		upstream, err = cli.Delete(r.Context(), target)
 	default:
 		r.Response.WriteStatus(405)
 		return
@@ -88,10 +72,17 @@ func (p *AssetAdminProxy) Forward(r *ghttp.Request) {
 		r.SetError(fmt.Errorf("asset service unreachable: %w", err))
 		return
 	}
-	j := gjson.New(raw)
-	if code := j.Get("code").String(); code != "ok" {
-		r.Response.WriteJson(response.Fail(code, j.Get("message").String(), nil))
+	defer upstream.Close()
+	body := upstream.ReadAll()
+	contentType := upstream.Header.Get("Content-Type")
+	if !strings.HasPrefix(contentType, "application/json") && !strings.HasPrefix(contentType, "application/problem+json") {
+		r.SetError(fmt.Errorf("asset service returned unsupported content type"))
 		return
 	}
-	r.Response.WriteJson(response.OK(j.Get("data").Val()))
+	r.Response.Header().Set("Content-Type", contentType)
+	if traceID := upstream.Header.Get("X-Trace-Id"); traceID != "" {
+		r.Response.Header().Set("X-Trace-Id", traceID)
+	}
+	r.Response.WriteHeader(upstream.StatusCode)
+	r.Response.Write(body)
 }

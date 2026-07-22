@@ -276,10 +276,13 @@ func main() {
 	// request — business API, OIDC endpoints, and OAuth login callbacks —
 	// has IP / User-Agent / X-Request-Id available via actor.From(ctx).
 	s.Use(controller.ActorMiddleware)
+	rateLimiter := ghttpx.MustRateLimiterFromEnvironment()
+	apiMiddleware := ghttpx.NewMiddleware(rateLimiter, ghttpx.ForwardedClientIPKey)
+	rawRateLimitMiddleware := ghttpx.NewRawRateLimitMiddleware(rateLimiter, ghttpx.ForwardedClientIPKey)
 
-	// Business API: JSON envelope middleware applied to this group only.
+	// Business API: raw-success/Problem middleware applied to this group only.
 	s.Group("/", func(grp *ghttp.RouterGroup) {
-		grp.Middleware(ghttpx.Middleware, authhttp.Optional(identityVerifier))
+		grp.Middleware(apiMiddleware, authhttp.Optional(identityVerifier))
 		grp.GET("/healthz", controller.Healthz)
 		grp.GET("/readyz", healthcheck.Handler(map[string]healthcheck.Check{
 			"database": healthcheck.Database,
@@ -295,7 +298,7 @@ func main() {
 
 	// OIDC standard endpoints: raw RFC responses — NO envelope middleware.
 	s.Group("/", func(grp *ghttp.RouterGroup) {
-		grp.Middleware(ghttpx.RawRateLimitMiddleware)
+		grp.Middleware(rawRateLimitMiddleware)
 		grp.GET("/.well-known/openid-configuration", oidcCtl.Discovery)
 		grp.GET("/oauth2/jwks.json", oidcCtl.JWKS)
 		grp.GET("/oauth2/authorize", oidcCtl.Authorize)
@@ -307,7 +310,7 @@ func main() {
 
 	// Google OAuth login: raw redirect handlers — NO envelope middleware.
 	s.Group("/", func(grp *ghttp.RouterGroup) {
-		grp.Middleware(ghttpx.RawRateLimitMiddleware)
+		grp.Middleware(rawRateLimitMiddleware)
 		grp.GET("/api/v1/auth/oauth/google/start", oauthCtl.GoogleStart)
 		grp.GET("/api/v1/auth/oauth/google/callback", oauthCtl.GoogleCallback)
 	})

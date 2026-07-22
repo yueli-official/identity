@@ -8,12 +8,16 @@
 package assetclient
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/gogf/gf/v2/encoding/gjson"
 	"github.com/gogf/gf/v2/frame/g"
+	foundationhttpclient "github.com/yueli-official/foundation/go/httpclient"
 )
 
 type Client struct{ base string }
@@ -42,19 +46,23 @@ type View struct {
 }
 
 func (c *Client) post(ctx context.Context, bearer, path string, body g.Map) (*gjson.Json, error) {
-	cli := g.Client()
-	cli.SetHeader("Authorization", "Bearer "+bearer)
-	cli.ContentJson()
-	resp, err := cli.Post(ctx, c.base+path, body)
+	raw, _ := json.Marshal(body)
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.base+path, bytes.NewReader(raw))
+	if err != nil {
+		return nil, fmt.Errorf("asset request invalid: %w", err)
+	}
+	request.Header.Set("Authorization", "Bearer "+bearer)
+	request.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("asset service unreachable: %w", err)
 	}
-	defer resp.Close()
-	j := gjson.New(resp.ReadAllString())
-	if code := j.Get("code").String(); code != "ok" {
-		return nil, fmt.Errorf("asset service error: %s", code)
+	defer resp.Body.Close()
+	out, err := foundationhttpclient.DecodeJSON[map[string]any](resp, foundationhttpclient.Limits{})
+	if err != nil {
+		return nil, fmt.Errorf("asset service error: %w", err)
 	}
-	return j, nil
+	return gjson.New(out), nil
 }
 
 func (c *Client) uploadInit(ctx context.Context, bearer string, in InitInput) (initOutput, error) {
@@ -67,9 +75,9 @@ func (c *Client) uploadInit(ctx context.Context, bearer string, in InitInput) (i
 		return initOutput{}, err
 	}
 	return initOutput{
-		UploadURL:     j.Get("data.uploadUrl").String(),
-		UploadToken:   j.Get("data.uploadToken").String(),
-		UploadHeaders: stringMap(j.Get("data.uploadHeaders").Map()),
+		UploadURL:     j.Get("uploadUrl").String(),
+		UploadToken:   j.Get("uploadToken").String(),
+		UploadHeaders: stringMap(j.Get("uploadHeaders").Map()),
 	}, nil
 }
 
@@ -90,24 +98,27 @@ func (c *Client) finalize(ctx context.Context, bearer, token string) (View, erro
 		return View{}, err
 	}
 	return View{
-		ID:     j.Get("data.asset.id").String(),
-		CdnURL: j.Get("data.asset.cdnUrl").String(),
+		ID:     j.Get("asset.id").String(),
+		CdnURL: j.Get("asset.cdnUrl").String(),
 	}, nil
 }
 
 // putBlob streams the bytes to the presigned, token-validated blob URL. The blob
 // endpoint authenticates by the URL token (not a bearer), so no auth header here.
 func (c *Client) putBlob(ctx context.Context, uploadURL, mime string, headers map[string]string, data []byte) error {
-	cli := g.Client()
-	cli.SetHeader("Content-Type", mime)
-	for k, v := range headers {
-		cli.SetHeader(k, v)
+	request, err := http.NewRequestWithContext(ctx, http.MethodPut, uploadURL, bytes.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("asset blob upload request invalid: %w", err)
 	}
-	resp, err := cli.Put(ctx, uploadURL, data)
+	request.Header.Set("Content-Type", mime)
+	for k, v := range headers {
+		request.Header.Set(k, v)
+	}
+	resp, err := http.DefaultClient.Do(request)
 	if err != nil {
 		return fmt.Errorf("asset blob upload failed: %w", err)
 	}
-	defer resp.Close()
+	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("asset blob upload failed: HTTP %d", resp.StatusCode)
 	}
@@ -117,15 +128,18 @@ func (c *Client) putBlob(ctx context.Context, uploadURL, mime string, headers ma
 // Delete removes an asset by id (owner-scoped via the bearer). Best-effort:
 // used to drop the previous avatar/cover when a new one replaces it.
 func (c *Client) Delete(ctx context.Context, bearer, assetID string) error {
-	cli := g.Client()
-	cli.SetHeader("Authorization", "Bearer "+bearer)
-	resp, err := cli.Delete(ctx, c.base+"/api/v1/assets/"+assetID)
+	request, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.base+"/api/v1/assets/"+assetID, nil)
+	if err != nil {
+		return fmt.Errorf("asset delete request invalid: %w", err)
+	}
+	request.Header.Set("Authorization", "Bearer "+bearer)
+	resp, err := http.DefaultClient.Do(request)
 	if err != nil {
 		return fmt.Errorf("asset service unreachable: %w", err)
 	}
-	defer resp.Close()
-	if code := gjson.New(resp.ReadAllString()).Get("code").String(); code != "ok" {
-		return fmt.Errorf("asset delete failed: %s", code)
+	defer resp.Body.Close()
+	if _, err := foundationhttpclient.DecodeJSON[any](resp, foundationhttpclient.Limits{}); err != nil {
+		return fmt.Errorf("asset delete failed: %w", err)
 	}
 	return nil
 }

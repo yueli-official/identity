@@ -131,9 +131,8 @@ func TestE2E_AuditLogging(t *testing.T) {
 		adminID := adminOut.ID
 
 		// Log the admin in over HTTP so we get a real session cookie:
-		adminLoginBody, adminLoginHdr := doPost("/api/v1/auth/login",
+		_, adminLoginHdr := doPost("/api/v1/auth/login",
 			`{"email":"admin@audit.test","password":"longenough123"}`, nil)
-		t.Assert(gjson.New(adminLoginBody).Get("code").String(), "ok")
 		adminSID := extractSessionCookie(adminLoginHdr)
 		t.AssertNE(adminSID, "")
 
@@ -146,22 +145,20 @@ func TestE2E_AuditLogging(t *testing.T) {
 		const userPassword = "longenough123"
 		const testUA = "TestBrowser/1.0 (audit-e2e)"
 
-		regBody, _ := doPost("/api/v1/auth/register",
+		_, _ = doPost("/api/v1/auth/register",
 			fmt.Sprintf(`{"email":%q,"password":%q,"displayName":"AuditUser"}`, userEmail, userPassword),
 			map[string]string{"User-Agent": testUA},
 		)
-		t.Assert(gjson.New(regBody).Get("code").String(), "ok")
 		// Resolve the user ID via the service so we can filter audit logs:
 		userIdentity, err := svc.GetByEmail(ctx, userEmail)
 		t.AssertNil(err)
 		userID := userIdentity.ID
 
 		// Log the user in over HTTP with a recognisable User-Agent:
-		loginBody, loginHdr := doPost("/api/v1/auth/login",
+		_, loginHdr := doPost("/api/v1/auth/login",
 			fmt.Sprintf(`{"email":%q,"password":%q}`, userEmail, userPassword),
 			map[string]string{"User-Agent": testUA},
 		)
-		t.Assert(gjson.New(loginBody).Get("code").String(), "ok")
 		userSID := extractSessionCookie(loginHdr)
 		t.AssertNE(userSID, "")
 
@@ -170,9 +167,8 @@ func TestE2E_AuditLogging(t *testing.T) {
 		auditBody, auditStatus := doGet(auditURL, cookieHdr(adminSID))
 		t.Assert(auditStatus, 200)
 		aj := gjson.New(auditBody)
-		t.Assert(aj.Get("code").String(), "ok")
 
-		entries := aj.Get("data.entries").Array()
+		entries := aj.Get("entries").Array()
 		t.AssertGT(len(entries), 0)
 
 		// Collect event names for membership checks. Capture the login.success
@@ -219,9 +215,8 @@ func TestE2E_AuditLogging(t *testing.T) {
 		)
 		t.Assert(failAuditStatus, 200)
 		faj := gjson.New(failAuditBody)
-		t.Assert(faj.Get("code").String(), "ok")
 
-		failEntries := faj.Get("data.entries").Array()
+		failEntries := faj.Get("entries").Array()
 		t.AssertGT(len(failEntries), 0)
 
 		// Find the login.failure for our user (by email matching in detail or result):
@@ -243,8 +238,7 @@ func TestE2E_AuditLogging(t *testing.T) {
 
 		const grantedRole = "admin"
 		grantPath := fmt.Sprintf("/api/v1/admin/identities/%s/roles?role=%s", userID, grantedRole)
-		grantHTTPBody, _ := doPost(grantPath, "", cookieHdr(adminSID))
-		t.Assert(gjson.New(grantHTTPBody).Get("code").String(), "ok")
+		_, _ = doPost(grantPath, "", cookieHdr(adminSID))
 
 		// Query audit for role.granted on the target user:
 		roleAuditBody, roleAuditStatus := doGet(
@@ -253,9 +247,8 @@ func TestE2E_AuditLogging(t *testing.T) {
 		)
 		t.Assert(roleAuditStatus, 200)
 		raj := gjson.New(roleAuditBody)
-		t.Assert(raj.Get("code").String(), "ok")
 
-		roleEntries := raj.Get("data.entries").Array()
+		roleEntries := raj.Get("entries").Array()
 		t.AssertGT(len(roleEntries), 0)
 
 		// Find the role.granted entry for grantedRole ("admin") granted by the admin:
@@ -293,18 +286,15 @@ func TestE2E_AuditLogging(t *testing.T) {
 			// the true non-admin 403 path:
 			body, status := doGet("/api/v1/admin/audit", cookieHdr(userSID))
 			t.Assert(status, 200)
-			t.Assert(gjson.New(body).Get("code").String(), "ok")
 
-			plainBody, _ := doPost("/api/v1/auth/register",
+			_, _ = doPost("/api/v1/auth/register",
 				`{"email":"plain@audit.test","password":"longenough123","displayName":"Plain"}`,
 				nil,
 			)
-			t.Assert(gjson.New(plainBody).Get("code").String(), "ok")
-			plainLoginBody, plainLoginHdr := doPost("/api/v1/auth/login",
+			_, plainLoginHdr := doPost("/api/v1/auth/login",
 				`{"email":"plain@audit.test","password":"longenough123"}`,
 				nil,
 			)
-			t.Assert(gjson.New(plainLoginBody).Get("code").String(), "ok")
 			plainSID := extractSessionCookie(plainLoginHdr)
 			t.AssertNE(plainSID, "")
 
@@ -315,9 +305,8 @@ func TestE2E_AuditLogging(t *testing.T) {
 
 		// 4c. Admin session → 200 success
 		{
-			body, status := doGet("/api/v1/admin/audit", cookieHdr(adminSID))
+			_, status := doGet("/api/v1/admin/audit", cookieHdr(adminSID))
 			t.Assert(status, 200)
-			t.Assert(gjson.New(body).Get("code").String(), "ok")
 		}
 	})
 }

@@ -83,7 +83,7 @@ func (controller *Capability) ProviderHealthCheck(ctx context.Context, req *v1.A
 		return nil, err
 	}
 	key := strings.TrimSpace(req.Key)
-	if allowed, _, _ := controller.healthLimiter.Allow(probeActor.rateKey + "|" + key); !allowed {
+	if decision := controller.healthLimiter.Evaluate(probeActor.rateKey + "|" + key); !decision.Allowed {
 		return nil, iderr.CapabilityProbeRateLimited(key)
 	}
 	snapshot, err := controller.registry.Snapshot(controller.service, time.Now())

@@ -2,7 +2,6 @@ package controller
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,7 +12,6 @@ import (
 
 	"github.com/gogf/gf/v2/net/ghttp"
 
-	"platform/gokit/response"
 	"platform/services/identity/internal/oidc"
 )
 
@@ -97,21 +95,17 @@ func (proxy *PlatformCapabilityProxy) Forward(request *ghttp.Request) {
 		request.SetError(fmt.Errorf("%s capability response is invalid or too large", service))
 		return
 	}
-	var payload struct {
-		Code    string `json:"code"`
-		Message string `json:"message"`
-		Data    any    `json:"data"`
-	}
-	if err := json.Unmarshal(body, &payload); err != nil {
-		request.SetError(fmt.Errorf("%s capability response is not valid JSON", service))
+	contentType := upstream.Header.Get("Content-Type")
+	if !strings.HasPrefix(contentType, "application/json") && !strings.HasPrefix(contentType, "application/problem+json") {
+		request.SetError(fmt.Errorf("%s capability response has unsupported content type", service))
 		return
 	}
-	if payload.Code != "ok" {
-		request.Response.WriteStatus(upstream.StatusCode)
-		request.Response.WriteJson(response.Fail(payload.Code, payload.Message, nil))
-		return
+	request.Response.Header().Set("Content-Type", contentType)
+	if traceID := upstream.Header.Get("X-Trace-Id"); traceID != "" {
+		request.Response.Header().Set("X-Trace-Id", traceID)
 	}
-	request.Response.WriteJson(response.OK(payload.Data))
+	request.Response.WriteHeader(upstream.StatusCode)
+	request.Response.Write(body)
 }
 
 func capabilityProxyRoute(method, path string) (service, suffix, scope string, ok bool) {
