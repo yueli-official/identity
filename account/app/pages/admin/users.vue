@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import {
-  ManageTabs, ManageEmpty, ManagePagination, ManageCollectionToolbar, ManageCollectionDock, ManagePageSelection, ManageSortDirectionButton, SkeletonList
-} from '@platform/manage/components'
+  createCollectionRouteQueryCodec,
+  createJsonCollectionQueryPolicy,
+  type CollectionControl,
+  type CollectionControlValue,
+  type CollectionPanelMessages,
+  type CollectionWorkflow
+} from '@yueli/ui/collection'
+import { CollectionPanel } from '@yueli/ui/collection/pattern'
+import { useVueCollectionWorkflow } from '@yueli/ui/collection/vue'
+import { createVueRouterCollectionQuerySync } from '@yueli/ui/collection/vue-router'
 import { PageHeader } from '@yueli/ui/dashboard/pattern'
-import { manageCollectionQueryFingerprint, serializeManageCollectionQuery, type ManageCollectionDefinition } from '@platform/manage/collection'
-import { useManageCollectionState } from '@platform/manage/use-manage-collection-state'
-import { useManageSelection } from '@platform/manage/use-manage-selection'
 import { useMinimumLoading } from '@yueli/ui/feedback'
 import { abs } from '@platform/ui/date'
 import { createPlatformNotifier } from '@platform/ui/feedback'
@@ -18,7 +23,6 @@ useSeoMeta({ title: '用户管理 · 控制台' })
 const { me } = useSession()
 const { call } = useApi()
 const toast = createPlatformNotifier(useToast())
-const route = useRoute()
 const router = useRouter()
 
 interface AdminUser {
@@ -32,90 +36,172 @@ interface AdminUser {
   avatarUrl: string
   roles: string[]
 }
-interface UserListData { list: AdminUser[], total: number }
-interface UserStats { total: number, active: number, disabled: number, deleted: number }
+interface UserListData {
+  list: AdminUser[]
+  total: number
+}
+interface UserStats {
+  total: number
+  active: number
+  disabled: number
+  deleted: number
+}
 
 // ── Filters / paging ─────────────────────────────────────────────────────────
-const ALL = '__all__'
-const collectionDefinition = {
-  resourceKind: 'account-user',
-  statuses: ['', 'active', 'disabled', 'deleted'],
-  views: ['list'],
-  sortKeys: ['createdAt', 'displayName'],
-  pageSizes: [20, 50, 100],
-  defaultStatus: '', defaultView: 'list', defaultSort: 'createdAt', defaultDirection: 'desc', defaultPageSize: 20,
-  pagination: 'server', selection: 'page', filters: ['role']
-} as const satisfies ManageCollectionDefinition
-const { searchInput, q, status, sort, direction, page, size, state: collectionState, filterModel } = useManageCollectionState({
-  definition: collectionDefinition,
-  routeQuery: computed(() => route.query),
-  replaceQuery: query => router.replace({ query })
+const ALL = '__all__' as const
+type UserStatus = '' | AdminUser['status']
+type UserRole = typeof ALL | 'user' | 'admin'
+type UserSort = 'createdAt' | 'displayName'
+type UserDirection = 'asc' | 'desc'
+interface UserCollectionQuery {
+  q: string
+  status: UserStatus
+  role: UserRole
+  sort: UserSort
+  direction: UserDirection
+  page: number
+  size: number
+}
+
+const statuses = ['', 'active', 'disabled', 'deleted'] as const
+const roles = [ALL, 'user', 'admin'] as const
+const sorts = ['createdAt', 'displayName'] as const
+const pageSizes = [20, 50, 100] as const
+const defaultQuery: UserCollectionQuery = { q: '', status: '', role: ALL, sort: 'createdAt', direction: 'desc', page: 1, size: 20 }
+const queryPolicy = createJsonCollectionQueryPolicy<UserCollectionQuery>()
+const searchInput = ref('')
+const sync = createVueRouterCollectionQuerySync({
+  router,
+  codec: createCollectionRouteQueryCodec({
+    q: { kind: 'string', default: defaultQuery.q, maxLength: 200 },
+    status: { kind: 'enum', values: statuses, default: defaultQuery.status },
+    role: { kind: 'enum', values: roles, default: defaultQuery.role },
+    sort: { kind: 'enum', values: sorts, default: defaultQuery.sort },
+    direction: { kind: 'enum', values: ['asc', 'desc'] as const, default: defaultQuery.direction },
+    page: { kind: 'positive-integer', default: defaultQuery.page },
+    size: { kind: 'positive-integer', values: pageSizes, default: defaultQuery.size }
+  })
 })
-const role = filterModel('role', ALL)
 
-const users = ref<AdminUser[]>([])
-const total = ref(0)
-const stats = ref<UserStats>({ total: 0, active: 0, disabled: 0, deleted: 0 })
-
-const mounted = ref(false)
-const loading = ref(true)
-onMounted(() => { mounted.value = true; fetchUsers(); fetchStats() })
-const showSkeleton = useMinimumLoading(computed(() => !mounted.value || loading.value))
-
-const totalPages = computed(() => Math.max(1, Math.ceil(total.value / size.value)))
-
-const statusTabs = computed(() => [
-  { key: '', label: '全部', count: stats.value.active + stats.value.disabled },
-  { key: 'active', label: '正常', count: stats.value.active },
-  { key: 'disabled', label: '已封禁', count: stats.value.disabled },
-  { key: 'deleted', label: '已删除', count: stats.value.deleted }
-])
-
-async function fetchUsers() {
-  loading.value = true
+function isSelf(user: AdminUser) {
+  return user.id === me.value?.id
+}
+async function load(nextQuery: Readonly<UserCollectionQuery>, activeWorkflow: CollectionWorkflow<AdminUser, string, UserCollectionQuery>) {
+  const token = activeWorkflow.beginLoad()
   try {
     const data = await call<UserListData>('/api/v1/admin/users', {
       params: {
-        page: page.value,
-        size: size.value,
-        keyword: q.value || undefined,
-        status: status.value || undefined,
-        role: role.value !== ALL ? role.value : undefined,
-        orderBy: sort.value === 'displayName' ? 'display_name' : 'created_at',
-        order: direction.value
+        page: nextQuery.page,
+        size: nextQuery.size,
+        keyword: nextQuery.q || undefined,
+        status: nextQuery.status || undefined,
+        role: nextQuery.role !== ALL ? nextQuery.role : undefined,
+        orderBy: nextQuery.sort === 'displayName' ? 'display_name' : 'created_at',
+        order: nextQuery.direction
       }
     })
-    users.value = data.list ?? []
-    total.value = data.total ?? 0
-  } catch (e) {
-    toast.add({ title: '加载用户失败', description: (e as Error)?.message, color: 'error' })
-  } finally {
-    loading.value = false
+    const lastPage = Math.max(1, Math.ceil((data.total ?? 0) / nextQuery.size))
+    if (nextQuery.page > lastPage) {
+      activeWorkflow.setQuery({ ...nextQuery, page: lastPage })
+      return
+    }
+    activeWorkflow.resolveLoad(token, { items: data.list ?? [], total: data.total ?? 0 })
+  } catch {
+    activeWorkflow.rejectLoad(token, { key: 'account.users.collection.load_failed' })
   }
 }
-async function fetchStats() {
-  try { stats.value = await call<UserStats>('/api/v1/admin/users/stats') } catch { /* silent */ }
-}
-async function reloadAll() { await Promise.all([fetchUsers(), fetchStats()]) }
 
-watch([q, status, role, sort, direction, page, size], fetchUsers)
+const {
+  snapshot: collection,
+  workflow,
+  reload
+} = useVueCollectionWorkflow({
+  initialQuery: defaultQuery,
+  queryPolicy,
+  keyOf: (user: AdminUser) => user.id,
+  isSelectable: (user: AdminUser) => !isSelf(user),
+  querySync: sync,
+  dataQueryKey: (query) => JSON.stringify(query),
+  load
+})
+const query = computed(() => collection.value.query)
+function updateQuery(patch: Partial<UserCollectionQuery>, resetPage = true) {
+  workflow.setQuery({ ...query.value, ...patch, ...(resetPage ? { page: 1 } : {}) })
+}
+const q = computed(() => query.value.q)
+const status = computed({ get: () => query.value.status, set: (value: UserStatus) => updateQuery({ status: value }) })
+const role = computed({ get: () => query.value.role, set: (value: UserRole) => updateQuery({ role: value }) })
+const sort = computed({ get: () => query.value.sort, set: (value: UserSort) => updateQuery({ sort: value }) })
+const direction = computed({ get: () => query.value.direction, set: (value: UserDirection) => updateQuery({ direction: value }) })
+const page = computed({ get: () => query.value.page, set: (value: number) => updateQuery({ page: value }, false) })
+const size = computed({ get: () => query.value.size, set: (value: number) => updateQuery({ size: value }) })
+
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+watch(searchInput, (value) => {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => updateQuery({ q: value.trim() }), 300)
+})
+searchInput.value = collection.value.query.q
+watch(q, (value) => {
+  if (searchInput.value !== value) searchInput.value = value
+})
+
+const users = computed(() => collection.value.items)
+const total = computed(() => collection.value.total)
+const stats = ref<UserStats>({ total: 0, active: 0, disabled: 0, deleted: 0 })
+
+const mounted = ref(false)
+onMounted(() => {
+  mounted.value = true
+  fetchStats()
+})
+watch(
+  () => me.value?.id,
+  (id, previousId) => {
+    if (mounted.value && id && id !== previousId) void reload()
+  }
+)
+onScopeDispose(() => {
+  if (searchTimer) clearTimeout(searchTimer)
+})
+const pending = computed(() => collection.value.loadState === 'loading' || collection.value.loadState === 'refreshing')
+const showSkeleton = useMinimumLoading(computed(() => !mounted.value || pending.value))
+async function fetchStats() {
+  try {
+    stats.value = await call<UserStats>('/api/v1/admin/users/stats')
+  } catch {
+    /* silent */
+  }
+}
+async function reloadAll() {
+  await Promise.all([reload(), fetchStats()])
+}
 
 // ── Selection ────────────────────────────────────────────────────────────────
-const selectionResetKey = computed(() => manageCollectionQueryFingerprint(serializeManageCollectionQuery(collectionState.value, collectionDefinition)))
-const { selectedIds, selectionCount, isPageSelected, isPageIndeterminate, isSelected, toggleOne, togglePage, keepOnly, clear: clearSelection } = useManageSelection({
-  visibleIds: computed(() => users.value.filter(user => !isSelf(user)).map(user => user.id)), filteredTotal: total, resetKey: selectionResetKey
-})
+const selectedIds = computed(() => (collection.value.selection.mode === 'keys' ? collection.value.selection.keys : []))
+const selectionCount = computed(() => collection.value.selection.count)
+const isPageSelected = computed(() => collection.value.isPageSelected)
+const isPageIndeterminate = computed(() => collection.value.isPageIndeterminate)
+const isSelected = (id: string) => workflow.isSelected(id)
+const toggleOne = (id: string, selected?: boolean) => {
+  if (selected === undefined || selected !== workflow.isSelected(id)) workflow.toggleKey(id)
+}
+const togglePage = (selected?: boolean | 'indeterminate') => workflow.togglePage(selected === true)
+const clearSelection = () => workflow.clearSelection()
+function replaceSelection(ids: readonly string[]) {
+  workflow.clearSelection()
+  for (const id of ids) workflow.toggleKey(id)
+}
 
 // ── Row actions ──────────────────────────────────────────────────────────────
 const busy = ref('') // id currently mutating
-function isSelf(user: AdminUser) { return user.id === me.value?.id }
 
 async function setStatus(u: AdminUser, next: AdminUser['status']) {
   busy.value = u.id
   try {
     await call(`/api/v1/admin/users/${u.id}/status`, { method: 'PUT', body: { status: next } })
-    u.status = next
-    await fetchStats()
+    if (workflow.isSelected(u.id)) workflow.toggleKey(u.id)
+    await reloadAll()
   } catch (e) {
     toast.add({ title: '操作失败', description: (e as Error)?.message, color: 'error' })
   } finally {
@@ -126,14 +212,32 @@ const ban = (u: AdminUser) => setStatus(u, 'disabled')
 const unban = (u: AdminUser) => setStatus(u, 'active')
 
 function rowActions(u: AdminUser) {
-  const items: { label: string, icon: string, color?: 'error', disabled?: boolean, onSelect: () => void }[][] = [[
-    { label: '查看详情', icon: 'i-tabler-eye', onSelect: () => openDetail(u) },
-    { label: '重置密码', icon: 'i-tabler-lock', onSelect: () => { resetTarget.value = u; newPw.value = '' } }
-  ]]
-  const lifecycle: typeof items[number] = []
+  const items: { label: string; icon: string; color?: 'error'; disabled?: boolean; onSelect: () => void }[][] = [
+    [
+      { label: '查看详情', icon: 'i-tabler-eye', onSelect: () => openDetail(u) },
+      {
+        label: '重置密码',
+        icon: 'i-tabler-lock',
+        onSelect: () => {
+          resetTarget.value = u
+          newPw.value = ''
+        }
+      }
+    ]
+  ]
+  const lifecycle: (typeof items)[number] = []
   if (u.status === 'active') lifecycle.push({ label: '封禁', icon: 'i-tabler-ban', color: 'error', disabled: isSelf(u), onSelect: () => ban(u) })
   if (u.status === 'disabled') lifecycle.push({ label: '解封', icon: 'i-tabler-circle-check', onSelect: () => unban(u) })
-  if (u.status !== 'deleted') lifecycle.push({ label: '删除', icon: 'i-tabler-trash', color: 'error', disabled: isSelf(u), onSelect: () => { deleteTarget.value = u } })
+  if (u.status !== 'deleted')
+    lifecycle.push({
+      label: '删除',
+      icon: 'i-tabler-trash',
+      color: 'error',
+      disabled: isSelf(u),
+      onSelect: () => {
+        deleteTarget.value = u
+      }
+    })
   items.push(lifecycle)
   return items
 }
@@ -141,16 +245,20 @@ function rowActions(u: AdminUser) {
 // ── Batch ────────────────────────────────────────────────────────────────────
 const batchAction = ref<'' | 'active' | 'disabled'>('')
 const batchRunning = ref(false)
-const batchResult = ref<{ success: number, failed: number } | null>(null)
+const batchResult = ref<{ success: number; failed: number } | null>(null)
+watch([q, status, role, sort, direction, page, size], () => {
+  batchAction.value = ''
+  batchResult.value = null
+})
 async function applyBatch() {
   if (!batchAction.value || !selectedIds.value.length || batchRunning.value) return
-  const ids = selectedIds.value.filter(id => id !== me.value?.id)
+  const ids = selectedIds.value.filter((id) => id !== me.value?.id)
   batchRunning.value = true
   try {
-    const results = await Promise.allSettled(ids.map(id => call(`/api/v1/admin/users/${id}/status`, { method: 'PUT', body: { status: batchAction.value } })))
+    const results = await Promise.allSettled(ids.map((id) => call(`/api/v1/admin/users/${id}/status`, { method: 'PUT', body: { status: batchAction.value } })))
     const failedIds = ids.filter((_, index) => results[index]?.status === 'rejected')
     batchResult.value = { success: ids.length - failedIds.length, failed: failedIds.length }
-    if (failedIds.length) keepOnly(failedIds)
+    if (failedIds.length) replaceSelection(failedIds)
     else clearSelection()
     batchAction.value = ''
     await reloadAll()
@@ -161,8 +269,15 @@ async function applyBatch() {
 
 // ── Detail modal (+ role toggle) ─────────────────────────────────────────────
 const detailUser = ref<AdminUser | null>(null)
-const detailOpen = computed({ get: () => !!detailUser.value, set: v => { if (!v) detailUser.value = null } })
-function openDetail(u: AdminUser) { detailUser.value = { ...u } }
+const detailOpen = computed({
+  get: () => !!detailUser.value,
+  set: (v) => {
+    if (!v) detailUser.value = null
+  }
+})
+function openDetail(u: AdminUser) {
+  detailUser.value = { ...u }
+}
 const togglingRole = ref(false)
 async function toggleAdminRole() {
   const u = detailUser.value
@@ -172,8 +287,8 @@ async function toggleAdminRole() {
   try {
     if (has) await call(`/api/v1/admin/identities/${u.id}/roles/admin`, { method: 'DELETE' })
     else await call(`/api/v1/admin/identities/${u.id}/roles`, { method: 'POST', body: { role: 'admin' } })
-    u.roles = has ? u.roles.filter(r => r !== 'admin') : [...u.roles, 'admin']
-    await fetchUsers()
+    u.roles = has ? u.roles.filter((r) => r !== 'admin') : [...u.roles, 'admin']
+    await reload()
   } catch (e) {
     toast.add({ title: '操作失败', description: (e as Error)?.message, color: 'error' })
   } finally {
@@ -183,7 +298,12 @@ async function toggleAdminRole() {
 
 // ── Reset password modal ─────────────────────────────────────────────────────
 const resetTarget = ref<AdminUser | null>(null)
-const resetOpen = computed({ get: () => !!resetTarget.value, set: v => { if (!v) resetTarget.value = null } })
+const resetOpen = computed({
+  get: () => !!resetTarget.value,
+  set: (v) => {
+    if (!v) resetTarget.value = null
+  }
+})
 const newPw = ref('')
 const resetting = ref(false)
 async function confirmReset() {
@@ -201,7 +321,12 @@ async function confirmReset() {
 
 // ── Delete confirm modal ─────────────────────────────────────────────────────
 const deleteTarget = ref<AdminUser | null>(null)
-const deleteOpen = computed({ get: () => !!deleteTarget.value, set: v => { if (!v) deleteTarget.value = null } })
+const deleteOpen = computed({
+  get: () => !!deleteTarget.value,
+  set: (v) => {
+    if (!v) deleteTarget.value = null
+  }
+})
 const deleting = ref(false)
 async function confirmDelete() {
   if (!deleteTarget.value) return
@@ -223,7 +348,10 @@ const createForm = reactive({ email: '', password: '', displayName: '', admin: f
 const creating = ref(false)
 const createError = ref('')
 function openCreate() {
-  createForm.email = ''; createForm.password = ''; createForm.displayName = ''; createForm.admin = false
+  createForm.email = ''
+  createForm.password = ''
+  createForm.displayName = ''
+  createForm.admin = false
   createError.value = ''
   createOpen.value = true
 }
@@ -264,14 +392,64 @@ const sortItems = [
   { label: '注册时间', value: 'createdAt' },
   { label: '昵称', value: 'displayName' }
 ]
-const pageSizeItems = [20, 50, 100].map(value => ({ label: `${value}/页`, value }))
-const activeFilterCount = computed(() => role.value === ALL ? 0 : 1)
-const statusBadge: Record<AdminUser['status'], { label: string, color: 'success' | 'error' | 'neutral' }> = {
+const statusItems = computed(() => [
+  { label: `全部状态 (${stats.value.active + stats.value.disabled})`, value: '' },
+  { label: `正常 (${stats.value.active})`, value: 'active' },
+  { label: `已封禁 (${stats.value.disabled})`, value: 'disabled' },
+  { label: `已删除 (${stats.value.deleted})`, value: 'deleted' }
+])
+const activeFilterCount = computed(() => Number(status.value !== defaultQuery.status) + Number(role.value !== ALL))
+const collectionControls = computed<CollectionControl[]>(() => [
+  { kind: 'select', id: 'status', label: '用户状态', value: status.value, options: statusItems.value, icon: 'i-tabler-user-check', class: 'w-36' },
+  { kind: 'select', id: 'role', label: '用户角色', value: role.value, options: roleFilterItems, icon: 'i-tabler-shield', class: 'w-32' },
+  { kind: 'select', id: 'sort', label: '用户排序', value: sort.value, options: sortItems, icon: 'i-tabler-arrows-sort', class: 'w-32' },
+  { kind: 'direction', id: 'direction', label: '排序方向', value: direction.value, ascendingLabel: '切换为倒序', descendingLabel: '切换为正序' }
+])
+const collectionMessages: CollectionPanelMessages = {
+  searchPlaceholder: '搜索昵称、用户名或邮箱…',
+  searchAction: '搜索',
+  filtersAction: '筛选',
+  activeFilters: (count) => `筛选（${count}）`,
+  clearFilters: '清除筛选',
+  selectPage: '选择当前页可操作用户',
+  selectItem: (label) => `选择用户：${label}`,
+  bulkRegion: '用户批量操作',
+  selected: (count) => `已选择 ${count} 个用户`,
+  selectAllResults: '选择全部结果',
+  clearSelection: '取消选择',
+  emptyTitle: '没有匹配的用户',
+  emptyDescription: '请调整搜索、状态或角色筛选后重试。',
+  errorTitle: '用户加载失败',
+  retry: '重新加载',
+  showing: (first, last, count) => `显示 ${first}–${last}，共 ${count} 个`,
+  pageSize: '每页',
+  pageSizeControl: '每页用户数量',
+  pageSizeOption: (value) => `${value} 个`
+}
+function changeCollectionControl(id: string, value: CollectionControlValue) {
+  if (id === 'status' && statuses.includes(value as UserStatus)) status.value = value as UserStatus
+  if (id === 'role' && roles.includes(value as UserRole)) role.value = value as UserRole
+  if (id === 'sort' && sorts.includes(value as UserSort)) sort.value = value as UserSort
+  if (id === 'direction' && (value === 'asc' || value === 'desc')) direction.value = value
+}
+function submitCollectionSearch(value: string) {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchInput.value = value
+  updateQuery({ q: value.trim() })
+}
+function clearActiveFilters() {
+  updateQuery({ status: defaultQuery.status, role: defaultQuery.role })
+}
+const statusBadge: Record<AdminUser['status'], { label: string; color: 'success' | 'error' | 'neutral' }> = {
   active: { label: '正常', color: 'success' },
   disabled: { label: '已封禁', color: 'error' },
   deleted: { label: '已删除', color: 'neutral' }
 }
-function initialOf(u: AdminUser) { return (u.displayName || u.email || '?').charAt(0).toUpperCase() }
+function initialOf(u: AdminUser) {
+  return (u.displayName || u.email || '?').charAt(0).toUpperCase()
+}
+const userKey = (user: AdminUser) => user.id
+const userLabel = (user: AdminUser) => user.displayName || user.email
 </script>
 
 <template>
@@ -295,80 +473,108 @@ function initialOf(u: AdminUser) { return (u.displayName || u.email || '?').char
       </template>
     </PageHeader>
 
-    <ManageTabs v-model="status" :items="statusTabs" class="mb-4" />
-
-    <ManageCollectionToolbar
+    <CollectionPanel
       v-model:search="searchInput"
-      search-placeholder="搜索昵称、用户名或邮箱…"
-      :filter-count="activeFilterCount"
-      class="mb-5"
+      :items="users"
+      :item-key="userKey"
+      :item-label="userLabel"
+      :controls="collectionControls"
+      :messages="collectionMessages"
+      :state="collection.issue ? 'error' : showSkeleton ? 'loading' : 'ready'"
+      :error-message="collection.issue?.key"
+      :total="total"
+      :page="page"
+      :page-size="size"
+      :page-sizes="pageSizes"
+      :active-filter-count="activeFilterCount"
+      selectable
+      :is-item-selectable="(user) => !isSelf(user)"
+      :selection-count="selectionCount"
+      :page-selected="isPageSelected"
+      :page-indeterminate="isPageIndeterminate"
+      :is-selected="isSelected"
+      label="用户列表"
+      @search="submitCollectionSearch"
+      @control-change="changeCollectionControl"
+      @clear-filters="clearActiveFilters"
+      @retry="reload"
+      @toggle-page="togglePage"
+      @toggle-item="toggleOne"
+      @clear-selection="clearSelection"
+      @page-change="
+        (value) => {
+          page = value
+        }
+      "
+      @page-size-change="
+        (value) => {
+          size = value
+        }
+      "
     >
-      <template #filters>
-        <USelect v-model="role" :items="roleFilterItems" value-key="value" class="w-full" />
-        <USelect v-model="sort" :items="sortItems" value-key="value" class="w-full" />
-        <ManageSortDirectionButton v-model="direction" />
+      <template #columns>
+        <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+          <span>用户、身份与注册时间</span>
+          <span class="hidden w-40 text-right sm:block">状态与操作</span>
+        </div>
       </template>
-    </ManageCollectionToolbar>
 
-    <!-- list -->
-    <SkeletonList v-if="showSkeleton" :rows="8" />
+      <template #bulk-actions>
+        <USelect
+          v-model="batchAction"
+          :items="[
+            { label: '设为正常', value: 'active' },
+            { label: '封禁', value: 'disabled' }
+          ]"
+          placeholder="批量操作"
+          value-key="value"
+          class="w-28"
+          size="xs"
+        />
+        <UButton color="primary" variant="soft" size="xs" :loading="batchRunning" :disabled="!batchAction" @click="applyBatch">应用</UButton>
+      </template>
 
-    <ManageEmpty
-      v-else-if="!users.length"
-      icon="i-tabler-users"
-      :text="q || activeFilterCount ? '没有匹配的用户' : '还没有用户'" />
-
-    <ul v-else class="space-y-2.5">
-      <li
-        v-for="u in users" :key="u.id"
-        class="group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-default bg-default px-3 py-3 transition sm:px-4 hover:shadow-sm">
-        <UCheckbox :model-value="isSelected(u.id)" :disabled="isSelf(u)" @update:model-value="toggleOne(u.id)" />
-        <div class="flex min-w-0 items-center gap-3">
-          <UAvatar :src="u.avatarUrl || undefined" :text="initialOf(u)" size="md" class="hidden shrink-0 sm:flex" />
-          <div class="min-w-0 flex-1">
-            <div class="flex min-w-0 items-center gap-2">
-              <span class="line-clamp-1 text-sm font-medium text-highlighted">{{ u.displayName || '未命名' }}</span>
-              <span v-if="isSelf(u)" class="shrink-0 rounded bg-primary/10 px-1.5 text-xs text-primary">你</span>
+      <template #item="{ item: u }">
+        <div class="grid min-w-0 grid-cols-1 items-center gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <div class="flex min-w-0 items-center gap-3">
+            <UAvatar :src="u.avatarUrl || undefined" :text="initialOf(u)" size="md" class="hidden shrink-0 sm:flex" />
+            <div class="min-w-0 flex-1">
+              <div class="flex min-w-0 items-center gap-2">
+                <span class="line-clamp-1 text-sm font-medium text-highlighted">{{ u.displayName || '未命名' }}</span>
+                <span v-if="isSelf(u)" class="shrink-0 rounded bg-primary/10 px-1.5 text-xs text-primary">你</span>
+              </div>
+              <div class="line-clamp-1 text-xs text-muted">
+                {{ u.email }}<span v-if="u.username"> · @{{ u.username }}</span>
+              </div>
+              <div class="mt-0.5 text-xs text-dimmed">
+                注册于 <ClientOnly fallback="—">{{ abs(u.createdAt) }}</ClientOnly>
+              </div>
             </div>
-            <div class="line-clamp-1 text-xs text-muted">{{ u.email }}<span v-if="u.username"> · @{{ u.username }}</span></div>
-            <div class="mt-0.5 text-xs text-dimmed">注册于 <ClientOnly fallback="—">{{ abs(u.createdAt) }}</ClientOnly></div>
+          </div>
+          <div class="flex w-full shrink-0 items-center justify-between gap-2 sm:w-40 sm:justify-end">
+            <div class="flex flex-wrap items-center gap-1">
+              <UBadge :label="statusBadge[u.status].label" :color="statusBadge[u.status].color" variant="subtle" size="sm" />
+              <UBadge v-if="u.roles.includes('admin')" label="管理员" color="warning" variant="soft" size="sm" class="hidden lg:inline-flex" />
+            </div>
+            <UDropdownMenu :items="rowActions(u)">
+              <UButton color="neutral" variant="ghost" icon="i-tabler-dots-vertical" square size="xs" :loading="busy === u.id" :aria-label="`管理 ${u.displayName || u.email}`" />
+            </UDropdownMenu>
           </div>
         </div>
-        <div class="flex shrink-0 items-center gap-2">
-          <UBadge v-if="u.roles.includes('admin')" label="管理员" color="warning" variant="soft" size="sm" class="hidden sm:inline-flex" />
-          <UDropdownMenu :items="rowActions(u)">
-            <UButton
-              color="neutral" variant="ghost" icon="i-tabler-dots-vertical" square size="xs"
-              :loading="busy === u.id"
-              :aria-label="`管理 ${u.displayName || u.email}`" />
-          </UDropdownMenu>
-        </div>
-      </li>
-    </ul>
+      </template>
+    </CollectionPanel>
 
-    <ManageCollectionDock v-if="users.length" label="用户选择、批量操作与分页">
-      <template #selection>
-        <ManagePageSelection :model-value="isPageSelected" :indeterminate="isPageIndeterminate" label="选择当前页用户" @update:model-value="togglePage" />
-        <template v-if="selectionCount">
-          <span>已选 {{ selectionCount }}</span>
-          <USeparator orientation="vertical" class="h-4" />
-          <USelect
-            v-model="batchAction"
-            :items="[{ label: '设为正常', value: 'active' }, { label: '封禁', value: 'disabled' }]"
-            placeholder="批量操作" value-key="value" class="w-32" size="sm" />
-          <UButton color="primary" variant="soft" size="sm" :loading="batchRunning" :disabled="!batchAction" @click="applyBatch">应用</UButton>
-          <UButton color="neutral" variant="ghost" size="sm" :disabled="batchRunning" @click="clearSelection(); batchAction = ''; batchResult = null">清除</UButton>
-        </template>
-        <span v-else class="text-xs">共 {{ total }} 个用户</span>
-        <span v-if="batchResult" class="text-xs" :class="batchResult.failed ? 'text-warning' : 'text-success'">
-          成功 {{ batchResult.success }}<template v-if="batchResult.failed">，失败 {{ batchResult.failed }}</template>
-        </span>
-      </template>
-      <template #pagination>
-        <USelect v-model="size" :items="pageSizeItems" value-key="value" size="sm" class="w-24" />
-        <ManagePagination v-model="page" :total-pages="totalPages" />
-      </template>
-    </ManageCollectionDock>
+    <UAlert
+      v-if="batchResult"
+      class="mt-3"
+      :color="batchResult.failed ? 'warning' : 'success'"
+      variant="subtle"
+      :icon="batchResult.failed ? 'i-tabler-alert-triangle' : 'i-tabler-circle-check'"
+      :title="`已处理 ${batchResult.success} 个用户`"
+      :description="batchResult.failed ? `${batchResult.failed} 个用户处理失败，已保留选中。` : '批量操作已完成。'"
+      close
+      @update:open="batchResult = null"
+    />
 
     <!-- ── Detail modal ── -->
     <UModal v-model:open="detailOpen" :title="detailUser?.displayName || '用户详情'">
@@ -382,13 +588,18 @@ function initialOf(u: AdminUser) { return (u.displayName || u.email || '?').char
             </div>
           </div>
           <dl class="grid grid-cols-3 gap-y-2 text-sm">
-            <dt class="text-muted">用户名</dt><dd class="col-span-2 text-default">{{ detailUser.username || '—' }}</dd>
+            <dt class="text-muted">用户名</dt>
+            <dd class="col-span-2 text-default">{{ detailUser.username || '—' }}</dd>
             <dt class="text-muted">状态</dt>
             <dd class="col-span-2"><UBadge :label="statusBadge[detailUser.status].label" :color="statusBadge[detailUser.status].color" variant="soft" size="sm" /></dd>
             <dt class="text-muted">邮箱验证</dt>
             <dd class="col-span-2 text-default">{{ detailUser.emailVerified ? '已验证' : '未验证' }}</dd>
-            <dt class="text-muted">注册时间</dt><dd class="col-span-2 text-default"><ClientOnly fallback="—">{{ abs(detailUser.createdAt) }}</ClientOnly></dd>
-            <dt class="text-muted">用户 ID</dt><dd class="col-span-2 truncate font-mono text-xs text-dimmed">{{ detailUser.id }}</dd>
+            <dt class="text-muted">注册时间</dt>
+            <dd class="col-span-2 text-default">
+              <ClientOnly fallback="—">{{ abs(detailUser.createdAt) }}</ClientOnly>
+            </dd>
+            <dt class="text-muted">用户 ID</dt>
+            <dd class="col-span-2 truncate font-mono text-xs text-dimmed">{{ detailUser.id }}</dd>
           </dl>
           <div class="flex items-center justify-between gap-4 border-t border-default pt-4">
             <div>
@@ -398,9 +609,12 @@ function initialOf(u: AdminUser) { return (u.displayName || u.email || '?').char
             <UButton
               :color="detailUser.roles.includes('admin') ? 'error' : 'primary'"
               :variant="detailUser.roles.includes('admin') ? 'soft' : 'solid'"
-              size="sm" :loading="togglingRole" :disabled="isSelf(detailUser)"
+              size="sm"
+              :loading="togglingRole"
+              :disabled="isSelf(detailUser)"
               :label="detailUser.roles.includes('admin') ? '撤销管理员' : '授予管理员'"
-              @click="toggleAdminRole" />
+              @click="toggleAdminRole"
+            />
           </div>
         </div>
       </template>
@@ -410,13 +624,25 @@ function initialOf(u: AdminUser) { return (u.displayName || u.email || '?').char
     <UModal v-model:open="resetOpen" title="重置密码">
       <template #body>
         <div class="space-y-3">
-          <p class="text-sm text-muted">为 <span class="font-medium text-default">{{ resetTarget?.email }}</span> 设置新密码,该用户其他会话将被退出。</p>
+          <p class="text-sm text-muted">
+            为 <span class="font-medium text-default">{{ resetTarget?.email }}</span> 设置新密码,该用户其他会话将被退出。
+          </p>
           <UInput v-model="newPw" type="password" placeholder="新密码(至少 8 位)" class="w-full" autocomplete="new-password" />
         </div>
       </template>
       <template #footer>
         <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="取消" :disabled="resetting" @click="() => { resetTarget = null }" />
+          <UButton
+            color="neutral"
+            variant="ghost"
+            label="取消"
+            :disabled="resetting"
+            @click="
+              () => {
+                resetTarget = null
+              }
+            "
+          />
           <UButton color="primary" label="重置密码" :loading="resetting" :disabled="newPw.length < 8" @click="confirmReset" />
         </div>
       </template>
@@ -426,12 +652,23 @@ function initialOf(u: AdminUser) { return (u.displayName || u.email || '?').char
     <UModal v-model:open="deleteOpen" title="删除用户?">
       <template #body>
         <p class="text-sm text-muted">
-          将删除 <span class="font-medium text-default">{{ deleteTarget?.email }}</span>。该账户将无法登录,其邮箱可被重新注册。此操作不可轻易撤销。
+          将删除 <span class="font-medium text-default">{{ deleteTarget?.email }}</span
+          >。该账户将无法登录,其邮箱可被重新注册。此操作不可轻易撤销。
         </p>
       </template>
       <template #footer>
         <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="取消" :disabled="deleting" @click="() => { deleteTarget = null }" />
+          <UButton
+            color="neutral"
+            variant="ghost"
+            label="取消"
+            :disabled="deleting"
+            @click="
+              () => {
+                deleteTarget = null
+              }
+            "
+          />
           <UButton color="error" label="确认删除" :loading="deleting" @click="confirmDelete" />
         </div>
       </template>
@@ -456,7 +693,17 @@ function initialOf(u: AdminUser) { return (u.displayName || u.email || '?').char
       </template>
       <template #footer>
         <div class="flex w-full justify-end gap-2">
-          <UButton color="neutral" variant="ghost" label="取消" :disabled="creating" @click="() => { createOpen = false }" />
+          <UButton
+            color="neutral"
+            variant="ghost"
+            label="取消"
+            :disabled="creating"
+            @click="
+              () => {
+                createOpen = false
+              }
+            "
+          />
           <UButton color="primary" label="创建" :loading="creating" @click="confirmCreate" />
         </div>
       </template>
