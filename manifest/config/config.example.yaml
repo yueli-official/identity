@@ -50,16 +50,12 @@ commerce:
 notification:
   baseUrl: "http://localhost:8089"
   audience: "notification-api"
+  tokenUrl: "http://localhost:8081/oauth2/token"
+  clientId: "identity-notification-svc"
+  clientSecret: ""
+  scope: "notification:send"
 rbac:
   # The default role granted to new identities is the DefaultRole const in
   # internal/logic/roles.go (kept in lockstep with the migration 0006 seed),
   # not a config value — so no defaultRole key here.
   bootstrapAdminEmail: ""   # env GF_RBAC_BOOTSTRAPADMINEMAIL — granted admin at startup if the identity exists
-mail:
-  smtp:
-    host: ""        # env GF_MAIL_SMTP_HOST — empty ⇒ dev-log mailer
-    port: "465"     # env GF_MAIL_SMTP_PORT — implicit TLS
-    username: ""    # env GF_MAIL_SMTP_USERNAME
-    password: ""    # env GF_MAIL_SMTP_PASSWORD
-  from: ""          # env GF_MAIL_FROM
-  fromName: "用户中心"  # env GF_MAIL_FROMNAME

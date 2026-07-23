@@ -22,6 +22,7 @@ import (
 	"platform/gokit/capability"
 	"platform/gokit/ghttpx"
 	"platform/gokit/healthcheck"
+	"platform/gokit/notificationclient"
 	"platform/gokit/observability"
 	"platform/gokit/openapiexport"
 	"platform/services/identity/internal/assetclient"
@@ -139,19 +140,29 @@ func main() {
 	}
 
 	// ── Mailer ──────────────────────────────────────────────────────────────
-	// Default to the dev-log mailer (links printed to logs); switch to real SMTP
-	// only when mail.smtp.host is configured.
-	smtpHost := g.Cfg().MustGet(ctx, "mail.smtp.host").String()
-	smtpPort := g.Cfg().MustGet(ctx, "mail.smtp.port", "465").String()
-	smtpUsername := g.Cfg().MustGet(ctx, "mail.smtp.username").String()
-	smtpPassword := g.Cfg().MustGet(ctx, "mail.smtp.password").String()
-	mailFrom := g.Cfg().MustGet(ctx, "mail.from").String()
-	mailFromName := g.Cfg().MustGet(ctx, "mail.fromName").String()
+	// Production delivery goes through Notification. Local development keeps a
+	// log-only fallback when client credentials have not been provisioned.
 	devMailer := mailer.NewDev()
-	smtpMailer := mailer.NewSMTP(smtpHost, smtpPort, smtpUsername, smtpPassword, mailFrom, mailFromName)
 	var mlr mailer.Mailer = devMailer
-	if smtpHost != "" {
-		mlr = smtpMailer
+	var notificationHealth identitycap.HealthChecker = devMailer
+	notificationClientConfig := notificationclient.Config{
+		BaseURL:      notificationBaseURL,
+		TokenURL:     g.Cfg().MustGet(ctx, "notification.tokenUrl").String(),
+		ClientID:     g.Cfg().MustGet(ctx, "notification.clientId").String(),
+		ClientSecret: g.Cfg().MustGet(ctx, "notification.clientSecret").String(),
+		Scope:        g.Cfg().MustGet(ctx, "notification.scope", "notification:send").String(),
+	}
+	notificationConfigured := notificationClientConfig.BaseURL != "" && notificationClientConfig.TokenURL != "" &&
+		notificationClientConfig.ClientID != "" && notificationClientConfig.ClientSecret != ""
+	if notificationConfigured {
+		client, err := notificationclient.New(notificationClientConfig)
+		if err != nil {
+			panic(fmt.Sprintf("notification client: %v", err))
+		}
+		mlr = mailer.NewNotification(client)
+		notificationHealth = client
+	} else {
+		g.Log().Warning(ctx, "identity notification OAuth config is incomplete; using dev-log mailer")
 	}
 	svc.SetMailer(mlr)
 
@@ -220,16 +231,17 @@ func main() {
 			}),
 		},
 		identitycap.Registration{
-			Key: "dev-mail", Adapter: "dev", Mode: "development", Registered: true, Enabled: smtpHost == "",
+			Key: "dev-mail", Adapter: "dev", Mode: "development", Registered: true, Enabled: !notificationConfigured,
 			CapabilityKeys: mailKeys, Operations: []string{"send"}, Checker: devMailer, InitialHealth: capability.HealthHealthy,
 		},
 		identitycap.Registration{
-			Key: "primary-smtp", Adapter: "smtp", Mode: "production", Registered: true, Enabled: smtpHost != "",
-			CapabilityKeys: mailKeys, Operations: []string{"send"}, Checker: smtpMailer,
+			Key: "notification-service", Adapter: "notification-http", Mode: "platform", Registered: notificationConfigured, Enabled: notificationConfigured,
+			CapabilityKeys: mailKeys, Operations: []string{"enqueue"}, Checker: notificationHealth,
 			RequiredConfig: []capability.ConfigField{
-				identitycap.Field("host", smtpHost, false), identitycap.Field("port", smtpPort, false),
-				identitycap.Field("username", smtpUsername, false), identitycap.Field("password", smtpPassword, true),
-				identitycap.Field("from", mailFrom, false),
+				identitycap.Field("base_url", notificationClientConfig.BaseURL, false),
+				identitycap.Field("token_url", notificationClientConfig.TokenURL, false),
+				identitycap.Field("client_id", notificationClientConfig.ClientID, false),
+				identitycap.Field("client_secret", notificationClientConfig.ClientSecret, true),
 			},
 		},
 		identitycap.Registration{
