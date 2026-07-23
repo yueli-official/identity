@@ -17,6 +17,8 @@ import (
 	_ "github.com/gogf/gf/contrib/drivers/pgsql/v2"
 	_ "github.com/gogf/gf/contrib/nosql/redis/v2"
 
+	foundationabuse "github.com/yueli-official/foundation/go/abuse"
+	"github.com/yueli-official/foundation/go/abuse/turnstile"
 	foundationauth "github.com/yueli-official/foundation/go/auth"
 	"platform/gokit/authhttp"
 	"platform/gokit/capability"
@@ -30,6 +32,7 @@ import (
 	"platform/services/identity/internal/controller"
 	"platform/services/identity/internal/dao"
 	"platform/services/identity/internal/guest"
+	"platform/services/identity/internal/identityabuse"
 	"platform/services/identity/internal/identitycap"
 	"platform/services/identity/internal/logic"
 	"platform/services/identity/internal/mailer"
@@ -117,6 +120,59 @@ func main() {
 	}
 
 	svc := logic.New(repositories.store, cfg)
+	var (
+		challengeDefinition *foundationabuse.ChallengeDefinition
+		challengeVerifiers  map[foundationabuse.ChallengeKind]foundationabuse.ChallengeVerifier
+	)
+	turnstileSecret := g.Cfg().MustGet(ctx, "abuse.turnstile.secret").String()
+	if turnstileSecret != "" && !openAPIExport {
+		hostnames := g.Cfg().MustGet(ctx, "abuse.turnstile.hostnames").Strings()
+		if len(hostnames) == 0 {
+			panic("abuse.turnstile.hostnames is required when Turnstile is enabled")
+		}
+		verifier, err := turnstile.New(turnstile.Options{
+			Secret:   turnstileSecret,
+			Endpoint: g.Cfg().MustGet(ctx, "abuse.turnstile.endpoint").String(),
+		})
+		if err != nil {
+			panic(fmt.Sprintf("identity abuse Turnstile verifier: %v", err))
+		}
+		challengeDefinition = &foundationabuse.ChallengeDefinition{
+			Kind: "turnstile", ExpectedAction: "identity-login",
+			AllowedHosts: hostnames,
+		}
+		challengeVerifiers = map[foundationabuse.ChallengeKind]foundationabuse.ChallengeVerifier{
+			"turnstile": verifier,
+		}
+	}
+	abuseCatalog := foundationabuse.MustCompile(identityabuse.Definition(identityabuse.Policy{
+		LoginAccountCapacity: int64(cfg.LoginMaxFails),
+		LoginNetworkCapacity: int64(cfg.IPMaxFails),
+		LoginWindow:          cfg.LoginFailWindow,
+		Challenge:            challengeDefinition,
+	}))
+	var (
+		abuseModule foundationabuse.Module
+		abuseErr    error
+	)
+	if openAPIExport {
+		abuseModule, abuseErr = foundationabuse.NewMemory(abuseCatalog, foundationabuse.MemoryOptions{
+			Secret:    []byte("identity-openapi-abuse-memory-secret"),
+			Verifiers: challengeVerifiers,
+		})
+	} else {
+		master, masterErr := g.DB().Master()
+		if masterErr != nil {
+			panic(fmt.Sprintf("identity abuse database: %v", masterErr))
+		}
+		abuseModule, abuseErr = foundationabuse.NewPostgres(ctx, abuseCatalog, foundationabuse.PostgresOptions{
+			DB: master, InstanceKey: "identity", Verifiers: challengeVerifiers,
+		})
+	}
+	if abuseErr != nil {
+		panic(fmt.Sprintf("identity abuse module: %v", abuseErr))
+	}
+	svc.SetAbuseModule(abuseModule)
 	authCtl := controller.New(svc, secureCookie, cfg.SessionIdleTTL)
 
 	// ── Bootstrap admin (RBAC) ───────────────────────────────────────────────

@@ -188,8 +188,9 @@ type GuestSessionStore interface {
 	ClaimGuestSession(ctx context.Context, tokenHash, identityID string, claimedAt time.Time) (model.GuestSession, error)
 }
 
-// LoginThrottle tracks failed-login counters for rate-limit / lockout.
-type LoginThrottle interface {
+// VerificationThrottle protects email-verification and password-reset delivery.
+// Password-login admission is handled by Foundation Abuse instead.
+type VerificationThrottle interface {
 	Locked(ctx context.Context, key string) (bool, error)
 	RecordFailure(ctx context.Context, key string, window, lockDur time.Duration, max int) error
 	Reset(ctx context.Context, key string) error
@@ -262,7 +263,7 @@ type PATRepo interface {
 type Store interface {
 	IdentityRepo
 	SessionStore
-	LoginThrottle
+	VerificationThrottle
 	OAuthRepo
 	VerificationRepo
 	RoleRepo

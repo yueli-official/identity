@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gogf/gf/v2/net/ghttp"
+	"github.com/google/uuid"
 
 	v1 "platform/services/identity/api/v1"
 	"platform/services/identity/internal/logic"
@@ -31,8 +32,14 @@ func New(svc *logic.Service, secureCookie bool, sessionTTL ...time.Duration) *Co
 }
 
 func (c *Controller) Register(ctx context.Context, req *v1.RegisterReq) (*v1.RegisterRes, error) {
+	r := ghttp.RequestFromCtx(ctx)
+	attemptID := req.AbuseAttemptID
+	if attemptID == "" {
+		attemptID = uuid.NewString()
+	}
 	id, err := c.svc.Register(ctx, logic.RegisterInput{
 		Email: req.Email, Password: req.Password, DisplayName: req.DisplayName,
+		AttemptID: attemptID, IP: r.GetClientIp(), Proof: req.ChallengeProof,
 	})
 	if err != nil {
 		return nil, err
@@ -42,9 +49,14 @@ func (c *Controller) Register(ctx context.Context, req *v1.RegisterReq) (*v1.Reg
 
 func (c *Controller) Login(ctx context.Context, req *v1.LoginReq) (*v1.LoginRes, error) {
 	r := ghttp.RequestFromCtx(ctx)
+	attemptID := req.AbuseAttemptID
+	if attemptID == "" {
+		attemptID = uuid.NewString()
+	}
 	out, err := c.svc.Login(ctx, logic.LoginInput{
 		Email: req.Email, Password: req.Password,
 		UserAgent: r.UserAgent(), IP: r.GetClientIp(),
+		AttemptID: attemptID, Proof: req.ChallengeProof,
 	})
 	if err != nil {
 		return nil, err

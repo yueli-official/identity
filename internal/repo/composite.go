@@ -1,7 +1,8 @@
 package repo
 
 // Composite assembles the full Store from separate IdentityRepo / OAuthRepo /
-// VerificationRepo / RoleRepo / AuditRepo / PATRepo / SessionStore / LoginThrottle
+// VerificationRepo / RoleRepo / AuditRepo / PATRepo / SessionStore /
+// VerificationThrottle
 // implementations (e.g. Postgres + Redis). IdentityRepo, OAuthRepo,
 // VerificationRepo, RoleRepo, AuditRepo, and PATRepo are typically the same
 // PG-backed value.
@@ -13,7 +14,7 @@ type Composite struct {
 	AuditRepo
 	PATRepo
 	SessionStore
-	LoginThrottle
+	VerificationThrottle
 }
 
 // NewComposite returns a Store backed by the given implementations. The identity
@@ -26,15 +27,15 @@ func NewComposite(i interface {
 	RoleRepo
 	AuditRepo
 	PATRepo
-}, s SessionStore, l LoginThrottle) Store {
+}, s SessionStore, throttle VerificationThrottle) Store {
 	return Composite{
-		IdentityRepo:     i,
-		OAuthRepo:        i,
-		VerificationRepo: i,
-		RoleRepo:         i,
-		AuditRepo:        i,
-		PATRepo:          i,
-		SessionStore:     s,
-		LoginThrottle:    l,
+		IdentityRepo:         i,
+		OAuthRepo:            i,
+		VerificationRepo:     i,
+		RoleRepo:             i,
+		AuditRepo:            i,
+		PATRepo:              i,
+		SessionStore:         s,
+		VerificationThrottle: throttle,
 	}
 }

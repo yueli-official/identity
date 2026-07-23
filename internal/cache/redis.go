@@ -1,4 +1,5 @@
-// Package cache implements the Redis-backed SessionStore and LoginThrottle
+// Package cache implements the Redis-backed SessionStore and the delivery
+// throttle used by email verification and password reset.
 // (repo interfaces). Sessions are Redis-only: a string per session
 // plus a per-identity set index for list/revoke.
 package cache
@@ -14,7 +15,8 @@ import (
 	"platform/services/identity/internal/repo"
 )
 
-// Redis wraps *gredis.Redis and satisfies repo.SessionStore and repo.LoginThrottle.
+// Redis wraps *gredis.Redis and satisfies repo.SessionStore and
+// repo.VerificationThrottle.
 type Redis struct {
 	c *gredis.Redis
 }
@@ -109,15 +111,11 @@ func (r *Redis) DeleteSessionsByIdentity(ctx context.Context, identityID string)
 	return err
 }
 
-// Locked reports whether the given key is currently locked out.
 func (r *Redis) Locked(ctx context.Context, key string) (bool, error) {
 	n, err := r.c.Exists(ctx, "lock:"+key)
 	return n > 0, err
 }
 
-// RecordFailure increments the failure counter for key. On the first increment
-// a sliding window TTL is applied. Once failures reach max, a lock key is set
-// that expires after lockDur.
 func (r *Redis) RecordFailure(ctx context.Context, key string, window, lockDur time.Duration, max int) error {
 	n, err := r.c.Incr(ctx, "fail:"+key)
 	if err != nil {
@@ -136,7 +134,6 @@ func (r *Redis) RecordFailure(ctx context.Context, key string, window, lockDur t
 	return nil
 }
 
-// Reset clears the failure counter and any lock for the given key.
 func (r *Redis) Reset(ctx context.Context, key string) error {
 	_, err := r.c.Del(ctx, "fail:"+key, "lock:"+key)
 	return err
@@ -144,4 +141,4 @@ func (r *Redis) Reset(ctx context.Context, key string) error {
 
 // Compile-time interface assertions.
 var _ repo.SessionStore = (*Redis)(nil)
-var _ repo.LoginThrottle = (*Redis)(nil)
+var _ repo.VerificationThrottle = (*Redis)(nil)

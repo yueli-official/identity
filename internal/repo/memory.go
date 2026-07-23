@@ -52,8 +52,9 @@ func NewMemory() *Memory {
 	return &Memory{
 		byID: map[string]model.Identity{}, byEmail: map[string]string{},
 		pwHash: map[string]string{}, profiles: map[string]model.Profile{},
-		sessions: map[string]model.Session{}, guestSessions: map[string]model.GuestSession{}, failCount: map[string]int{},
-		lockUntil: map[string]time.Time{}, now: time.Now,
+		sessions: map[string]model.Session{}, guestSessions: map[string]model.GuestSession{},
+		failCount: map[string]int{}, lockUntil: map[string]time.Time{},
+		now:     time.Now,
 		clients: map[string]model.OIDCClient{}, keys: nil,
 		oauthLinks: map[string]string{},
 		verifs:     map[string]memVerification{},

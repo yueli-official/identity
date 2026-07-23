@@ -26,6 +26,11 @@ redis:
     db: 0
 auth:
   sessionIdleTtl: "720h"  # 30 days; Redis is a cache, PG remains the durable session source
+abuse:
+  turnstile:
+    secret: ""              # optional; set via secret manager to enable challenge escalation
+    endpoint: ""            # empty uses Cloudflare Siteverify
+    hostnames: []           # trusted public account hostnames, never derive from the request Host
 guest:
   maxSessionTtl: "720h"   # site BFF supplies its requested TTL; Identity enforces this ceiling
   accessTokenTtl: "10m"   # short-lived resource JWT, independent of the durable guest session

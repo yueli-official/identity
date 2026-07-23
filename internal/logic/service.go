@@ -3,6 +3,8 @@ package logic
 import (
 	"time"
 
+	"github.com/yueli-official/foundation/go/abuse"
+	"platform/services/identity/internal/identityabuse"
 	"platform/services/identity/internal/mailer"
 	"platform/services/identity/internal/pat"
 	"platform/services/identity/internal/repo"
@@ -58,6 +60,7 @@ type Service struct {
 	revoker RefreshRevoker // optional; nil before OIDC wiring
 	mailer  mailer.Mailer  // optional; nil sends no mail (links still issued)
 	patKey  []byte         // derived HMAC key for PAT hashing
+	abuse   identityabuse.Actions
 }
 
 func New(store repo.Store, cfg Config) *Service {
@@ -66,12 +69,25 @@ func New(store repo.Store, cfg Config) *Service {
 	if cfg.PATMaxPerUser <= 0 {
 		cfg.PATMaxPerUser = 20
 	}
-	return &Service{
+	service := &Service{
 		store:  store,
 		cfg:    cfg,
 		now:    time.Now,
 		patKey: pat.DeriveKey(cfg.PATHMACSecret),
 	}
+	catalog := abuse.MustCompile(identityabuse.Definition(identityabuse.Policy{
+		LoginAccountCapacity: int64(cfg.LoginMaxFails),
+		LoginNetworkCapacity: int64(cfg.IPMaxFails),
+		LoginWindow:          cfg.LoginFailWindow,
+	}))
+	module, err := abuse.NewMemory(catalog, abuse.MemoryOptions{
+		Secret: []byte("identity-default-abuse-memory-secret"),
+	})
+	if err != nil {
+		panic(err)
+	}
+	service.SetAbuseModule(module)
+	return service
 }
 
 // SetRefreshRevoker wires OIDC refresh revocation into passive logout. Called in
@@ -81,3 +97,13 @@ func (s *Service) SetRefreshRevoker(r RefreshRevoker) { s.revoker = r }
 // SetMailer wires the transactional mailer used by email-verify / password-reset.
 // Called in main after the mailer is built (mirrors SetRefreshRevoker).
 func (s *Service) SetMailer(m mailer.Mailer) { s.mailer = m }
+
+// SetAbuseModule replaces the deterministic in-memory test default with the
+// instance-local durable runtime assembled by main.
+func (s *Service) SetAbuseModule(module abuse.Module) {
+	actions, err := identityabuse.Bind(module)
+	if err != nil {
+		panic(err)
+	}
+	s.abuse = actions
+}

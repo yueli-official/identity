@@ -5,10 +5,12 @@ package v1
 import "github.com/gogf/gf/v2/frame/g"
 
 type RegisterReq struct {
-	g.Meta      `path:"/api/v1/auth/register" method:"post" tags:"auth" summary:"Register with email+password"`
-	Email       string `json:"email" v:"required|email"`
-	Password    string `json:"password" v:"required|length:8,128"`
-	DisplayName string `json:"displayName"`
+	g.Meta         `path:"/api/v1/auth/register" method:"post" tags:"auth" summary:"Register with email+password"`
+	Email          string `json:"email" v:"required|email"`
+	Password       string `json:"password" v:"required|length:8,128"`
+	DisplayName    string `json:"displayName"`
+	AbuseAttemptID string `json:"abuseAttemptId,omitempty"`
+	ChallengeProof string `json:"challengeProof,omitempty"`
 }
 type RegisterRes struct {
 	ID    string `json:"id"`
@@ -16,9 +18,11 @@ type RegisterRes struct {
 }
 
 type LoginReq struct {
-	g.Meta   `path:"/api/v1/auth/login" method:"post" tags:"auth" summary:"Email+password login"`
-	Email    string `json:"email" v:"required|email"`
-	Password string `json:"password" v:"required"`
+	g.Meta         `path:"/api/v1/auth/login" method:"post" tags:"auth" summary:"Email+password login"`
+	Email          string `json:"email" v:"required|email"`
+	Password       string `json:"password" v:"required"`
+	AbuseAttemptID string `json:"abuseAttemptId,omitempty"`
+	ChallengeProof string `json:"challengeProof,omitempty"`
 }
 type LoginRes struct {
 	ID    string `json:"id"`

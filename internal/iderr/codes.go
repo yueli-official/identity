@@ -17,6 +17,9 @@ var (
 	CodeWeakPassword       = errs.Register("identity.weak_password", http.StatusBadRequest)
 	CodeInvalidEmail       = errs.Register("identity.invalid_email", http.StatusBadRequest)
 	CodeNotAuthenticated   = errs.Register("identity.not_authenticated", http.StatusUnauthorized)
+	CodeChallengeRequired  = errs.Register("identity.challenge_required", http.StatusForbidden)
+	CodeAbuseUnavailable   = errs.Register("identity.abuse_unavailable", http.StatusServiceUnavailable)
+	CodeAbuseReplay        = errs.Register("identity.abuse_attempt_replayed", http.StatusConflict)
 
 	CodeOAuthEmailConflict = errs.Register("identity.oauth_email_conflict", http.StatusConflict)
 	CodeOAuthNoEmail       = errs.Register("identity.oauth_no_email", http.StatusBadRequest)
@@ -64,6 +67,21 @@ func AccountDisabled() *errs.Coded {
 
 func AccountLocked() *errs.Coded {
 	return errs.New(CodeAccountLocked, "too many attempts, try again later", nil)
+}
+
+func ChallengeRequired(attemptID string) *errs.Coded {
+	return errs.New(CodeChallengeRequired, "additional verification required", map[string]any{
+		"attemptId": attemptID,
+		"challenge": "turnstile",
+	})
+}
+
+func AbuseUnavailable() *errs.Coded {
+	return errs.New(CodeAbuseUnavailable, "request admission is temporarily unavailable", nil)
+}
+
+func AbuseAttemptReplayed() *errs.Coded {
+	return errs.New(CodeAbuseReplay, "request attempt was already admitted", nil)
 }
 
 func WeakPassword(reason string) *errs.Coded {

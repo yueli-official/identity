@@ -5,7 +5,9 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
+	"github.com/yueli-official/foundation/go/abuse"
 
+	"platform/services/identity/internal/identityabuse"
 	"platform/services/identity/internal/iderr"
 	"platform/services/identity/internal/model"
 	"platform/services/identity/internal/repo"
@@ -16,6 +18,8 @@ type LoginInput struct {
 	Password  string
 	UserAgent string
 	IP        string
+	AttemptID string
+	Proof     string
 }
 
 type LoginOutput struct {
@@ -25,20 +29,44 @@ type LoginOutput struct {
 
 func (s *Service) Login(ctx context.Context, in LoginInput) (LoginOutput, error) {
 	email := CanonicalizeEmail(in.Email)
-	acctKey := "login:acct:" + email
-	ipKey := "login:ip:" + in.IP
-
-	// Lockout check first (account + IP), before any password work.
-	if locked, _ := s.store.Locked(ctx, acctKey); locked {
-		return LoginOutput{}, iderr.AccountLocked()
-	}
-	if locked, _ := s.store.Locked(ctx, ipKey); locked {
-		return LoginOutput{}, iderr.AccountLocked()
+	var admission abuse.Admission
+	gated := in.AttemptID != "" || in.IP != ""
+	if gated {
+		attemptID := in.AttemptID
+		if attemptID == "" {
+			attemptID = uuid.NewString()
+		}
+		network, err := identityabuse.NetworkPrefix(in.IP)
+		if err != nil {
+			return LoginOutput{}, iderr.AbuseUnavailable()
+		}
+		admission, err = identityabuse.Admit(
+			ctx, s.abuse.Login, attemptID, network, email, in.Proof,
+		)
+		if err != nil {
+			if abuse.IsKind(err, abuse.ErrorConflict) {
+				return LoginOutput{}, iderr.AbuseAttemptReplayed()
+			}
+			return LoginOutput{}, iderr.AbuseUnavailable()
+		}
+		switch admission.Disposition {
+		case abuse.DispositionAllow:
+			if admission.Replay {
+				return LoginOutput{}, iderr.AbuseAttemptReplayed()
+			}
+		case abuse.DispositionChallenge:
+			return LoginOutput{}, iderr.ChallengeRequired(attemptID)
+		default:
+			return LoginOutput{}, iderr.AccountLocked()
+		}
 	}
 
 	fail := func(reason string) (LoginOutput, error) {
-		_ = s.store.RecordFailure(ctx, acctKey, s.cfg.LoginFailWindow, s.cfg.LoginLockFor, s.cfg.LoginMaxFails)
-		_ = s.store.RecordFailure(ctx, ipKey, s.cfg.LoginFailWindow, s.cfg.LoginLockFor, s.cfg.IPMaxFails)
+		if gated {
+			if err := s.abuse.Login.Resolve(ctx, admission.Receipt, "credentials_rejected"); err != nil {
+				return LoginOutput{}, iderr.AbuseUnavailable()
+			}
+		}
 		s.audit(ctx, AuditEvent{
 			Event:  EvLoginFailure,
 			Email:  email,
@@ -67,9 +95,12 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (LoginOutput, error)
 		return fail("deleted")
 	}
 
-	// Success: clear counters, mint a fresh (rotated) session id.
-	_ = s.store.Reset(ctx, acctKey)
-	_ = s.store.Reset(ctx, ipKey)
+	if gated {
+		if err := s.abuse.Login.Resolve(ctx, admission.Receipt, "authenticated"); err != nil {
+			return LoginOutput{}, iderr.AbuseUnavailable()
+		}
+	}
+	// Success: mint a fresh (rotated) session id after Abuse resolution.
 	sess := model.Session{
 		ID: uuid.NewString(), IdentityID: id.ID,
 		CreatedAt: s.now(), LastSeen: s.now(), UserAgent: in.UserAgent, IP: in.IP,
