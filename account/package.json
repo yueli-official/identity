@@ -14,11 +14,13 @@
     "@platform/manage": "workspace:*",
     "@yueli/ui": "workspace:*",
     "nuxt": "catalog:",
+    "qrcode": "catalog:",
     "tailwindcss": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@iconify-json/tabler": "catalog:",
+    "@types/qrcode": "catalog:",
     "vitest": "catalog:"
   }
 }

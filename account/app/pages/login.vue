@@ -13,6 +13,10 @@ const loading = ref(false)
 const passkeyLoading = ref(false)
 const passkeyAvailable = ref(false)
 const passkeys = usePasskeys()
+const mfaTransaction = ref(String(route.query.mfa_transaction ?? ''))
+const mfaCode = ref('')
+const mfaLoading = ref(false)
+const useRecoveryCode = ref(false)
 
 onMounted(() => {
   passkeyAvailable.value = passkeys.isSupported()
@@ -40,7 +44,17 @@ async function onSubmit(e: FormSubmitEvent<Schema>) {
   error.value = ''
   loading.value = true
   try {
-    await call('/api/v1/auth/login', { method: 'POST', body: e.data })
+    const result = await call<{
+      mfaRequired: boolean
+      mfaTransaction?: string
+      mfaExpiresAt?: string
+      mfaMethods?: string[]
+    }>('/api/v1/auth/login', { method: 'POST', body: e.data })
+    if (result.mfaRequired && result.mfaTransaction) {
+      mfaTransaction.value = result.mfaTransaction
+      state.password = ''
+      return
+    }
     await refresh()
     // external: full-page nav so a return_to like /oauth2/authorize hits the
     // dev proxy → identity, instead of Nuxt's client router (which 404s — there
@@ -51,6 +65,42 @@ async function onSubmit(e: FormSubmitEvent<Schema>) {
   } finally {
     loading.value = false
   }
+}
+
+async function onMFASubmit() {
+  if (!useRecoveryCode.value && !/^\d{6}$/.test(mfaCode.value)) return
+  if (useRecoveryCode.value && mfaCode.value.trim().length < 16) return
+  error.value = ''
+  mfaLoading.value = true
+  try {
+    await call(useRecoveryCode.value ? '/api/v1/auth/mfa/recovery' : '/api/v1/auth/mfa/totp', {
+      method: 'POST',
+      body: { transactionId: mfaTransaction.value, code: mfaCode.value },
+    })
+    if (useRecoveryCode.value) {
+      await navigateTo('/recovery')
+      return
+    }
+    await refresh()
+    await navigateTo(safeReturnTo(route.query.return_to as string), { external: true })
+  } catch (err) {
+    error.value = mfaErrorMessage(err)
+  } finally {
+    mfaLoading.value = false
+  }
+}
+
+function cancelMFA() {
+  mfaTransaction.value = ''
+  mfaCode.value = ''
+  useRecoveryCode.value = false
+  error.value = ''
+}
+
+function toggleRecoveryCode() {
+  useRecoveryCode.value = !useRecoveryCode.value
+  mfaCode.value = ''
+  error.value = ''
 }
 
 async function onPasskeyLogin() {
@@ -89,7 +139,55 @@ async function onPasskeyLogin() {
           class="mb-4"
         />
 
-        <UForm :schema="schema" :state="state" class="space-y-4" @submit="onSubmit">
+        <form v-if="mfaTransaction" class="space-y-4" @submit.prevent="onMFASubmit">
+          <UAlert
+            color="info"
+            variant="soft"
+            icon="i-tabler-shield-lock"
+            :title="useRecoveryCode ? '使用恢复代码' : '完成双重验证'"
+            :description="useRecoveryCode
+              ? '恢复代码只能使用一次，登录后仅可重建身份验证器。'
+              : '输入身份验证器应用中显示的 6 位动态验证码。'"
+          />
+          <UFormField :label="useRecoveryCode ? '恢复代码' : '动态验证码'">
+            <UInput
+              v-model="mfaCode"
+              :inputmode="useRecoveryCode ? 'text' : 'numeric'"
+              :autocomplete="useRecoveryCode ? 'off' : 'one-time-code'"
+              :maxlength="useRecoveryCode ? 32 : 6"
+              :pattern="useRecoveryCode ? undefined : '[0-9]{6}'"
+              autofocus
+              class="w-full"
+            />
+          </UFormField>
+          <UAlert v-if="error" color="error" variant="soft" :title="error" />
+          <UButton
+            type="submit"
+            label="验证并登录"
+            block
+            size="lg"
+            :disabled="useRecoveryCode ? mfaCode.trim().length < 16 : !/^\d{6}$/.test(mfaCode)"
+            :loading="mfaLoading"
+          />
+          <UButton
+            color="neutral"
+            variant="link"
+            :label="useRecoveryCode ? '改用动态验证码' : '无法使用身份验证器？使用恢复代码'"
+            block
+            :disabled="mfaLoading"
+            @click="toggleRecoveryCode"
+          />
+          <UButton
+            color="neutral"
+            variant="ghost"
+            label="返回其他登录方式"
+            block
+            :disabled="mfaLoading"
+            @click="cancelMFA"
+          />
+        </form>
+
+        <UForm v-else :schema="schema" :state="state" class="space-y-4" @submit="onSubmit">
           <UFormField name="email" label="邮箱">
             <UInput v-model="state.email" type="email" autocomplete="email" placeholder="you@example.com" class="w-full" />
           </UFormField>
@@ -103,8 +201,8 @@ async function onPasskeyLogin() {
           <UButton type="submit" label="登录" block size="lg" :loading="loading" />
         </UForm>
 
-        <USeparator label="或" class="my-4" />
-        <div class="space-y-2">
+        <USeparator v-if="!mfaTransaction" label="或" class="my-4" />
+        <div v-if="!mfaTransaction" class="space-y-2">
           <UButton
             block
             color="neutral"
@@ -125,12 +223,12 @@ async function onPasskeyLogin() {
             external
           />
         </div>
-        <p v-if="!passkeyAvailable" class="mt-3 text-center text-xs text-muted">
+        <p v-if="!mfaTransaction && !passkeyAvailable" class="mt-3 text-center text-xs text-muted">
           当前浏览器不支持通行密钥登录
         </p>
       </UCard>
 
-      <p class="text-center text-sm text-muted">
+      <p v-if="!mfaTransaction" class="text-center text-sm text-muted">
         还没有账户?<ULink :to="`/register?return_to=${encodeURIComponent(returnTo)}`" class="text-primary font-medium">注册</ULink>
       </p>
     </div>

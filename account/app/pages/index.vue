@@ -377,6 +377,8 @@ const cardHeaderClass = 'flex items-center gap-2 font-semibold text-highlighted'
 
     <PasskeyManager @changed="refreshCreds" />
 
+    <TOTPManager />
+
     <!-- Credentials / login methods -->
     <UCard>
       <template #header>
