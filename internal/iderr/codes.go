@@ -41,29 +41,34 @@ var (
 	CodeLastCredential     = errs.Register("identity.last_credential", http.StatusConflict)
 	CodePasswordAlreadySet = errs.Register("identity.password_already_set", http.StatusConflict)
 
-	CodeIdentityNotFound         = errs.Register("identity.not_found", http.StatusNotFound)
-	CodeInvalidStatus            = errs.Register("identity.invalid_status", http.StatusBadRequest)
-	CodeCapabilityNotFound       = errs.Register("identity.capability_not_found", http.StatusNotFound)
-	CodeProviderNotFound         = errs.Register("identity.provider_not_found", http.StatusNotFound)
-	CodeCapabilityProbeRateLimit = errs.Register("identity.capability_probe_rate_limited", http.StatusTooManyRequests)
-	CodeCapabilityAudit          = errs.Register("identity.capability_audit_unavailable", http.StatusInternalServerError)
-	CodeInvalidGuestRequest      = errs.Register("identity.guest_request_invalid", http.StatusBadRequest)
-	CodeInvalidGuestSession      = errs.Register("identity.guest_session_invalid", http.StatusUnauthorized)
-	CodeInvalidGuestAudience     = errs.Register("identity.guest_audience_invalid", http.StatusForbidden)
-	CodeGuestClaimConflict       = errs.Register("identity.guest_claim_conflict", http.StatusConflict)
-	CodePasskeyUnavailable       = errs.Register("identity.passkey_unavailable", http.StatusServiceUnavailable)
-	CodePasskeyCeremonyInvalid   = errs.Register("identity.passkey_ceremony_invalid", http.StatusBadRequest)
-	CodePasskeyExists            = errs.Register("identity.passkey_exists", http.StatusConflict)
-	CodeMFAUnavailable           = errs.Register("identity.mfa_unavailable", http.StatusServiceUnavailable)
-	CodeTOTPEnrollmentInvalid    = errs.Register("identity.totp_enrollment_invalid", http.StatusBadRequest)
-	CodeTOTPCodeInvalid          = errs.Register("identity.totp_code_invalid", http.StatusUnauthorized)
-	CodeTOTPNotFound             = errs.Register("identity.totp_not_found", http.StatusNotFound)
-	CodeMFATransactionInvalid    = errs.Register("identity.mfa_transaction_invalid", http.StatusBadRequest)
-	CodeRecoveryCodeInvalid      = errs.Register("identity.recovery_code_invalid", http.StatusUnauthorized)
-	CodeStepUpRequestInvalid     = errs.Register("identity.step_up_request_invalid", http.StatusBadRequest)
-	CodeStepUpMethodUnavailable  = errs.Register("identity.step_up_method_unavailable", http.StatusConflict)
-	CodeStepUpProofInvalid       = errs.Register("identity.step_up_proof_invalid", http.StatusUnauthorized)
-	CodeStepUpProofReplayed      = errs.Register("identity.step_up_proof_replayed", http.StatusConflict)
+	CodeIdentityNotFound             = errs.Register("identity.not_found", http.StatusNotFound)
+	CodeInvalidStatus                = errs.Register("identity.invalid_status", http.StatusBadRequest)
+	CodeCapabilityNotFound           = errs.Register("identity.capability_not_found", http.StatusNotFound)
+	CodeProviderNotFound             = errs.Register("identity.provider_not_found", http.StatusNotFound)
+	CodeCapabilityProbeRateLimit     = errs.Register("identity.capability_probe_rate_limited", http.StatusTooManyRequests)
+	CodeCapabilityAudit              = errs.Register("identity.capability_audit_unavailable", http.StatusInternalServerError)
+	CodeInvalidGuestRequest          = errs.Register("identity.guest_request_invalid", http.StatusBadRequest)
+	CodeInvalidGuestSession          = errs.Register("identity.guest_session_invalid", http.StatusUnauthorized)
+	CodeInvalidGuestAudience         = errs.Register("identity.guest_audience_invalid", http.StatusForbidden)
+	CodeGuestClaimConflict           = errs.Register("identity.guest_claim_conflict", http.StatusConflict)
+	CodePasskeyUnavailable           = errs.Register("identity.passkey_unavailable", http.StatusServiceUnavailable)
+	CodePasskeyCeremonyInvalid       = errs.Register("identity.passkey_ceremony_invalid", http.StatusBadRequest)
+	CodePasskeyExists                = errs.Register("identity.passkey_exists", http.StatusConflict)
+	CodeMFAUnavailable               = errs.Register("identity.mfa_unavailable", http.StatusServiceUnavailable)
+	CodeTOTPEnrollmentInvalid        = errs.Register("identity.totp_enrollment_invalid", http.StatusBadRequest)
+	CodeTOTPCodeInvalid              = errs.Register("identity.totp_code_invalid", http.StatusUnauthorized)
+	CodeTOTPNotFound                 = errs.Register("identity.totp_not_found", http.StatusNotFound)
+	CodeMFATransactionInvalid        = errs.Register("identity.mfa_transaction_invalid", http.StatusBadRequest)
+	CodeRecoveryCodeInvalid          = errs.Register("identity.recovery_code_invalid", http.StatusUnauthorized)
+	CodeStepUpRequestInvalid         = errs.Register("identity.step_up_request_invalid", http.StatusBadRequest)
+	CodeStepUpMethodUnavailable      = errs.Register("identity.step_up_method_unavailable", http.StatusConflict)
+	CodeStepUpProofInvalid           = errs.Register("identity.step_up_proof_invalid", http.StatusUnauthorized)
+	CodeStepUpProofReplayed          = errs.Register("identity.step_up_proof_replayed", http.StatusConflict)
+	CodePublisherConsumerNotFound    = errs.Register("identity.publisher_consumer_not_found", http.StatusNotFound)
+	CodePublisherConsumerDisabled    = errs.Register("identity.publisher_consumer_disabled", http.StatusConflict)
+	CodePublisherAttestationInvalid  = errs.Register("identity.publisher_attestation_invalid", http.StatusBadRequest)
+	CodePublisherIdempotencyConflict = errs.Register("identity.publisher_idempotency_conflict", http.StatusConflict)
+	CodePublisherSigningUnavailable  = errs.Register("identity.publisher_signing_unavailable", http.StatusServiceUnavailable)
 )
 
 func EmailTaken(email string) *errs.Coded {
@@ -198,6 +203,26 @@ func StepUpProofInvalid() *errs.Coded {
 
 func StepUpProofReplayed() *errs.Coded {
 	return errs.New(CodeStepUpProofReplayed, "step-up proof was already used", nil)
+}
+
+func PublisherConsumerNotFound() *errs.Coded {
+	return errs.New(CodePublisherConsumerNotFound, "publisher consumer not found", nil)
+}
+
+func PublisherConsumerDisabled() *errs.Coded {
+	return errs.New(CodePublisherConsumerDisabled, "publisher consumer is disabled", nil)
+}
+
+func PublisherAttestationInvalid() *errs.Coded {
+	return errs.New(CodePublisherAttestationInvalid, "publisher attestation request is invalid", nil)
+}
+
+func PublisherIdempotencyConflict() *errs.Coded {
+	return errs.New(CodePublisherIdempotencyConflict, "publisher idempotency key conflicts with another request", nil)
+}
+
+func PublisherSigningUnavailable() *errs.Coded {
+	return errs.New(CodePublisherSigningUnavailable, "publisher signing is temporarily unavailable", nil)
 }
 
 // OAuthEmailConflict: the provider's (unverified) email collides with an

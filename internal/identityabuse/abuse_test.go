@@ -99,6 +99,53 @@ func TestPasskeyCeremonyBudgetIsNetworkBound(t *testing.T) {
 	}
 }
 
+func TestPublisherIssueBudgetIsActorBoundAndReplaySafe(t *testing.T) {
+	module, err := abuse.NewMemory(
+		abuse.MustCompile(Definition(Policy{
+			PublisherActorCapacity: 2,
+			PublisherWindow:        time.Hour,
+		})),
+		abuse.MemoryOptions{Secret: []byte("identity-abuse-test-secret-at-least-32-bytes")},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actions, err := Bind(module)
+	if err != nil {
+		t.Fatal(err)
+	}
+	network, _ := NetworkPrefix("192.0.2.29")
+	input := abuse.Input{
+		ID: abuse.AttemptID("publisher-a"),
+		Signals: abuse.Signals{
+			Network: network,
+			Target:  "publisher-subject",
+		},
+	}
+	first, err := actions.PublisherIssue.Admit(context.Background(), input)
+	if err != nil || first.Disposition != abuse.DispositionAllow || first.Replay {
+		t.Fatalf("first publisher admission = %+v, %v", first, err)
+	}
+	replay, err := actions.PublisherIssue.Admit(context.Background(), input)
+	if err != nil || replay.Disposition != abuse.DispositionAllow || !replay.Replay {
+		t.Fatalf("publisher replay = %+v, %v", replay, err)
+	}
+	for _, id := range []string{"publisher-b", "publisher-c"} {
+		input.ID = abuse.AttemptID(id)
+		got, admitErr := actions.PublisherIssue.Admit(context.Background(), input)
+		if admitErr != nil {
+			t.Fatal(admitErr)
+		}
+		want := abuse.DispositionAllow
+		if id == "publisher-c" {
+			want = abuse.DispositionReject
+		}
+		if got.Disposition != want {
+			t.Fatalf("%s disposition = %q, want %q", id, got.Disposition, want)
+		}
+	}
+}
+
 func TestMFAVerificationFailureBudgetSpansTransactionsByNetwork(t *testing.T) {
 	module, err := abuse.NewMemory(
 		abuse.MustCompile(Definition(Policy{

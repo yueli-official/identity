@@ -14,20 +14,24 @@ const (
 	ActionLogin           abuse.ActionKey = "identity.password_login"
 	ActionPasskeyCeremony abuse.ActionKey = "identity.passkey_ceremony"
 	ActionMFAVerification abuse.ActionKey = "identity.mfa_verification"
+	ActionPublisherIssue  abuse.ActionKey = "identity.publisher_attestation_issue"
 )
 
 type Policy struct {
-	LoginAccountCapacity   int64
-	LoginNetworkCapacity   int64
-	LoginWindow            time.Duration
-	RegisterCapacity       int64
-	RegisterWindow         time.Duration
-	PasskeyNetworkCapacity int64
-	PasskeyWindow          time.Duration
-	MFANetworkCapacity     int64
-	MFATargetCapacity      int64
-	MFAWindow              time.Duration
-	Challenge              *abuse.ChallengeDefinition
+	LoginAccountCapacity     int64
+	LoginNetworkCapacity     int64
+	LoginWindow              time.Duration
+	RegisterCapacity         int64
+	RegisterWindow           time.Duration
+	PasskeyNetworkCapacity   int64
+	PasskeyWindow            time.Duration
+	MFANetworkCapacity       int64
+	MFATargetCapacity        int64
+	MFAWindow                time.Duration
+	PublisherNetworkCapacity int64
+	PublisherActorCapacity   int64
+	PublisherWindow          time.Duration
+	Challenge                *abuse.ChallengeDefinition
 }
 
 func Definition(policy Policy) abuse.Definition {
@@ -60,6 +64,15 @@ func Definition(policy Policy) abuse.Definition {
 	}
 	if policy.MFAWindow <= 0 {
 		policy.MFAWindow = 10 * time.Minute
+	}
+	if policy.PublisherNetworkCapacity <= 0 {
+		policy.PublisherNetworkCapacity = 120
+	}
+	if policy.PublisherActorCapacity <= 0 {
+		policy.PublisherActorCapacity = 30
+	}
+	if policy.PublisherWindow <= 0 {
+		policy.PublisherWindow = 10 * time.Minute
 	}
 	challengeAt := int64(0)
 	if policy.Challenge != nil {
@@ -181,6 +194,30 @@ func Definition(policy Policy) abuse.Definition {
 					PendingTTL:     time.Minute,
 				},
 			},
+			{
+				Key: ActionPublisherIssue,
+				Required: abuse.SignalRequirements{
+					Network: abuse.Required, Target: abuse.Required,
+				},
+				Meters: []abuse.MeterDefinition{
+					{
+						ID: "identity.publisher_issue.network", Slot: abuse.SlotNetwork,
+						Algorithm: abuse.TokenBucket(
+							policy.PublisherNetworkCapacity,
+							policy.PublisherNetworkCapacity,
+							policy.PublisherWindow,
+						),
+					},
+					{
+						ID: "identity.publisher_issue.actor", Slot: abuse.SlotTarget,
+						Algorithm: abuse.TokenBucket(
+							policy.PublisherActorCapacity,
+							policy.PublisherActorCapacity,
+							policy.PublisherWindow,
+						),
+					},
+				},
+			},
 		},
 	}
 }
@@ -190,6 +227,7 @@ type Actions struct {
 	Login           abuse.Action
 	PasskeyCeremony abuse.Action
 	MFAVerification abuse.Action
+	PublisherIssue  abuse.Action
 }
 
 func Bind(module abuse.Module) (Actions, error) {
@@ -209,9 +247,13 @@ func Bind(module abuse.Module) (Actions, error) {
 	if err != nil {
 		return Actions{}, err
 	}
+	publisherIssue, err := module.Action(ActionPublisherIssue)
+	if err != nil {
+		return Actions{}, err
+	}
 	return Actions{
 		Register: register, Login: login, PasskeyCeremony: passkeyCeremony,
-		MFAVerification: mfaVerification,
+		MFAVerification: mfaVerification, PublisherIssue: publisherIssue,
 	}, nil
 }
 

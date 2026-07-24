@@ -50,19 +50,21 @@ import (
 	"platform/services/identity/internal/mailer"
 	"platform/services/identity/internal/oauthlogin"
 	"platform/services/identity/internal/oidc"
+	"platform/services/identity/internal/publisher"
 	"platform/services/identity/internal/repo"
 )
 
 type runtimeRepositories struct {
-	store        repo.Store
-	guestStore   repo.GuestSessionStore
-	clients      repo.ClientRepo
-	signingKeys  repo.SigningKeyRepo
-	audit        repo.AuditRepo
-	oidcBackend  oidc.Backend
-	passkeys     authentication.PasskeyStore
-	mfa          authentication.MFAStore
-	sessionCache authentication.SessionCache
+	store          repo.Store
+	guestStore     repo.GuestSessionStore
+	clients        repo.ClientRepo
+	signingKeys    repo.SigningKeyRepo
+	audit          repo.AuditRepo
+	oidcBackend    oidc.Backend
+	passkeys       authentication.PasskeyStore
+	mfa            authentication.MFAStore
+	sessionCache   authentication.SessionCache
+	publisherStore publisher.Store
 }
 
 type privacyOwnerConfig struct {
@@ -74,31 +76,40 @@ type privacyOwnerConfig struct {
 	AllowInsecureHTTP bool   `json:"allowInsecureHttp"`
 }
 
+type publisherConsumerConfig struct {
+	Audience      string            `json:"audience"`
+	Instance      string            `json:"instance"`
+	Enabled       bool              `json:"enabled"`
+	ArtifactKinds map[string]string `json:"artifactKinds"`
+}
+
 func newRuntimeRepositories(openAPIExport bool) runtimeRepositories {
 	if openAPIExport {
 		memory := repo.NewMemory()
 		return runtimeRepositories{
-			store:       memory,
-			guestStore:  memory,
-			clients:     memory,
-			signingKeys: memory,
-			audit:       memory,
-			oidcBackend: oidc.NewMemBackend(),
+			store:          memory,
+			guestStore:     memory,
+			clients:        memory,
+			signingKeys:    memory,
+			audit:          memory,
+			oidcBackend:    oidc.NewMemBackend(),
+			publisherStore: publisher.NewMemoryStore(),
 		}
 	}
 
 	postgres := dao.NewPG(g.DB())
 	redis := cache.NewRedis(g.Redis())
 	return runtimeRepositories{
-		store:        repo.NewComposite(postgres, repo.NewRecoveringSessionStore(redis, postgres), redis),
-		guestStore:   postgres,
-		clients:      postgres,
-		signingKeys:  postgres,
-		audit:        postgres,
-		oidcBackend:  oidc.NewPGBackend(g.DB()),
-		passkeys:     postgres,
-		mfa:          postgres,
-		sessionCache: redis,
+		store:          repo.NewComposite(postgres, repo.NewRecoveringSessionStore(redis, postgres), redis),
+		guestStore:     postgres,
+		clients:        postgres,
+		signingKeys:    postgres,
+		audit:          postgres,
+		oidcBackend:    oidc.NewPGBackend(g.DB()),
+		passkeys:       postgres,
+		mfa:            postgres,
+		sessionCache:   redis,
+		publisherStore: postgres,
 	}
 }
 
@@ -410,6 +421,49 @@ func main() {
 		cfg.SessionIdleTTL, adminStepUpVerifier,
 	)
 
+	var publisherKeys *publisher.LocalKeyProvider
+	if openAPIExport {
+		publisherKeys, err = publisher.NewLocalKeyProvider()
+	} else {
+		switch mode := g.Cfg().MustGet(ctx, "publisher.mode").String(); mode {
+		case "local-file":
+			publisherKeys, err = publisher.LoadOrCreateLocalKey(
+				g.Cfg().MustGet(ctx, "publisher.keyFile").String(),
+			)
+		default:
+			err = fmt.Errorf(
+				"publisher key provider mode %q is not configured; local-file must be explicit",
+				mode,
+			)
+		}
+	}
+	if err != nil {
+		panic(fmt.Sprintf("identity publisher key provider: %v", err))
+	}
+	var publisherConsumerConfigs []publisherConsumerConfig
+	if err := g.Cfg().MustGet(ctx, "publisher.consumers").Scan(&publisherConsumerConfigs); err != nil {
+		panic(fmt.Sprintf("identity publisher consumers: %v", err))
+	}
+	publisherConsumers := make([]publisher.Consumer, 0, len(publisherConsumerConfigs))
+	for _, configured := range publisherConsumerConfigs {
+		artifactKinds := make(map[string]publisher.ArtifactPolicy, len(configured.ArtifactKinds))
+		for kind, mediaType := range configured.ArtifactKinds {
+			artifactKinds[kind] = publisher.ArtifactPolicy{MediaType: mediaType}
+		}
+		publisherConsumers = append(publisherConsumers, publisher.Consumer{
+			Audience: configured.Audience, Instance: configured.Instance,
+			Disabled: !configured.Enabled, ArtifactKinds: artifactKinds,
+		})
+	}
+	publisherModule, err := publisher.New(publisher.Config{
+		Issuer: issuer, Consumers: publisherConsumers,
+		Store: repositories.publisherStore, Signer: publisherKeys,
+	})
+	if err != nil {
+		panic(fmt.Sprintf("identity publisher module: %v", err))
+	}
+	publisherCtl := controller.NewPublisher(svc, publisherModule, publisherKeys)
+
 	// ── Bootstrap admin (RBAC) ───────────────────────────────────────────────
 	// If rbac.bootstrapAdminEmail is set and that identity already exists, grant
 	// it the admin role. Best-effort + idempotent (GrantRole is a no-op on a
@@ -503,7 +557,7 @@ func main() {
 	}
 	oauthCtl := controller.NewOAuth(svc, googleProvider, secureCookie, []byte(globalSecret), loginURL, cfg.SessionIdleTTL)
 
-	coreKeys := []string{"identity.oidc", "identity.pat", "identity.profile", "identity.user-admin"}
+	coreKeys := []string{"identity.oidc", "identity.pat", "identity.profile", "identity.publisher-attestation", "identity.user-admin"}
 	mailKeys := []string{"identity.reset-password", "identity.verify-email"}
 	var googleChecker identitycap.HealthChecker
 	if googleProvider != nil {
@@ -598,6 +652,7 @@ func main() {
 		grp.Bind(avatarCtl)
 		grp.Bind(capabilityCtl)
 		grp.Bind(guestCtl)
+		grp.Bind(publisherCtl)
 		if privacyOwner != nil {
 			grp.POST("/api/internal/privacy/owner", privacyhttp.OwnerHandler(privacyOwner, "privacy:owner"))
 		}

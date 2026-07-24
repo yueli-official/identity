@@ -5,6 +5,7 @@ import (
 
 	"github.com/gogf/gf/v2/frame/g"
 	"platform/services/identity/internal/actor"
+	"platform/services/identity/internal/publisher"
 	"platform/services/identity/internal/repo"
 )
 
@@ -38,6 +39,8 @@ const (
 	EvAdminStatusChanged = "admin.user_status_changed"
 	EvAdminUserDeleted   = "admin.user_deleted"
 	EvAdminPasswordReset = "admin.password_reset"
+
+	EvPublisherAttestationIssued = "publisher.attestation_issued"
 )
 
 // AuditEvent is the logic-layer description of one auditable event. IP/UA/request-id
@@ -81,4 +84,25 @@ func (s *Service) audit(ctx context.Context, e AuditEvent) {
 	if err := s.store.InsertAudit(ctx, row); err != nil {
 		g.Log().Errorf(ctx, "audit: record %s failed: %v", e.Event, err)
 	}
+}
+
+func (s *Service) RecordPublisherAttestation(
+	ctx context.Context,
+	identityID string,
+	value publisher.Attestation,
+) {
+	s.audit(ctx, AuditEvent{
+		Event:   EvPublisherAttestationIssued,
+		ActorID: identityID, TargetID: identityID, ClientID: value.Audience,
+		Detail: map[string]any{
+			"attestation_id":    value.AttestationID,
+			"statement_digest":  value.StatementDigest,
+			"consumer_instance": value.ConsumerInstance,
+			"namespace":         value.Namespace,
+			"artifact_kind":     value.Artifact.Kind,
+			"artifact_identity": value.Artifact.Identity,
+			"artifact_version":  value.Artifact.Version,
+			"key_id":            value.KeyID,
+		},
+	})
 }

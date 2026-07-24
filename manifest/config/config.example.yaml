@@ -63,6 +63,18 @@ oidc:
 account:
   loginUrl: "http://localhost:3000/login"
   baseUrl: "http://localhost:3000" # env GF_ACCOUNT_BASEURL — used to build email links
+publisher:
+  # local-file is development-only and creates a 0600 P-256 PEM at keyFile.
+  # Production must provide a KMS/HSM KeyProvider adapter before enabling signing.
+  mode: "local-file"
+  keyFile: "publisher-signing-key.pem"
+  consumers:
+    - audience: "urn:yueli:registry:yotta"
+      instance: "urn:yueli:platform-instance:local"
+      enabled: true
+      artifactKinds:
+        workflow-release: "application/vnd.yueli.workflow-release.v1+json"
+        node-package-release: "application/vnd.yueli.node-package-release.v1+json"
 maintenance:
   securityRetention:
     enabled: true

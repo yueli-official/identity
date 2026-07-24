@@ -44,6 +44,18 @@ _Avoid_: 登录会话、公开 Request ID、跨站用户画像
 可选的指纹、IP、UA 或行为特征，只参与滥用判断。
 _Avoid_: 身份、所有权键、认领证明
 
+**Publisher Attestation（发布者证明）**:
+Identity 对已认证 User 面向特定消费者和命名空间声明了某个精确制品摘要的长期签名事实。
+_Avoid_: Access Token、上架许可、代码安全证明
+
+**External Identity Binding（外部身份绑定）**:
+Identity 向外部 Provider 验证过的稳定账号 ID 与 User 的所有权绑定事实。
+_Avoid_: OAuth 登录凭据、用户名、邮箱、Profile 社交链接
+
+**Platform Publication Proof（平台发布证明）**:
+Registry 审核通过后对精确制品摘要与 Publisher Attestation 签发的上架批准事实。
+_Avoid_: Publisher Attestation、Identity 凭证、远程撤销开关
+
 ## Invariants
 
 - Identity 颁发凭证但不决定 Gallery 等产品的审核、公开或业务生命周期。
@@ -53,3 +65,6 @@ _Avoid_: 身份、所有权键、认领证明
 - 同一 Guest Session 只能认领给一个 User；同 User 重试幂等，其他 User 冲突。
 - 浏览器指纹永远不能替代 Guest Session。
 - Identity 只编排其他 Data Owner；账号删除是最终化任务，状态能力不授予任何其他账户权限。
+- Publisher Attestation 只证明 User 的精确投稿声明；Registry 仍拥有 namespace、审核、上架和下架决策。
+- Publisher signing key 与 OIDC、step-up 和 Registry publication key 必须按用途隔离；`kid` 只是验签 key 查找提示。
+- External Identity Binding 使用 Provider 稳定账号 ID，不能由 login、email、Profile 链接或浏览器自报字段建立。

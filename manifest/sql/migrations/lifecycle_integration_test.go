@@ -62,16 +62,19 @@ func TestMigrationUpDownUpLifecycle(t *testing.T) {
 	assertTableExists(t, db, "authentication_ceremonies", true)
 	assertTableExists(t, db, "authentication_transactions", true)
 	assertTableExists(t, db, "step_up_proof_uses", true)
+	assertTableExists(t, db, "publisher_attestations", true)
 
 	applyMigrationFiles(t, db, down)
 	assertTableExists(t, db, "identities", false)
 	assertTableExists(t, db, "authentication_ceremonies", false)
 	assertTableExists(t, db, "authentication_transactions", false)
 	assertTableExists(t, db, "step_up_proof_uses", false)
+	assertTableExists(t, db, "publisher_attestations", false)
 
 	applyMigrationFiles(t, db, up)
 	assertTableExists(t, db, "identities", true)
 	assertTableExists(t, db, "step_up_proof_uses", true)
+	assertTableExists(t, db, "publisher_attestations", true)
 	assertSecurityRetention(t, db)
 }
 
