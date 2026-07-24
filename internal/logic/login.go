@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/yueli-official/foundation/go/abuse"
 
+	"platform/services/identity/internal/authentication"
 	"platform/services/identity/internal/identityabuse"
 	"platform/services/identity/internal/iderr"
 	"platform/services/identity/internal/model"
@@ -101,9 +102,11 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (LoginOutput, error)
 		}
 	}
 	// Success: mint a fresh (rotated) session id after Abuse resolution.
+	authenticatedAt := s.now()
 	sess := model.Session{
 		ID: uuid.NewString(), IdentityID: id.ID,
-		CreatedAt: s.now(), LastSeen: s.now(), UserAgent: in.UserAgent, IP: in.IP,
+		CreatedAt: authenticatedAt, LastSeen: authenticatedAt, UserAgent: in.UserAgent, IP: in.IP,
+		Authentication: authentication.Password(uuid.NewString(), authenticatedAt),
 	}
 	if err := s.store.CreateSession(ctx, sess, s.cfg.SessionIdleTTL); err != nil {
 		return LoginOutput{}, err

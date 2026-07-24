@@ -2,16 +2,18 @@ package controller
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/yueli-official/foundation/go/privacy"
 
 	v1 "platform/services/identity/api/v1"
+	"platform/services/identity/internal/authentication"
 )
+
+const privacyRecentAuthentication = 5 * time.Minute
 
 func (c *Controller) OpenErasure(ctx context.Context, req *v1.OpenErasureReq) (*v1.OpenErasureRes, error) {
 	if c.privacy == nil {
@@ -23,16 +25,22 @@ func (c *Controller) OpenErasure(ctx context.Context, req *v1.OpenErasureReq) (*
 	}
 	request := ghttp.RequestFromCtx(ctx)
 	sessionID := request.Cookie.Get(sessionCookie, "").String()
-	identity, err := c.svc.Me(ctx, sessionID)
+	session, identity, err := c.svc.RequireAuthentication(ctx, sessionID, authentication.Requirement{
+		FreshWithin:     privacyRecentAuthentication,
+		MinimumLevel:    authentication.LevelAAL1,
+		MinimumProfile:  authentication.ProfileBaseline,
+		RecoveryAllowed: false,
+	})
 	if err != nil {
 		return nil, err
 	}
-	sessionDigest := sha256.Sum256([]byte(sessionID))
 	view, err := c.privacy.OpenErasure(
 		ctx, identity.ID, identity.Email, privacy.IdempotencyKey(req.IdempotencyKey), req.StatusToken, requestedAt,
 		privacy.VerificationEvidence{
-			VerifiedAt: requestedAt, Method: "active_identity_session",
-			Assurance: "single_factor", VerificationRef: hex.EncodeToString(sessionDigest[:]),
+			VerifiedAt:      session.Authentication.AuthenticatedAt,
+			Method:          strings.Join(authentication.MethodStrings(session.Authentication.Methods), "+"),
+			Assurance:       string(session.Authentication.Profile),
+			VerificationRef: session.Authentication.EventID,
 		},
 	)
 	if err != nil {

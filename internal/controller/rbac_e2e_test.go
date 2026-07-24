@@ -103,7 +103,10 @@ func TestE2E_RBAC(t *testing.T) {
 			AccessTTL:    10 * time.Minute,
 			IDTTL:        10 * time.Minute,
 		}, mgr.KeyGetter)
-		oidcCtl := controller.NewOIDC(provider, mgr, svc, r, base, base+"/login")
+		oidcCtl := controller.NewOIDC(
+			provider, mgr, svc, r, base, base+"/login", false,
+			[]byte("0123456789abcdef0123456789abcdef"),
+		)
 
 		// business controller carries the admin endpoints; secureCookie=false so
 		// the session cookie round-trips over plain HTTP.

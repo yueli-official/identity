@@ -10,6 +10,7 @@ import (
 	"github.com/yueli-official/foundation/go/privacy"
 
 	v1 "platform/services/identity/api/v1"
+	"platform/services/identity/internal/authentication"
 	"platform/services/identity/internal/logic"
 )
 
@@ -21,6 +22,7 @@ type Controller struct {
 	secureCookie bool
 	sessionTTL   time.Duration
 	privacy      PrivacyService
+	authn        *authentication.Module
 }
 
 type PrivacyService interface {
@@ -42,10 +44,15 @@ func New(svc *logic.Service, secureCookie bool, sessionTTL ...time.Duration) *Co
 // Keeping dependency wiring in a constructor prevents GoFrame from treating a
 // public setter method as an HTTP action during reflection-based binding.
 func NewPrivacyAware(
-	svc *logic.Service, secureCookie bool, privacyService PrivacyService, sessionTTL time.Duration,
+	svc *logic.Service,
+	authn *authentication.Module,
+	secureCookie bool,
+	privacyService PrivacyService,
+	sessionTTL time.Duration,
 ) *Controller {
 	controller := New(svc, secureCookie, sessionTTL)
 	controller.privacy = privacyService
+	controller.authn = authn
 	return controller
 }
 

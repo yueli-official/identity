@@ -26,6 +26,16 @@ redis:
     db: 0
 auth:
   sessionIdleTtl: "720h" # 30 days; Redis is a cache, PG remains the durable session source
+webauthn:
+  # rpId is the registrable account-domain suffix, never a URL. Every origin
+  # must exactly match a browser origin allowed to create/use credentials.
+  rpId: "account.example.com"
+  displayName: "月离账户"
+  origins:
+    - "https://account.example.com"
+  topOrigins: [] # only needed for explicitly trusted cross-origin iframe ceremonies
+  allowCrossOrigin: false
+  ceremonyTtl: "5m"
 abuse:
   turnstile:
     secret: "" # optional; set via secret manager to enable challenge escalation

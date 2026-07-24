@@ -22,4 +22,12 @@ func (DevMailer) SendPasswordReset(ctx context.Context, to, link string) error {
 	return nil
 }
 
+func (DevMailer) SendSecurityAlert(ctx context.Context, alert SecurityAlert) error {
+	g.Log().Infof(
+		ctx, "[mailer:dev] security-alert to=%s action=%s ip=%s",
+		alert.To, alert.Action, alert.IP,
+	)
+	return nil
+}
+
 func (DevMailer) CheckHealth(context.Context) error { return nil }

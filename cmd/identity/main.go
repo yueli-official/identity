@@ -35,6 +35,7 @@ import (
 	"platform/gokit/privacycatalog"
 	"platform/gokit/privacyhttp"
 	"platform/services/identity/internal/assetclient"
+	"platform/services/identity/internal/authentication"
 	"platform/services/identity/internal/cache"
 	"platform/services/identity/internal/controller"
 	"platform/services/identity/internal/dao"
@@ -42,6 +43,7 @@ import (
 	"platform/services/identity/internal/identityabuse"
 	"platform/services/identity/internal/identitycap"
 	"platform/services/identity/internal/identityprivacy"
+	"platform/services/identity/internal/identitysecurity"
 	"platform/services/identity/internal/logic"
 	"platform/services/identity/internal/mailer"
 	"platform/services/identity/internal/oauthlogin"
@@ -50,12 +52,14 @@ import (
 )
 
 type runtimeRepositories struct {
-	store       repo.Store
-	guestStore  repo.GuestSessionStore
-	clients     repo.ClientRepo
-	signingKeys repo.SigningKeyRepo
-	audit       repo.AuditRepo
-	oidcBackend oidc.Backend
+	store        repo.Store
+	guestStore   repo.GuestSessionStore
+	clients      repo.ClientRepo
+	signingKeys  repo.SigningKeyRepo
+	audit        repo.AuditRepo
+	oidcBackend  oidc.Backend
+	passkeys     authentication.PasskeyStore
+	sessionCache authentication.SessionCache
 }
 
 type privacyOwnerConfig struct {
@@ -83,12 +87,14 @@ func newRuntimeRepositories(openAPIExport bool) runtimeRepositories {
 	postgres := dao.NewPG(g.DB())
 	redis := cache.NewRedis(g.Redis())
 	return runtimeRepositories{
-		store:       repo.NewComposite(postgres, repo.NewRecoveringSessionStore(redis, postgres), redis),
-		guestStore:  postgres,
-		clients:     postgres,
-		signingKeys: postgres,
-		audit:       postgres,
-		oidcBackend: oidc.NewPGBackend(g.DB()),
+		store:        repo.NewComposite(postgres, repo.NewRecoveringSessionStore(redis, postgres), redis),
+		guestStore:   postgres,
+		clients:      postgres,
+		signingKeys:  postgres,
+		audit:        postgres,
+		oidcBackend:  oidc.NewPGBackend(g.DB()),
+		passkeys:     postgres,
+		sessionCache: redis,
 	}
 }
 
@@ -127,6 +133,31 @@ func main() {
 		cfg.SessionIdleTTL = sessionIdleTTL
 	}
 	repositories := newRuntimeRepositories(openAPIExport)
+	var authenticationModule *authentication.Module
+	if !openAPIExport {
+		webAuthnVerifier, verifierErr := authentication.NewWebAuthnVerifier(authentication.WebAuthnConfig{
+			RPID:             g.Cfg().MustGet(ctx, "webauthn.rpId").String(),
+			RPDisplayName:    g.Cfg().MustGet(ctx, "webauthn.displayName").String(),
+			RPOrigins:        g.Cfg().MustGet(ctx, "webauthn.origins").Strings(),
+			RPTopOrigins:     g.Cfg().MustGet(ctx, "webauthn.topOrigins").Strings(),
+			AllowCrossOrigin: g.Cfg().MustGet(ctx, "webauthn.allowCrossOrigin", false).Bool(),
+		})
+		if verifierErr != nil {
+			panic(fmt.Sprintf("identity WebAuthn verifier: %v", verifierErr))
+		}
+		authenticationModule, err = authentication.NewModule(
+			repositories.passkeys,
+			repositories.sessionCache,
+			webAuthnVerifier,
+			authentication.ModuleConfig{
+				SessionTTL:  cfg.SessionIdleTTL,
+				CeremonyTTL: g.Cfg().MustGet(ctx, "webauthn.ceremonyTtl", "5m").Duration(),
+			},
+		)
+		if err != nil {
+			panic(fmt.Sprintf("identity authentication module: %v", err))
+		}
+	}
 	var master *sql.DB
 	if !openAPIExport {
 		master, err = g.DB().Master()
@@ -282,7 +313,9 @@ func main() {
 			}
 		}()
 	}
-	authCtl := controller.NewPrivacyAware(svc, secureCookie, privacyService, cfg.SessionIdleTTL)
+	authCtl := controller.NewPrivacyAware(
+		svc, authenticationModule, secureCookie, privacyService, cfg.SessionIdleTTL,
+	)
 
 	// ── Bootstrap admin (RBAC) ───────────────────────────────────────────────
 	// If rbac.bootstrapAdminEmail is set and that identity already exists, grant
@@ -309,6 +342,7 @@ func main() {
 	// log-only fallback when client credentials have not been provisioned.
 	devMailer := mailer.NewDev()
 	var mlr mailer.Mailer = devMailer
+	var securityNotifier mailer.SecurityNotifier = devMailer
 	var notificationHealth identitycap.HealthChecker = devMailer
 	notificationClientConfig := notificationclient.Config{
 		BaseURL:      notificationBaseURL,
@@ -324,12 +358,19 @@ func main() {
 		if err != nil {
 			panic(fmt.Sprintf("notification client: %v", err))
 		}
-		mlr = mailer.NewNotification(client)
+		notificationMailer := mailer.NewNotification(client)
+		mlr = notificationMailer
+		securityNotifier = notificationMailer
 		notificationHealth = client
 	} else {
 		g.Log().Warning(ctx, "identity notification OAuth config is incomplete; using dev-log mailer")
 	}
 	svc.SetMailer(mlr)
+	if authenticationModule != nil {
+		authenticationModule.SetSecurityEventSink(identitysecurity.New(
+			repositories.audit, repositories.store, securityNotifier, accountBaseURL,
+		))
+	}
 
 	// ── OIDC / OAuth2 ───────────────────────────────────────────────────────
 	mgr, err := oidc.NewManager(ctx, repositories.signingKeys)
@@ -356,7 +397,10 @@ func main() {
 		IDTTL:        10 * time.Minute,
 		RefreshTTL:   refreshTTL,
 	}, mgr.KeyGetter)
-	oidcCtl := controller.NewOIDC(provider, mgr, svc, repositories.clients, issuer, loginURL)
+	oidcCtl := controller.NewOIDC(
+		provider, mgr, svc, repositories.clients, issuer, loginURL,
+		secureCookie, []byte(globalSecret),
+	)
 	guestCtl := controller.NewGuest(guest.New(repositories.guestStore, repositories.clients, mgr, guest.Config{
 		Issuer:         issuer,
 		MaxSessionTTL:  g.Cfg().MustGet(ctx, "guest.maxSessionTtl", "720h").Duration(),

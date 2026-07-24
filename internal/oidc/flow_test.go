@@ -127,7 +127,10 @@ func setupE2E(t *testing.T, clientID string) *e2eEnv {
 		IDTTL:        10 * time.Minute,
 		RefreshTTL:   720 * time.Hour,
 	}, mgr.KeyGetter)
-	ctl := controller.NewOIDC(provider, mgr, svc, r, base, base+"/login")
+	ctl := controller.NewOIDC(
+		provider, mgr, svc, r, base, base+"/login", false,
+		[]byte("0123456789abcdef0123456789abcdef"),
+	)
 
 	// 5. Start GoFrame server on the pre-chosen port (NO ghttpx.Middleware), with
 	//    the full OIDC route set.
@@ -457,7 +460,10 @@ func TestOIDCFlow(t *testing.T) {
 		AccessTTL:    10 * time.Minute,
 		IDTTL:        10 * time.Minute,
 	}, mgr.KeyGetter)
-	ctl := controller.NewOIDC(provider, mgr, svc, r, base, base+"/login")
+	ctl := controller.NewOIDC(
+		provider, mgr, svc, r, base, base+"/login", false,
+		[]byte("0123456789abcdef0123456789abcdef"),
+	)
 
 	// -----------------------------------------------------------------------
 	// 5. Start GoFrame server on the pre-chosen port (NO ghttpx.Middleware)

@@ -109,3 +109,59 @@ func TestGuestSessionMigrationHasDurableClaimableSessions(t *testing.T) {
 		t.Errorf("0015 down missing: %v", err)
 	}
 }
+
+func TestAuthenticationContextMigrationPreservesServerObservedFacts(t *testing.T) {
+	up, err := os.ReadFile("0020_authentication_context.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(up)
+	for _, want := range []string{
+		"CREATE TABLE authentication_events",
+		"authenticated_at",
+		"methods",
+		"factor_classes",
+		"assurance_level",
+		"assurance_profile",
+		"user_verified",
+		"phishing_resistant",
+		"recovery",
+		"authentication_event_id",
+		"ARRAY['legacy']",
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("0020 up missing %q", want)
+		}
+	}
+	if _, err := os.Stat("0020_authentication_context.down.sql"); err != nil {
+		t.Errorf("0020 down migration missing: %v", err)
+	}
+}
+
+func TestPasskeyMigrationPersistsCredentialAndCeremonyState(t *testing.T) {
+	up, err := os.ReadFile("0021_passkeys.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(up)
+	for _, want := range []string{
+		"CREATE TABLE webauthn_users",
+		"CREATE TABLE webauthn_credentials",
+		"CREATE TABLE authentication_ceremonies",
+		"UNIQUE (rp_id, credential_id)",
+		"user_verified_at_registration",
+		"backup_eligible",
+		"backup_state",
+		"sign_count",
+		"challenge_digest",
+		"library_state",
+		"consumed_at",
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("0021 up missing %q", want)
+		}
+	}
+	if _, err := os.Stat("0021_passkeys.down.sql"); err != nil {
+		t.Errorf("0021 down migration missing: %v", err)
+	}
+}

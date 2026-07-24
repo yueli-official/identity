@@ -10,17 +10,20 @@ import (
 )
 
 const (
-	ActionRegister abuse.ActionKey = "identity.register"
-	ActionLogin    abuse.ActionKey = "identity.password_login"
+	ActionRegister        abuse.ActionKey = "identity.register"
+	ActionLogin           abuse.ActionKey = "identity.password_login"
+	ActionPasskeyCeremony abuse.ActionKey = "identity.passkey_ceremony"
 )
 
 type Policy struct {
-	LoginAccountCapacity int64
-	LoginNetworkCapacity int64
-	LoginWindow          time.Duration
-	RegisterCapacity     int64
-	RegisterWindow       time.Duration
-	Challenge            *abuse.ChallengeDefinition
+	LoginAccountCapacity   int64
+	LoginNetworkCapacity   int64
+	LoginWindow            time.Duration
+	RegisterCapacity       int64
+	RegisterWindow         time.Duration
+	PasskeyNetworkCapacity int64
+	PasskeyWindow          time.Duration
+	Challenge              *abuse.ChallengeDefinition
 }
 
 func Definition(policy Policy) abuse.Definition {
@@ -38,6 +41,12 @@ func Definition(policy Policy) abuse.Definition {
 	}
 	if policy.RegisterWindow <= 0 {
 		policy.RegisterWindow = 10 * time.Minute
+	}
+	if policy.PasskeyNetworkCapacity <= 0 {
+		policy.PasskeyNetworkCapacity = 30
+	}
+	if policy.PasskeyWindow <= 0 {
+		policy.PasskeyWindow = 10 * time.Minute
 	}
 	challengeAt := int64(0)
 	if policy.Challenge != nil {
@@ -103,13 +112,30 @@ func Definition(policy Policy) abuse.Definition {
 				},
 				Challenge: policy.Challenge,
 			},
+			{
+				Key: ActionPasskeyCeremony,
+				Required: abuse.SignalRequirements{
+					Network: abuse.Required,
+				},
+				Meters: []abuse.MeterDefinition{
+					{
+						ID: "identity.passkey_ceremony.network", Slot: abuse.SlotNetwork,
+						Algorithm: abuse.TokenBucket(
+							policy.PasskeyNetworkCapacity,
+							policy.PasskeyNetworkCapacity,
+							policy.PasskeyWindow,
+						),
+					},
+				},
+			},
 		},
 	}
 }
 
 type Actions struct {
-	Register abuse.Action
-	Login    abuse.Action
+	Register        abuse.Action
+	Login           abuse.Action
+	PasskeyCeremony abuse.Action
 }
 
 func Bind(module abuse.Module) (Actions, error) {
@@ -121,7 +147,13 @@ func Bind(module abuse.Module) (Actions, error) {
 	if err != nil {
 		return Actions{}, err
 	}
-	return Actions{Register: register, Login: login}, nil
+	passkeyCeremony, err := module.Action(ActionPasskeyCeremony)
+	if err != nil {
+		return Actions{}, err
+	}
+	return Actions{
+		Register: register, Login: login, PasskeyCeremony: passkeyCeremony,
+	}, nil
 }
 
 func NetworkPrefix(value string) (netip.Prefix, error) {

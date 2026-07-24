@@ -7,6 +7,8 @@ import (
 	"github.com/ory/fosite"
 	"github.com/ory/fosite/handler/openid"
 	"github.com/ory/fosite/token/jwt"
+
+	"platform/services/identity/internal/authentication"
 )
 
 // Session is the fosite session type used throughout the identity service.
@@ -78,6 +80,23 @@ func NewSession(issuer, subject, clientID, kid string, idExtra, accessExtra map[
 		JWTClaims: &jwt.JWTClaims{Subject: subject, Extra: accessExtra},
 		JWTHeader: &jwt.Headers{Extra: map[string]interface{}{"kid": kid}},
 	}
+}
+
+// NewAuthenticatedSession separates token issuance from the server-observed
+// authentication event. This is the only constructor for end-user sessions;
+// NewSession remains useful for empty/service/test protocol sessions.
+func NewAuthenticatedSession(
+	issuer, subject, clientID, kid string,
+	idExtra, accessExtra map[string]interface{},
+	auth authentication.Context,
+	issuedAt time.Time,
+) *Session {
+	session := NewSession(issuer, subject, clientID, kid, idExtra, accessExtra, issuedAt)
+	methods := authentication.MethodStrings(auth.Methods)
+	session.DefaultSession.Claims.AuthTime = auth.AuthenticatedAt
+	session.DefaultSession.Claims.AuthenticationMethodsReferences = methods
+	session.DefaultSession.Claims.AuthenticationContextClassReference = string(auth.Profile)
+	return session
 }
 
 // EmptySession returns a hydratable empty session for the token/introspection

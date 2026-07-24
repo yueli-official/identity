@@ -13,6 +13,14 @@ import (
 // capMailer captures the links handed to the mailer so tests can replay tokens.
 type capMailer struct{ verifyLink, resetLink, verifyTo, resetTo string }
 
+type capRevoker struct{ identities []string }
+
+func (c *capRevoker) RevokeRefreshBySession(context.Context, string) error { return nil }
+func (c *capRevoker) RevokeRefreshByIdentity(_ context.Context, identityID string) error {
+	c.identities = append(c.identities, identityID)
+	return nil
+}
+
 func (c *capMailer) SendVerifyEmail(_ context.Context, to, link string) error {
 	c.verifyTo, c.verifyLink = to, link
 	return nil
@@ -57,6 +65,8 @@ func TestPasswordReset_Flow_ForceLogout(t *testing.T) {
 	s := logic.New(m, logic.DefaultConfig())
 	cm := &capMailer{}
 	s.SetMailer(cm)
+	revoker := &capRevoker{}
+	s.SetRefreshRevoker(revoker)
 	ctx := context.Background()
 	reg, _ := s.Register(ctx, logic.RegisterInput{Email: "r@example.com", Password: "oldpass12", DisplayName: "R"})
 	// establish a session, then reset, then ensure it's gone
@@ -73,13 +83,15 @@ func TestPasswordReset_Flow_ForceLogout(t *testing.T) {
 	if _, err := m.GetSession(ctx, login.SessionID); err == nil {
 		t.Fatal("other sessions must be force-logged-out")
 	}
+	if len(revoker.identities) != 1 || revoker.identities[0] != reg.ID {
+		t.Fatalf("refresh revocations = %v, want [%s]", revoker.identities, reg.ID)
+	}
 	if _, err := s.Login(ctx, logic.LoginInput{Email: "r@example.com", Password: "newpass12"}); err != nil {
 		t.Fatal("new password must work")
 	}
 	if _, err := s.Login(ctx, logic.LoginInput{Email: "r@example.com", Password: "oldpass12"}); err == nil {
 		t.Fatal("old password must fail")
 	}
-	_ = reg
 }
 
 func TestPasswordReset_UnknownEmail_NoLeak(t *testing.T) {

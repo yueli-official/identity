@@ -10,8 +10,9 @@ import (
 
 // CredentialSummary describes the login credentials bound to an identity.
 type CredentialSummary struct {
-	HasPassword bool
-	OAuth       []repo.OAuthCredential
+	HasPassword  bool
+	OAuth        []repo.OAuthCredential
+	PasskeyCount int
 }
 
 // ListCredentials returns the identity's password + oauth credentials.
@@ -24,7 +25,13 @@ func (s *Service) ListCredentials(ctx context.Context, identityID string) (Crede
 	if err != nil {
 		return CredentialSummary{}, err
 	}
-	return CredentialSummary{HasPassword: hasPw, OAuth: oauth}, nil
+	passkeyCount, err := s.store.CountActivePasskeys(ctx, identityID)
+	if err != nil {
+		return CredentialSummary{}, err
+	}
+	return CredentialSummary{
+		HasPassword: hasPw, OAuth: oauth, PasskeyCount: passkeyCount,
+	}, nil
 }
 
 // hasPassword reports whether the identity has a (non-empty) password credential.
@@ -78,10 +85,14 @@ func (s *Service) UnbindCredential(ctx context.Context, identityID, provider str
 	if summary.HasPassword {
 		total++
 	}
+	total += summary.PasskeyCount
 	if total <= 1 {
 		return iderr.LastCredential()
 	}
 	ok, err := s.store.DeleteOAuthCredential(ctx, identityID, provider)
+	if errors.Is(err, repo.ErrLastCredential) {
+		return iderr.LastCredential()
+	}
 	if err != nil {
 		return err
 	}

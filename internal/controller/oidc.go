@@ -2,27 +2,42 @@ package controller
 
 import (
 	"context"
+	"errors"
+	"net/http"
 	"net/url"
 	"slices"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/ory/fosite"
 
+	"platform/services/identity/internal/authentication"
 	"platform/services/identity/internal/logic"
+	"platform/services/identity/internal/model"
+	"platform/services/identity/internal/oauthlogin"
 	"platform/services/identity/internal/oidc"
 	"platform/services/identity/internal/repo"
 )
 
 // OIDCController handles the OAuth2/OIDC protocol endpoints.
 type OIDCController struct {
-	provider fosite.OAuth2Provider
-	keys     *oidc.Manager
-	svc      *logic.Service
-	issuer   string
-	loginURL string
-	clients  repo.ClientRepo
+	provider     fosite.OAuth2Provider
+	keys         *oidc.Manager
+	svc          *logic.Service
+	issuer       string
+	loginURL     string
+	clients      repo.ClientRepo
+	secureCookie bool
+	reauthSecret []byte
 }
+
+const (
+	oidcReauthCookie = "id_oidc_reauth"
+	oidcReauthParam  = "_identity_reauth"
+	oidcReauthTTL    = 10 * time.Minute
+)
 
 func (c *OIDCController) allowedPostLogout(ctx context.Context, clientID, uri string) bool {
 	if clientID == "" || uri == "" || c.clients == nil {
@@ -33,8 +48,20 @@ func (c *OIDCController) allowedPostLogout(ctx context.Context, clientID, uri st
 }
 
 // NewOIDC creates an OIDCController wired to a fosite provider and key manager.
-func NewOIDC(p fosite.OAuth2Provider, keys *oidc.Manager, svc *logic.Service, clients repo.ClientRepo, issuer, loginURL string) *OIDCController {
-	return &OIDCController{provider: p, keys: keys, svc: svc, clients: clients, issuer: issuer, loginURL: loginURL}
+func NewOIDC(
+	p fosite.OAuth2Provider,
+	keys *oidc.Manager,
+	svc *logic.Service,
+	clients repo.ClientRepo,
+	issuer, loginURL string,
+	secureCookie bool,
+	reauthSecret []byte,
+) *OIDCController {
+	return &OIDCController{
+		provider: p, keys: keys, svc: svc, clients: clients,
+		issuer: issuer, loginURL: loginURL, secureCookie: secureCookie,
+		reauthSecret: slices.Clone(reauthSecret),
+	}
 }
 
 // discoveryDoc builds the OIDC discovery document (testable without HTTP).
@@ -53,6 +80,15 @@ func (c *OIDCController) discoveryDoc() map[string]interface{} {
 		"code_challenge_methods_supported":      []string{"S256"},
 		"id_token_signing_alg_values_supported": []string{"RS256"},
 		"subject_types_supported":               []string{"public"},
+		"acr_values_supported": []string{
+			string(authentication.ProfileBaseline),
+			string(authentication.ProfileMultiFactor),
+			string(authentication.ProfilePhishingResistant),
+		},
+		"claims_supported": []string{
+			"sub", "iss", "aud", "exp", "iat", "auth_time", "acr", "amr",
+			"name", "preferred_username", "picture", "locale", "email", "email_verified", "roles",
+		},
 	}
 }
 
@@ -83,9 +119,42 @@ func (c *OIDCController) Authorize(r *ghttp.Request) {
 	}
 
 	sid := r.Cookie.Get("id_session", "").String()
-	id, merr := c.svc.Me(ctx, sid)
+	idpSession, id, merr := c.svc.AuthenticatedSession(ctx, sid)
 	if merr != nil {
-		r.Response.RedirectTo(c.loginURL + "?return_to=" + url.QueryEscape(req.URL.String()))
+		if promptContains(ar.GetRequestForm(), "none") {
+			c.provider.WriteAuthorizeError(ctx, w, ar, fosite.ErrLoginRequired)
+			return
+		}
+		c.redirectToLogin(r)
+		return
+	}
+
+	reauthenticated := c.consumeReauthMarker(r, idpSession)
+	needed, requirementErr := activeAuthenticationRequired(
+		ar.GetRequestForm(), idpSession, time.Now().UTC(),
+	)
+	if requirementErr != nil {
+		c.provider.WriteAuthorizeError(ctx, w, ar, requirementErr)
+		return
+	}
+	if needed && !reauthenticated {
+		if promptContains(ar.GetRequestForm(), "none") {
+			c.provider.WriteAuthorizeError(ctx, w, ar, fosite.ErrLoginRequired)
+			return
+		}
+		if err := c.redirectToReauthentication(r); err != nil {
+			c.provider.WriteAuthorizeError(ctx, w, ar, fosite.ErrServerError)
+		}
+		return
+	}
+	if !authenticationContextAccepted(ar.GetRequestForm(), idpSession) {
+		if reauthenticated || promptContains(ar.GetRequestForm(), "none") {
+			c.provider.WriteAuthorizeError(ctx, w, ar, fosite.ErrLoginRequired)
+			return
+		}
+		if err := c.redirectToReauthentication(r); err != nil {
+			c.provider.WriteAuthorizeError(ctx, w, ar, fosite.ErrServerError)
+		}
 		return
 	}
 
@@ -101,7 +170,7 @@ func (c *OIDCController) Authorize(r *ghttp.Request) {
 	roles, _ := c.svc.GetRoles(ctx, id.ID)     // empty roles is acceptable
 	session := oidc.BuildSession(
 		c.issuer, ar.GetClient().GetID(), c.keys.ActiveKID(), sid,
-		id, profile, ar.GetGrantedScopes(), roles, time.Now().UTC(),
+		id, profile, ar.GetGrantedScopes(), roles, idpSession.Authentication, time.Now().UTC(),
 	)
 	session.JWTClaims.Audience = audiences
 
@@ -111,6 +180,115 @@ func (c *OIDCController) Authorize(r *ghttp.Request) {
 		return
 	}
 	c.provider.WriteAuthorizeResponse(ctx, w, ar, resp)
+}
+
+func activeAuthenticationRequired(
+	form url.Values,
+	session model.Session,
+	now time.Time,
+) (bool, error) {
+	if promptContains(form, "login") {
+		return true, nil
+	}
+	rawMaxAge := strings.TrimSpace(form.Get("max_age"))
+	if rawMaxAge == "" {
+		return false, nil
+	}
+	maxAge, err := strconv.ParseInt(rawMaxAge, 10, 64)
+	if err != nil || maxAge < 0 {
+		return false, fosite.ErrInvalidRequest.WithHint("max_age must be a non-negative integer")
+	}
+	if maxAge == 0 || session.Authentication.AuthenticatedAt.IsZero() ||
+		session.Authentication.AuthenticatedAt.After(now) {
+		return true, nil
+	}
+	return now.Sub(session.Authentication.AuthenticatedAt) > time.Duration(maxAge)*time.Second, nil
+}
+
+func promptContains(form url.Values, expected string) bool {
+	return slices.Contains(strings.Fields(form.Get("prompt")), expected)
+}
+
+func authenticationContextAccepted(form url.Values, session model.Session) bool {
+	requested := strings.Fields(form.Get("acr_values"))
+	return len(requested) == 0 || slices.Contains(requested, string(session.Authentication.Profile))
+}
+
+func (c *OIDCController) redirectToLogin(r *ghttp.Request) {
+	r.Response.RedirectTo(c.loginURL + "?return_to=" + url.QueryEscape(r.Request.URL.RequestURI()))
+}
+
+func (c *OIDCController) redirectToReauthentication(r *ghttp.Request) error {
+	if len(c.reauthSecret) < 32 {
+		return errors.New("OIDC reauthentication secret is not configured")
+	}
+	now := time.Now().UTC()
+	original, err := removeQueryValue(r.Request.URL.RequestURI(), oidcReauthParam)
+	if err != nil {
+		return err
+	}
+	nonce := randHex(16)
+	marker := oauthlogin.EncodeState(
+		c.reauthSecret, original, nonce, strconv.FormatInt(now.Unix(), 10),
+		now.Add(oidcReauthTTL).Unix(),
+	)
+	r.Cookie.SetHttpCookie(&http.Cookie{
+		Name: oidcReauthCookie, Value: marker, Path: "/",
+		HttpOnly: true, Secure: c.secureCookie, SameSite: http.SameSiteLaxMode,
+		MaxAge: int(oidcReauthTTL.Seconds()),
+	})
+	returnTo, err := addQueryValue(original, oidcReauthParam, nonce)
+	if err != nil {
+		return err
+	}
+	r.Response.RedirectTo(c.loginURL + "?return_to=" + url.QueryEscape(returnTo))
+	return nil
+}
+
+func (c *OIDCController) consumeReauthMarker(r *ghttp.Request, session model.Session) bool {
+	nonce := r.Request.URL.Query().Get(oidcReauthParam)
+	if nonce == "" {
+		return false
+	}
+	marker := r.Cookie.Get(oidcReauthCookie, "").String()
+	r.Cookie.Remove(oidcReauthCookie)
+	original, expectedNonce, issuedAtRaw, err := oauthlogin.DecodeState(c.reauthSecret, marker)
+	if err != nil || nonce != expectedNonce {
+		return false
+	}
+	current, err := removeQueryValue(r.Request.URL.RequestURI(), oidcReauthParam)
+	if err != nil || current != original {
+		return false
+	}
+	issuedAtUnix, err := strconv.ParseInt(issuedAtRaw, 10, 64)
+	if err != nil {
+		return false
+	}
+	// One second of database/browser timestamp precision tolerance; an old
+	// session cannot satisfy a marker minted after its authentication event.
+	return !session.Authentication.AuthenticatedAt.Before(time.Unix(issuedAtUnix-1, 0).UTC())
+}
+
+func addQueryValue(raw, key, value string) (string, error) {
+	parsed, err := url.ParseRequestURI(raw)
+	if err != nil {
+		return "", err
+	}
+	query := parsed.Query()
+	query.Set(key, value)
+	parsed.RawQuery = query.Encode()
+	return parsed.RequestURI(), nil
+}
+
+func removeQueryValue(raw, key string) (string, error) {
+	parsed, err := url.ParseRequestURI(raw)
+	if err != nil {
+		return "", err
+	}
+	query := parsed.Query()
+	query.Del(key)
+	parsed.RawQuery = query.Encode()
+	return parsed.RequestURI(), nil
 }
 
 // Token handles POST /oauth2/token (authorization_code + refresh_token grants).

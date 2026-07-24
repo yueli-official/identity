@@ -7,13 +7,16 @@ require (
 	github.com/gogf/gf/contrib/drivers/pgsql/v2 v2.10.2
 	github.com/gogf/gf/contrib/nosql/redis/v2 v2.10.2
 	github.com/gogf/gf/v2 v2.10.2
+	github.com/go-webauthn/webauthn v0.17.4
 	github.com/google/uuid v1.6.0
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826
 	github.com/ory/fosite v0.49.0
-	golang.org/x/crypto v0.51.0
+	golang.org/x/crypto v0.52.0
 )
 
-require github.com/go-jose/go-jose/v4 v4.1.4 // indirect
+require (
+	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
+)
 
 require (
 	github.com/BurntSushi/toml v1.5.0 // indirect

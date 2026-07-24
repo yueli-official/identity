@@ -1,7 +1,11 @@
 // Package model holds identity-service domain entities (DB-agnostic).
 package model
 
-import "time"
+import (
+	"time"
+
+	"platform/services/identity/internal/authentication"
+)
 
 type Status string
 
@@ -40,14 +44,4 @@ type Profile struct {
 	CoverAssetID  string `orm:"cover_asset_id"`
 }
 
-// Session is an IdP self-hosted login session (Redis-backed).
-type Session struct {
-	ID         string
-	IdentityID string
-	CreatedAt  time.Time
-	LastSeen   time.Time
-	UserAgent  string
-	IP         string
-	Device     string
-	ExpiresAt  time.Time
-}
+type Session = authentication.Session

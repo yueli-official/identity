@@ -17,6 +17,7 @@ var (
 	CodeWeakPassword       = errs.Register("identity.weak_password", http.StatusBadRequest)
 	CodeInvalidEmail       = errs.Register("identity.invalid_email", http.StatusBadRequest)
 	CodeNotAuthenticated   = errs.Register("identity.not_authenticated", http.StatusUnauthorized)
+	CodeStepUpRequired     = errs.Register("identity.step_up_required", http.StatusPreconditionRequired)
 	CodeChallengeRequired  = errs.Register("identity.challenge_required", http.StatusForbidden)
 	CodeAbuseUnavailable   = errs.Register("identity.abuse_unavailable", http.StatusServiceUnavailable)
 	CodeAbuseReplay        = errs.Register("identity.abuse_attempt_replayed", http.StatusConflict)
@@ -50,6 +51,9 @@ var (
 	CodeInvalidGuestSession      = errs.Register("identity.guest_session_invalid", http.StatusUnauthorized)
 	CodeInvalidGuestAudience     = errs.Register("identity.guest_audience_invalid", http.StatusForbidden)
 	CodeGuestClaimConflict       = errs.Register("identity.guest_claim_conflict", http.StatusConflict)
+	CodePasskeyUnavailable      = errs.Register("identity.passkey_unavailable", http.StatusServiceUnavailable)
+	CodePasskeyCeremonyInvalid  = errs.Register("identity.passkey_ceremony_invalid", http.StatusBadRequest)
+	CodePasskeyExists           = errs.Register("identity.passkey_exists", http.StatusConflict)
 )
 
 func EmailTaken(email string) *errs.Coded {
@@ -96,6 +100,12 @@ func NotAuthenticated() *errs.Coded {
 	return errs.New(CodeNotAuthenticated, "not authenticated", nil)
 }
 
+func StepUpRequired(missing []string) *errs.Coded {
+	return errs.New(CodeStepUpRequired, "additional authentication required", map[string]any{
+		"missing": missing,
+	})
+}
+
 func CapabilityNotFound(key string) *errs.Coded {
 	return errs.New(CodeCapabilityNotFound, "identity capability not found", map[string]any{"key": key})
 }
@@ -126,6 +136,18 @@ func InvalidGuestAudience() *errs.Coded {
 
 func GuestClaimConflict() *errs.Coded {
 	return errs.New(CodeGuestClaimConflict, "guest session is already claimed", nil)
+}
+
+func PasskeyUnavailable() *errs.Coded {
+	return errs.New(CodePasskeyUnavailable, "passkey authentication is unavailable", nil)
+}
+
+func PasskeyCeremonyInvalid() *errs.Coded {
+	return errs.New(CodePasskeyCeremonyInvalid, "passkey ceremony is invalid, expired, or used", nil)
+}
+
+func PasskeyExists() *errs.Coded {
+	return errs.New(CodePasskeyExists, "passkey is already registered", nil)
 }
 
 // OAuthEmailConflict: the provider's (unverified) email collides with an

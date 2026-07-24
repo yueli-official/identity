@@ -115,13 +115,66 @@ func (p *PG) ListOAuthCredentials(ctx context.Context, identityID string) ([]rep
 
 // DeleteOAuthCredential removes the (identityID, provider) credential row.
 func (p *PG) DeleteOAuthCredential(ctx context.Context, identityID, provider string) (bool, error) {
-	res, err := p.db.Model("credentials_oauth").Ctx(ctx).
-		Where("identity_id", identityID).Where("provider", provider).Delete()
-	if err != nil {
-		return false, err
-	}
-	n, _ := res.RowsAffected()
-	return n > 0, nil
+	deleted := false
+	err := p.db.Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		tx = tx.Ctx(ctx)
+		locked, err := tx.GetValue(
+			`SELECT id FROM identities WHERE id = ? AND status = 'active' FOR UPDATE`,
+			identityID,
+		)
+		if err != nil {
+			return err
+		}
+		if locked.IsNil() || locked.String() == "" {
+			return nil
+		}
+		target, err := tx.GetValue(`
+SELECT provider FROM credentials_oauth
+WHERE identity_id = ? AND provider = ?
+`, identityID, provider)
+		if err != nil {
+			return err
+		}
+		if target.IsNil() || target.String() == "" {
+			return nil
+		}
+		alternative, err := tx.GetValue(`
+SELECT
+    EXISTS (
+        SELECT 1 FROM credentials_password WHERE identity_id = ?
+    )
+    OR EXISTS (
+        SELECT 1
+        FROM credentials_oauth
+        WHERE identity_id = ? AND provider <> ?
+    )
+    OR EXISTS (
+        SELECT 1
+        FROM webauthn_credentials
+        WHERE identity_id = ? AND status = 'active'
+    )
+`, identityID, identityID, provider, identityID)
+		if err != nil {
+			return err
+		}
+		if !alternative.Bool() {
+			return repo.ErrLastCredential
+		}
+		result, err := tx.Model("credentials_oauth").Ctx(ctx).
+			Where("identity_id", identityID).
+			Where("provider", provider).
+			Delete()
+		if err != nil {
+			return err
+		}
+		affected, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+		deleted = affected > 0
+		return nil
+	})
+	return deleted, err
 }
 
 // Compile-time interface assertion.

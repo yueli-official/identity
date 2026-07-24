@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"platform/services/identity/internal/authentication"
 	"platform/services/identity/internal/iderr"
 	"platform/services/identity/internal/model"
 	"platform/services/identity/internal/repo"
@@ -48,9 +49,13 @@ func (s *Service) OAuthLogin(ctx context.Context, in OAuthLoginInput) (LoginOutp
 		return LoginOutput{}, iderr.AccountDisabled()
 	}
 
+	authenticatedAt := s.now()
 	sess := model.Session{
 		ID: uuid.NewString(), IdentityID: id.ID,
-		CreatedAt: s.now(), LastSeen: s.now(), UserAgent: in.UserAgent, IP: in.IP,
+		CreatedAt: authenticatedAt, LastSeen: authenticatedAt, UserAgent: in.UserAgent, IP: in.IP,
+		Authentication: authentication.Federated(
+			uuid.NewString(), authenticatedAt, in.Provider+":"+in.ProviderUID,
+		),
 	}
 	if err := s.store.CreateSession(ctx, sess, s.cfg.SessionIdleTTL); err != nil {
 		return LoginOutput{}, err

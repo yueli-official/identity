@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"platform/services/identity/internal/authentication"
 	"platform/services/identity/internal/model"
 )
 
@@ -63,6 +64,7 @@ func (s *recoveringSessionStore) DeleteSessionsByIdentity(ctx context.Context, i
 }
 
 func withSessionExpiry(sess model.Session, ttl time.Duration) model.Session {
+	sess.Authentication = authentication.NormalizeLegacy(sess.Authentication, sess.CreatedAt)
 	if ttl <= 0 || !sess.ExpiresAt.IsZero() {
 		return sess
 	}

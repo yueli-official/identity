@@ -3,6 +3,7 @@ package oidc
 import (
 	"time"
 
+	"platform/services/identity/internal/authentication"
 	"platform/services/identity/internal/model"
 )
 
@@ -21,10 +22,25 @@ func scopeSet(scopes []string) map[string]bool {
 // session for passive logout. roles are the identity's granted role slugs; they
 // surface in BOTH the ID token and access-token JWT only when the "roles" scope
 // was granted. now is injected for tests.
-func BuildSession(issuer, clientID, kid, sessionID string, id model.Identity, p model.Profile, scopes []string, roles []string, now time.Time) *Session {
+func BuildSession(
+	issuer, clientID, kid, sessionID string,
+	id model.Identity,
+	p model.Profile,
+	scopes []string,
+	roles []string,
+	auth authentication.Context,
+	issuedAt time.Time,
+) *Session {
 	has := scopeSet(scopes)
 	idExtra := map[string]interface{}{}
-	accessExtra := map[string]interface{}{"client_id": clientID}
+	methods := authentication.MethodStrings(auth.Methods)
+	accessExtra := map[string]interface{}{
+		"client_id": clientID,
+		"auth_time": auth.AuthenticatedAt.Unix(),
+		"amr":       methods,
+		"acr":       string(auth.Profile),
+		"aal":       string(auth.Level),
+	}
 	if has["roles"] {
 		if roles == nil {
 			roles = []string{}
@@ -42,7 +58,7 @@ func BuildSession(issuer, clientID, kid, sessionID string, id model.Identity, p 
 		idExtra["email"] = id.Email
 		idExtra["email_verified"] = id.EmailVerified
 	}
-	s := NewSession(issuer, id.ID, clientID, kid, idExtra, accessExtra, now)
+	s := NewAuthenticatedSession(issuer, id.ID, clientID, kid, idExtra, accessExtra, auth, issuedAt)
 	s.IdPSessionID = sessionID
 	return s
 }

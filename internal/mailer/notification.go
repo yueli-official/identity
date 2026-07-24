@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"time"
 
 	"platform/gokit/notificationclient"
 )
@@ -31,6 +32,38 @@ func (mailer *NotificationMailer) SendPasswordReset(ctx context.Context, to, lin
 	return mailer.send(ctx, "identity.password_reset", to, link)
 }
 
+func (mailer *NotificationMailer) SendSecurityAlert(
+	ctx context.Context,
+	alert SecurityAlert,
+) error {
+	if mailer == nil || mailer.client == nil {
+		return fmt.Errorf("identity notification client is unavailable")
+	}
+	idempotencyKey := "identity-security:" + alert.EventID
+	if alert.EventID == "" {
+		sum := sha256.Sum256([]byte(
+			alert.To + "\x00" + alert.Action + "\x00" + alert.OccurredAt.String(),
+		))
+		idempotencyKey = fmt.Sprintf("identity-security:%x", sum[:])
+	}
+	occurredAt := alert.OccurredAt
+	if occurredAt.IsZero() {
+		occurredAt = time.Now().UTC()
+	}
+	_, err := mailer.client.Send(ctx, notificationclient.SendInput{
+		IdempotencyKey: idempotencyKey,
+		Scene:          "identity.security_alert",
+		Channel:        "email",
+		Recipient:      notificationclient.Recipient{Email: alert.To},
+		Data: map[string]string{
+			"action": alert.Action, "device": alert.Device, "ip": alert.IP,
+			"occurredAt": occurredAt.Format(time.RFC3339),
+			"accountUrl": alert.AccountURL,
+		},
+	})
+	return err
+}
+
 func (mailer *NotificationMailer) send(ctx context.Context, scene, to, link string) error {
 	if mailer == nil || mailer.client == nil {
 		return fmt.Errorf("identity notification client is unavailable")
@@ -47,3 +80,4 @@ func (mailer *NotificationMailer) send(ctx context.Context, scene, to, link stri
 }
 
 var _ Mailer = (*NotificationMailer)(nil)
+var _ SecurityNotifier = (*NotificationMailer)(nil)

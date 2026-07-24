@@ -9,6 +9,7 @@ package repo
 type Composite struct {
 	IdentityRepo
 	OAuthRepo
+	PasskeyInventoryRepo
 	VerificationRepo
 	RoleRepo
 	AuditRepo
@@ -23,6 +24,7 @@ type Composite struct {
 func NewComposite(i interface {
 	IdentityRepo
 	OAuthRepo
+	PasskeyInventoryRepo
 	VerificationRepo
 	RoleRepo
 	AuditRepo
@@ -31,6 +33,7 @@ func NewComposite(i interface {
 	return Composite{
 		IdentityRepo:         i,
 		OAuthRepo:            i,
+		PasskeyInventoryRepo: i,
 		VerificationRepo:     i,
 		RoleRepo:             i,
 		AuditRepo:            i,

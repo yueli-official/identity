@@ -61,3 +61,40 @@ func TestNetworkPrefixMasksIPv6ButNotIPv4(t *testing.T) {
 		t.Fatalf("IPv4 prefix got %q, want %q", got, want)
 	}
 }
+
+func TestPasskeyCeremonyBudgetIsNetworkBound(t *testing.T) {
+	module, err := abuse.NewMemory(
+		abuse.MustCompile(Definition(Policy{
+			PasskeyNetworkCapacity: 2,
+			PasskeyWindow:          time.Hour,
+		})),
+		abuse.MemoryOptions{Secret: []byte("identity-abuse-test-secret-at-least-32-bytes")},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actions, err := Bind(module)
+	if err != nil {
+		t.Fatal(err)
+	}
+	network, err := NetworkPrefix("192.0.2.9")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for index, want := range []abuse.Disposition{
+		abuse.DispositionAllow,
+		abuse.DispositionAllow,
+		abuse.DispositionReject,
+	} {
+		got, err := actions.PasskeyCeremony.Admit(context.Background(), abuse.Input{
+			ID:      abuse.AttemptID("passkey-ceremony-" + string(rune('a'+index))),
+			Signals: abuse.Signals{Network: network},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Disposition != want {
+			t.Fatalf("attempt %d: got %q, want %q", index+1, got.Disposition, want)
+		}
+	}
+}

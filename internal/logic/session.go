@@ -4,28 +4,58 @@ import (
 	"context"
 	"errors"
 
+	"platform/services/identity/internal/authentication"
 	"platform/services/identity/internal/iderr"
 	"platform/services/identity/internal/model"
 	"platform/services/identity/internal/repo"
 )
 
-// Me resolves a session id to its identity (the account-center /session/me).
-func (s *Service) Me(ctx context.Context, sessionID string) (model.Identity, error) {
+// AuthenticatedSession resolves the server-side session and its active identity.
+// Callers that need assurance facts must use the returned Session rather than
+// reconstructing authentication time from request/token timestamps.
+func (s *Service) AuthenticatedSession(ctx context.Context, sessionID string) (model.Session, model.Identity, error) {
 	if sessionID == "" {
-		return model.Identity{}, iderr.NotAuthenticated()
+		return model.Session{}, model.Identity{}, iderr.NotAuthenticated()
 	}
 	sess, err := s.store.GetSession(ctx, sessionID)
 	if errors.Is(err, repo.ErrSessionNotFound) {
-		return model.Identity{}, iderr.NotAuthenticated()
+		return model.Session{}, model.Identity{}, iderr.NotAuthenticated()
 	}
 	if err != nil {
-		return model.Identity{}, err
+		return model.Session{}, model.Identity{}, err
 	}
 	id, err := s.store.GetByID(ctx, sess.IdentityID)
 	if err != nil {
-		return model.Identity{}, iderr.NotAuthenticated()
+		return model.Session{}, model.Identity{}, iderr.NotAuthenticated()
 	}
-	return id, nil
+	if id.Status != model.StatusActive {
+		return model.Session{}, model.Identity{}, iderr.NotAuthenticated()
+	}
+	return sess, id, nil
+}
+
+// Me resolves a session id to its identity (the account-center /session/me).
+func (s *Service) Me(ctx context.Context, sessionID string) (model.Identity, error) {
+	_, identity, err := s.AuthenticatedSession(ctx, sessionID)
+	return identity, err
+}
+
+// RequireAuthentication evaluates a server-side session context against a
+// typed requirement. It never trusts request timestamps or token issuance time.
+func (s *Service) RequireAuthentication(
+	ctx context.Context,
+	sessionID string,
+	requirement authentication.Requirement,
+) (model.Session, model.Identity, error) {
+	session, identity, err := s.AuthenticatedSession(ctx, sessionID)
+	if err != nil {
+		return model.Session{}, model.Identity{}, err
+	}
+	decision := authentication.Evaluate(session.Authentication, requirement, s.now())
+	if !decision.Satisfied {
+		return model.Session{}, model.Identity{}, iderr.StepUpRequired(decision.Missing)
+	}
+	return session, identity, nil
 }
 
 // GetByID fetches a single identity by its primary-key ID.

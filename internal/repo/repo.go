@@ -21,6 +21,7 @@ var (
 	ErrUnknownRole         = errors.New("unknown role slug")
 	ErrGuestSessionMissing = errors.New("guest session not found")
 	ErrGuestClaimConflict  = errors.New("guest session already claimed")
+	ErrLastCredential      = errors.New("cannot remove the last login credential")
 )
 
 // Verification purpose scopes (a token issued for one purpose must not work for
@@ -164,6 +165,13 @@ type OAuthRepo interface {
 	DeleteOAuthCredential(ctx context.Context, identityID, provider string) (bool, error)
 }
 
+// PasskeyInventoryRepo exposes only the cross-credential fact needed by the
+// legacy password/OAuth account surface. Passkey ceremony state and key
+// material remain behind the authentication module's deeper store interface.
+type PasskeyInventoryRepo interface {
+	CountActivePasskeys(ctx context.Context, identityID string) (int, error)
+}
+
 // RoleRepo manages the coarse-grained RBAC role grants for an identity. The
 // catalog is the small fixed set seeded by migration 0006 (user, admin).
 type RoleRepo interface {
@@ -265,6 +273,7 @@ type Store interface {
 	SessionStore
 	VerificationThrottle
 	OAuthRepo
+	PasskeyInventoryRepo
 	VerificationRepo
 	RoleRepo
 	AuditRepo

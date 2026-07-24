@@ -95,8 +95,9 @@ type OAuthCredentialDTO struct {
 }
 
 type CredentialsRes struct {
-	HasPassword bool                 `json:"hasPassword"`
-	OAuth       []OAuthCredentialDTO `json:"oauth"`
+	HasPassword  bool                 `json:"hasPassword"`
+	OAuth        []OAuthCredentialDTO `json:"oauth"`
+	PasskeyCount int                  `json:"passkeyCount"`
 }
 
 type UnbindCredentialReq struct {

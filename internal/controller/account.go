@@ -115,7 +115,9 @@ func (c *Controller) Credentials(ctx context.Context, _ *v1.CredentialsReq) (*v1
 	for _, o := range cs.OAuth {
 		oauth = append(oauth, v1.OAuthCredentialDTO{Provider: o.Provider, Email: o.Email})
 	}
-	return &v1.CredentialsRes{HasPassword: cs.HasPassword, OAuth: oauth}, nil
+	return &v1.CredentialsRes{
+		HasPassword: cs.HasPassword, OAuth: oauth, PasskeyCount: cs.PasskeyCount,
+	}, nil
 }
 
 // UnbindCredential removes one of the caller's oauth credentials (last-credential guarded).

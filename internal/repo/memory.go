@@ -239,6 +239,10 @@ func (m *Memory) DeleteOAuthCredential(_ context.Context, identityID, provider s
 	return false, nil
 }
 
+func (m *Memory) CountActivePasskeys(context.Context, string) (int, error) {
+	return 0, nil
+}
+
 // SetEmailVerified flips the stored identity's email_verified flag.
 // Returns ErrIdentityMissing when the identity does not exist.
 func (m *Memory) SetEmailVerified(_ context.Context, identityID string, verified bool) error {
@@ -343,6 +347,7 @@ func (m *Memory) RevokeRole(_ context.Context, identityID, slug string) error {
 func (m *Memory) CreateSession(_ context.Context, s model.Session, _ time.Duration) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	s = withSessionExpiry(s, 0)
 	m.sessions[s.ID] = s
 	return nil
 }
