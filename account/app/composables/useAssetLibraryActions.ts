@@ -96,6 +96,7 @@ export function useAssetLibraryActions(options: UseAssetLibraryActionsOptions) {
     retryingSecurity.value = true
     try {
       await call(`/api/v1/admin/assets-proxy/library/${securityAsset.value.id}/security/retry`, { method: 'POST' })
+      // feedback-contract: the operation refreshes both the security drawer and library, so no single inline surface persists.
       toast.add({ title: '已重新进入安全处理队列', color: 'success' })
       await Promise.all([loadSecurity(securityAsset.value), options.reloadAll()])
     } catch (error) {
@@ -126,6 +127,7 @@ export function useAssetLibraryActions(options: UseAssetLibraryActionsOptions) {
         method: 'POST',
         body: { reason }
       })
+      // feedback-contract: rejection closes the security flow and refreshes the library, leaving no persistent inline target.
       toast.add({ title: '已拒绝素材交付', color: 'success' })
       securityRejectTarget.value = null
       await options.reloadAll()
