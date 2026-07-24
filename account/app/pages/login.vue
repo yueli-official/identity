@@ -10,6 +10,13 @@ const { call } = useApi()
 const { refresh } = useSession()
 const error = ref('')
 const loading = ref(false)
+const passkeyLoading = ref(false)
+const passkeyAvailable = ref(false)
+const passkeys = usePasskeys()
+
+onMounted(() => {
+  passkeyAvailable.value = passkeys.isSupported()
+})
 
 // Surface an error handed back via the query string (e.g. an OAuth redirect that
 // failed) so the "Sign in with Google" button never silently appears dead.
@@ -43,6 +50,20 @@ async function onSubmit(e: FormSubmitEvent<Schema>) {
     error.value = err?.data?.message || '登录失败,请重试'
   } finally {
     loading.value = false
+  }
+}
+
+async function onPasskeyLogin() {
+  error.value = ''
+  passkeyLoading.value = true
+  try {
+    await passkeys.authenticate()
+    await refresh()
+    await navigateTo(safeReturnTo(route.query.return_to as string), { external: true })
+  } catch (err) {
+    error.value = passkeyErrorMessage(err)
+  } finally {
+    passkeyLoading.value = false
   }
 }
 </script>
@@ -83,15 +104,30 @@ async function onSubmit(e: FormSubmitEvent<Schema>) {
         </UForm>
 
         <USeparator label="或" class="my-4" />
-        <UButton
-          block
-          color="neutral"
-          variant="outline"
-          icon="i-tabler-brand-google"
-          label="使用 Google 登录"
-          :to="`/api/v1/auth/oauth/google/start?return_to=${encodeURIComponent(returnTo)}`"
-          external
-        />
+        <div class="space-y-2">
+          <UButton
+            block
+            color="neutral"
+            variant="outline"
+            icon="i-tabler-key"
+            label="使用通行密钥登录"
+            :loading="passkeyLoading"
+            :disabled="!passkeyAvailable || loading"
+            @click="onPasskeyLogin"
+          />
+          <UButton
+            block
+            color="neutral"
+            variant="outline"
+            icon="i-tabler-brand-google"
+            label="使用 Google 登录"
+            :to="`/api/v1/auth/oauth/google/start?return_to=${encodeURIComponent(returnTo)}`"
+            external
+          />
+        </div>
+        <p v-if="!passkeyAvailable" class="mt-3 text-center text-xs text-muted">
+          当前浏览器不支持通行密钥登录
+        </p>
       </UCard>
 
       <p class="text-center text-sm text-muted">

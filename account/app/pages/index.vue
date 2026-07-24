@@ -176,13 +176,19 @@ async function onLogout() {
 }
 
 // ── Credentials (login methods) ─────────────────────────────────────────────
-interface CredRes { hasPassword: boolean; oauth: { provider: string; email: string }[] }
+interface CredRes {
+  hasPassword: boolean
+  oauth: { provider: string; email: string }[]
+  passkeyCount: number
+}
 const { data: credData, refresh: refreshCreds } = await useAsyncData('credentials',
   () => call<CredRes>('/api/v1/session/credentials'))
 const hasGoogle = computed(() => (credData.value?.oauth ?? []).some(o => o.provider === 'google'))
 const bindGoogleUrl = '/api/v1/auth/oauth/google/start?intent=bind&return_to=' + encodeURIComponent('/')
 const isGoogleLastCredential = computed(() =>
-  !credData.value?.hasPassword && (credData.value?.oauth?.length ?? 0) <= 1
+  !credData.value?.hasPassword &&
+  (credData.value?.oauth?.length ?? 0) <= 1 &&
+  (credData.value?.passkeyCount ?? 0) === 0
 )
 const confirmUnbindOpen = ref(false)
 const unbinding = ref(false)
@@ -369,6 +375,8 @@ const cardHeaderClass = 'flex items-center gap-2 font-semibold text-highlighted'
       </UForm>
     </UCard>
 
+    <PasskeyManager @changed="refreshCreds" />
+
     <!-- Credentials / login methods -->
     <UCard>
       <template #header>
@@ -413,6 +421,20 @@ const cardHeaderClass = 'flex items-center gap-2 font-semibold text-highlighted'
             color="neutral" variant="outline" size="xs" icon="i-tabler-brand-google"
             label="绑定" :to="bindGoogleUrl" external
           />
+        </li>
+        <li class="flex items-center justify-between gap-4 py-3 last:pb-0">
+          <div class="flex items-center gap-3">
+            <div class="grid size-9 shrink-0 place-items-center rounded-full bg-elevated">
+              <UIcon name="i-tabler-key" class="size-4.5 text-muted" />
+            </div>
+            <div>
+              <p class="text-sm font-medium text-highlighted">通行密钥</p>
+              <p class="text-xs text-muted">指纹、面容或设备 PIN 登录</p>
+            </div>
+          </div>
+          <UBadge :color="credData?.passkeyCount ? 'success' : 'neutral'" variant="soft" size="sm">
+            {{ credData?.passkeyCount ? `${credData.passkeyCount} 个` : '未设置' }}
+          </UBadge>
         </li>
       </ul>
     </UCard>
