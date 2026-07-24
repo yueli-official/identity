@@ -30,10 +30,10 @@ func NewWebAuthnVerifier(config WebAuthnConfig) (WebAuthnVerifier, error) {
 	library, err := webauthn.New(&webauthn.Config{
 		RPID: config.RPID, RPDisplayName: config.RPDisplayName,
 		RPOrigins: config.RPOrigins, RPTopOrigins: config.RPTopOrigins,
-		RPAllowCrossOrigin: config.AllowCrossOrigin,
+		RPAllowCrossOrigin:    config.AllowCrossOrigin,
 		AttestationPreference: protocol.PreferNoAttestation,
 		AuthenticatorSelection: protocol.AuthenticatorSelection{
-			ResidentKey: protocol.ResidentKeyRequirementRequired,
+			ResidentKey:      protocol.ResidentKeyRequirementRequired,
 			UserVerification: protocol.VerificationRequired,
 		},
 	})
@@ -149,7 +149,7 @@ func encodeCeremony(session *webauthn.SessionData, options any) (
 	}
 	return CeremonyMaterial{
 		ChallengeDigest: challengeDigest(challenge),
-		LibraryState: state,
+		LibraryState:    state,
 	}, BrowserOptions{JSON: wire}, nil
 }
 
@@ -175,8 +175,8 @@ type webAuthnUser struct {
 }
 
 func (user webAuthnUser) WebAuthnID() []byte                         { return user.handle }
-func (user webAuthnUser) WebAuthnName() string                      { return user.name }
-func (user webAuthnUser) WebAuthnDisplayName() string               { return user.displayName }
+func (user webAuthnUser) WebAuthnName() string                       { return user.name }
+func (user webAuthnUser) WebAuthnDisplayName() string                { return user.displayName }
 func (user webAuthnUser) WebAuthnCredentials() []webauthn.Credential { return user.credentials }
 
 func webAuthnUserFromDomain(user PasskeyUser) webAuthnUser {
@@ -206,17 +206,17 @@ func credentialToDomain(
 		IdentityID: identityID, RPID: rpID,
 		CredentialID: value.ID, PublicKey: value.PublicKey,
 		PublicKeyAlgorithm: value.Attestation.PublicKeyAlgorithm,
-		Transports: transports, Attachment: string(value.Authenticator.Attachment),
+		Transports:         transports, Attachment: string(value.Authenticator.Attachment),
 		AttestationType: value.AttestationType, AttestationFormat: value.AttestationFormat,
 		AAGUID: value.Authenticator.AAGUID, SignCount: value.Authenticator.SignCount,
 		CloneWarning: value.Authenticator.CloneWarning, Flags: byte(value.Flags.ProtocolValue()),
-		UserVerified: value.Flags.UserVerified,
+		UserVerified:               value.Flags.UserVerified,
 		UserVerifiedAtRegistration: registration && value.Flags.UserVerified,
-		BackupEligible: value.Flags.BackupEligible, BackupState: value.Flags.BackupState,
-		AttestationClientDataJSON: value.Attestation.ClientDataJSON,
-		AttestationClientDataHash: value.Attestation.ClientDataHash,
+		BackupEligible:             value.Flags.BackupEligible, BackupState: value.Flags.BackupState,
+		AttestationClientDataJSON:    value.Attestation.ClientDataJSON,
+		AttestationClientDataHash:    value.Attestation.ClientDataHash,
 		AttestationAuthenticatorData: value.Attestation.AuthenticatorData,
-		AttestationObject: value.Attestation.Object,
+		AttestationObject:            value.Attestation.Object,
 	}
 }
 
@@ -229,18 +229,18 @@ func credentialToLibrary(value PasskeyCredential) webauthn.Credential {
 		ID: value.CredentialID, PublicKey: value.PublicKey,
 		AttestationType: value.AttestationType, AttestationFormat: value.AttestationFormat,
 		Transport: transports,
-		Flags: webauthn.NewCredentialFlags(protocol.AuthenticatorFlags(value.Flags)),
+		Flags:     webauthn.NewCredentialFlags(protocol.AuthenticatorFlags(value.Flags)),
 		Authenticator: webauthn.Authenticator{
 			AAGUID: value.AAGUID, SignCount: value.SignCount,
 			CloneWarning: value.CloneWarning,
-			Attachment: protocol.AuthenticatorAttachment(value.Attachment),
+			Attachment:   protocol.AuthenticatorAttachment(value.Attachment),
 		},
 		Attestation: webauthn.CredentialAttestation{
-			ClientDataJSON: value.AttestationClientDataJSON,
-			ClientDataHash: value.AttestationClientDataHash,
-			AuthenticatorData: value.AttestationAuthenticatorData,
+			ClientDataJSON:     value.AttestationClientDataJSON,
+			ClientDataHash:     value.AttestationClientDataHash,
+			AuthenticatorData:  value.AttestationAuthenticatorData,
 			PublicKeyAlgorithm: value.PublicKeyAlgorithm,
-			Object: value.AttestationObject,
+			Object:             value.AttestationObject,
 		},
 	}
 }

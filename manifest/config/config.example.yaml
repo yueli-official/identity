@@ -63,6 +63,12 @@ oidc:
 account:
   loginUrl: "http://localhost:3000/login"
   baseUrl: "http://localhost:3000" # env GF_ACCOUNT_BASEURL — used to build email links
+maintenance:
+  securityRetention:
+    enabled: true
+    interval: "1h"
+    retention: "24h"
+    batchSize: 500
 asset:
   baseUrl: "http://localhost:8082"
   audience: "asset-api"

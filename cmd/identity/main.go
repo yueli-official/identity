@@ -43,6 +43,7 @@ import (
 	"platform/services/identity/internal/guest"
 	"platform/services/identity/internal/identityabuse"
 	"platform/services/identity/internal/identitycap"
+	"platform/services/identity/internal/identitymaintenance"
 	"platform/services/identity/internal/identityprivacy"
 	"platform/services/identity/internal/identitysecurity"
 	"platform/services/identity/internal/logic"
@@ -188,6 +189,48 @@ func main() {
 		if err != nil {
 			panic(fmt.Sprintf("identity database: %v", err))
 		}
+	}
+	if !openAPIExport && g.Cfg().MustGet(ctx, "maintenance.securityRetention.enabled", true).Bool() {
+		interval := g.Cfg().MustGet(ctx, "maintenance.securityRetention.interval", "1h").Duration()
+		retention := g.Cfg().MustGet(ctx, "maintenance.securityRetention.retention", "24h").Duration()
+		batchSize := g.Cfg().MustGet(ctx, "maintenance.securityRetention.batchSize", 500).Int()
+		if interval <= 0 {
+			panic("maintenance.securityRetention.interval must be positive")
+		}
+		cleaner := identitymaintenance.SecurityRetention{
+			DB: master, Retention: retention, BatchSize: batchSize,
+		}
+		maintenanceContext, stopMaintenance := context.WithCancel(ctx)
+		defer stopMaintenance()
+		go func() {
+			run := func() {
+				result, cleanupErr := cleaner.RunOnce(maintenanceContext)
+				if cleanupErr != nil {
+					if !errors.Is(cleanupErr, context.Canceled) {
+						g.Log().Warningf(maintenanceContext, "identity security retention cleanup: %v", cleanupErr)
+					}
+					return
+				}
+				if result.Ceremonies+result.Transactions+result.PendingTOTP+result.ProofUses > 0 {
+					g.Log().Infof(
+						maintenanceContext,
+						"identity security retention cleanup: ceremonies=%d transactions=%d pending_totp=%d proof_uses=%d",
+						result.Ceremonies, result.Transactions, result.PendingTOTP, result.ProofUses,
+					)
+				}
+			}
+			run()
+			ticker := time.NewTicker(interval)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-maintenanceContext.Done():
+					return
+				case <-ticker.C:
+					run()
+				}
+			}
+		}()
 	}
 
 	// PAT HMAC secret: warn at startup when falling back to the insecure dev key.

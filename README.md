@@ -19,8 +19,9 @@ Identity 是站群唯一身份提供方，负责账户、凭据、公开资料�
 
 ## 接口面
 
-- `/api/v1/auth/*`：注册、密码登录/退出、验证、密码重置/修改和可选 Google 登录。
+- `/api/v1/auth/*`：注册、密码/passkey 登录、MFA/恢复/step-up、验证、密码重置/修改和可选 Google 登录。
 - `/api/v1/session/*`：当前身份、资料与媒体更新、凭据和会话/设备管理。
+- `/api/v1/account/passkeys*`、`/api/v1/account/mfa*`：认证器 enrollment、列表、重命名、恢复和安全移除。
 - `POST /api/v1/session/privacy/erasure`：用稳定幂等键、请求时间和客户端生成的状态能力令牌发起删除。
 - `POST /api/v1/privacy/requests/{id}/status`：凭状态能力令牌继续驱动并读取聚合结果，账号删除后仍可用。
 - `POST /api/internal/privacy/owner`：供实例内协调协议调用的 Identity Owner Host，要求 `privacy:owner`。
@@ -37,6 +38,9 @@ Identity 是站群唯一身份提供方，负责账户、凭据、公开资料�
 - `api/v1/`：业务请求与响应契约。
 - `cmd/identity/`：依赖组合、路由和启动验证。
 - `internal/logic/`：身份、会话与凭据领域行为。
+- `internal/authentication/`：认证上下文、passkey/TOTP/recovery/step-up 深模块及协议 adapter seam。
+- `internal/password/`：统一 Unicode 密码策略、blocklist 与 Argon2id/bcrypt 渐进迁移。
+- `internal/identitymaintenance/`：短生命周期安全状态的有界 retention 清理。
 - `internal/oidc/`：Fosite store、PG 事务 adapter、claims 和密钥。
 - `internal/dao/`、`internal/repo/`：持久化与缓存 seam。
 - `internal/controller/`：业务、OIDC 与 OAuth 登录 HTTP seam。
@@ -60,7 +64,10 @@ go run ./services/identity/cmd/identity
 go test ./services/identity/...
 ```
 
-集成测试使用 `TEST_PG_LINK` 和 `TEST_REDIS_ADDR`。生产 wiring 绝不能把 PG 会话/OIDC store 替换为内存实现。
+DAO 集成测试使用 `TEST_PG_LINK` 和 `TEST_REDIS_ADDR`；完整迁移 lifecycle 使用
+`IDENTITY_MIGRATION_PG_*` 创建并删除隔离临时库。不要把整套历史 integration suite 指向长期
+Identity 数据库。生产 wiring 绝不能把 PG 会话/OIDC store 替换为内存实现。现代认证的长期契约见
+`flightdeck/knowledge/auth/identity-authentication-system.md`。
 
 Privacy 的远程 Owner URL 与 confidential OAuth client 在 `privacy.*` 配置，并由部署 Catalog 的
 `privacy:owner` service client 自动生成。每个独立站点使用 `site.<slug>` Owner key；协调器只冻结当前部署

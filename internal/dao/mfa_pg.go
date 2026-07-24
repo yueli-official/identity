@@ -41,7 +41,7 @@ FOR UPDATE OF identities
 			return authentication.ErrTOTPEnrollmentInvalid
 		}
 
-		if _, err := tx.Exec(`
+		if _, err := tx.Ctx(ctx).Exec(`
 UPDATE totp_authenticators
 SET status = 'revoked',
     binding_session_id = NULL,
@@ -146,7 +146,7 @@ RETURNING id
 			return authentication.ErrTOTPEnrollmentInvalid
 		}
 		if recoverySession.Bool() {
-			if _, err := tx.Exec(`
+			if _, err := tx.Ctx(ctx).Exec(`
 UPDATE totp_authenticators
 SET status = 'revoked',
     revoked_at = ?,
@@ -158,7 +158,7 @@ WHERE identity_id = ? AND id <> ? AND status IN ('active', 'suspended')
 			}
 		}
 
-		if _, err := tx.Exec(`
+		if _, err := tx.Ctx(ctx).Exec(`
 INSERT INTO authentication_policies(
     identity_id, second_factor_required, policy_version, updated_at
 )
@@ -171,7 +171,7 @@ SET second_factor_required = TRUE,
 			return err
 		}
 
-		if _, err := tx.Exec(`
+		if _, err := tx.Ctx(ctx).Exec(`
 UPDATE recovery_code_sets
 SET status = 'revoked',
     revoked_at = ?,
@@ -269,7 +269,7 @@ WHERE identity_id = ? AND status = 'active'
 			return nil
 		}
 
-		if _, err := tx.Exec(`
+		if _, err := tx.Ctx(ctx).Exec(`
 INSERT INTO authentication_policies(
     identity_id, second_factor_required, policy_version, updated_at
 )
@@ -281,7 +281,7 @@ SET second_factor_required = FALSE,
 `, identityID, now); err != nil {
 			return err
 		}
-		_, err = tx.Exec(`
+		_, err = tx.Ctx(ctx).Exec(`
 UPDATE recovery_code_sets
 SET status = 'revoked',
     revoked_at = ?,
@@ -486,7 +486,7 @@ WHERE set_id = ? AND consumed_at IS NULL
 			return err
 		}
 		if remaining.Int() == 0 {
-			if _, err := tx.Exec(`
+			if _, err := tx.Ctx(ctx).Exec(`
 UPDATE recovery_code_sets
 SET status = 'exhausted', exhausted_at = ?
 WHERE id = ? AND status = 'active'
