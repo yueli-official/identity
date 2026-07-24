@@ -338,7 +338,7 @@ const resetOpen = computed({
 const newPw = ref('')
 const resetting = ref(false)
 async function confirmReset() {
-  if (!resetTarget.value || newPw.value.length < 8) return
+  if (!resetTarget.value || !passwordMeetsLengthPolicy(newPw.value)) return
   resetting.value = true
   try {
     const target = resetTarget.value
@@ -402,8 +402,8 @@ function openCreate() {
   createOpen.value = true
 }
 async function confirmCreate() {
-  if (!createForm.email || createForm.password.length < 8) {
-    createError.value = '请填写邮箱和至少 8 位密码。'
+  if (!createForm.email || !passwordMeetsLengthPolicy(createForm.password)) {
+    createError.value = `请填写邮箱和 ${PASSWORD_MIN_LENGTH}–${PASSWORD_MAX_LENGTH} 个字符的密码。`
     return
   }
   createError.value = ''
@@ -679,7 +679,7 @@ const userLabel = (user: AdminUser) => user.displayName || user.email
           <p class="text-sm text-muted">
             为 <span class="font-medium text-default">{{ resetTarget?.email }}</span> 设置新密码,该用户其他会话将被退出。
           </p>
-          <UInput v-model="newPw" type="password" placeholder="新密码(至少 8 位)" class="w-full" autocomplete="new-password" />
+          <UInput v-model="newPw" type="password" :placeholder="PASSWORD_HINT" class="w-full" autocomplete="new-password" />
         </div>
       </template>
       <template #footer>
@@ -695,7 +695,7 @@ const userLabel = (user: AdminUser) => user.displayName || user.email
               }
             "
           />
-          <UButton color="primary" label="重置密码" :loading="resetting" :disabled="newPw.length < 8" @click="confirmReset" />
+          <UButton color="primary" label="重置密码" :loading="resetting" :disabled="!passwordMeetsLengthPolicy(newPw)" @click="confirmReset" />
         </div>
       </template>
     </UModal>
@@ -734,7 +734,7 @@ const userLabel = (user: AdminUser) => user.displayName || user.email
           <UFormField label="邮箱" required>
             <UInput v-model="createForm.email" type="email" placeholder="user@example.com" class="w-full" />
           </UFormField>
-          <UFormField label="初始密码" hint="至少 8 位" required>
+          <UFormField label="初始密码" :hint="PASSWORD_HINT" required>
             <UInput v-model="createForm.password" type="password" class="w-full" autocomplete="new-password" />
           </UFormField>
           <UFormField label="昵称">

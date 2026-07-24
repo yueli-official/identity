@@ -92,7 +92,7 @@ async function onCoverUpdated(url: string) { coverUrl.value = url; await refresh
 // ── Change password ─────────────────────────────────────────────────────────
 const pwSchema = z.object({
   currentPassword: z.string().min(1, '请输入当前密码'),
-  newPassword: z.string().min(8, '新密码至少 8 位').max(128),
+  newPassword: newPasswordSchema('新密码'),
   confirm: z.string().min(1, '请再次输入新密码')
 }).refine(d => d.newPassword === d.confirm, { message: '两次输入不一致', path: ['confirm'] })
 type PwSchema = z.output<typeof pwSchema>
@@ -116,7 +116,7 @@ async function onChangePassword(e: FormSubmitEvent<PwSchema>) {
 
 // ── Set initial password (accounts that have none, e.g. OAuth-only) ──────────
 const setPwSchema = z.object({
-  newPassword: z.string().min(8, '密码至少 8 位').max(128),
+  newPassword: newPasswordSchema(),
   confirm: z.string().min(1, '请再次输入密码')
 }).refine(d => d.newPassword === d.confirm, { message: '两次输入不一致', path: ['confirm'] })
 type SetPwSchema = z.output<typeof setPwSchema>
@@ -321,7 +321,7 @@ const cardHeaderClass = 'flex items-center gap-2 font-semibold text-highlighted'
           <UInput v-model="pwState.currentPassword" type="password" autocomplete="current-password" class="w-full" />
         </UFormField>
         <div class="grid gap-4 sm:grid-cols-2">
-          <UFormField name="newPassword" label="新密码" hint="至少 8 位">
+          <UFormField name="newPassword" label="新密码" :hint="PASSWORD_HINT">
             <UInput v-model="pwState.newPassword" type="password" autocomplete="new-password" class="w-full" />
           </UFormField>
           <UFormField name="confirm" label="确认新密码">
@@ -355,7 +355,7 @@ const cardHeaderClass = 'flex items-center gap-2 font-semibold text-highlighted'
           description="你目前只能用第三方账号登录。设置密码后即可用邮箱 + 密码登录,也才能解绑第三方账号。"
         />
         <div class="grid gap-4 sm:grid-cols-2">
-          <UFormField name="newPassword" label="新密码" hint="至少 8 位">
+          <UFormField name="newPassword" label="新密码" :hint="PASSWORD_HINT">
             <UInput v-model="setPwState.newPassword" type="password" autocomplete="new-password" class="w-full" />
           </UFormField>
           <UFormField name="confirm" label="确认密码">

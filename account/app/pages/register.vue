@@ -23,7 +23,7 @@ const returnTo = computed(() => String(route.query.return_to ?? '/'))
 const schema = z.object({
   displayName: z.string().min(1, '请输入昵称'),
   email: z.email('邮箱格式不正确'),
-  password: z.string().min(8, '密码至少 8 位').max(128, '密码最多 128 位')
+  password: newPasswordSchema()
 })
 type Schema = z.output<typeof schema>
 const state = reactive<Partial<Schema>>({ displayName: '', email: '', password: '' })
@@ -74,7 +74,7 @@ async function onSubmit(e: FormSubmitEvent<Schema>) {
           <UFormField name="email" label="邮箱">
             <UInput v-model="state.email" type="email" autocomplete="email" placeholder="you@example.com" class="w-full" />
           </UFormField>
-          <UFormField name="password" label="密码" hint="至少 8 位">
+          <UFormField name="password" label="密码" :hint="PASSWORD_HINT">
             <UInput v-model="state.password" type="password" autocomplete="new-password" class="w-full" />
           </UFormField>
           <UAlert v-if="error" color="error" variant="soft" :title="error" />

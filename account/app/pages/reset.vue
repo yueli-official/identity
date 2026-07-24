@@ -12,7 +12,7 @@ const loading = ref(false)
 const done = ref(false)
 
 const schema = z.object({
-  password: z.string().min(8, '密码至少 8 位').max(128, '密码最多 128 位'),
+  password: newPasswordSchema(),
   confirm: z.string().min(1, '请再次输入密码')
 }).refine(data => data.password === data.confirm, {
   message: '两次输入的密码不一致',
@@ -54,7 +54,7 @@ async function onSubmit(e: FormSubmitEvent<Schema>) {
       </template>
 
       <UForm v-else :schema="schema" :state="state" class="space-y-4" @submit="onSubmit">
-        <UFormField name="password" label="新密码" hint="至少 8 位">
+        <UFormField name="password" label="新密码" :hint="PASSWORD_HINT">
           <UInput v-model="state.password" type="password" autocomplete="new-password" class="w-full" />
         </UFormField>
         <UFormField name="confirm" label="确认密码">
