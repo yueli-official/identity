@@ -106,11 +106,19 @@ func (adapter *webAuthnAdapter) FinishDiscoverableAuthentication(
 	if len(parsed.Response.UserHandle) == 0 {
 		return PasskeyUser{}, PasskeyCredential{}, ErrCeremonyInvalid
 	}
-	user, err := resolve(parsed.Response.UserHandle)
-	if err != nil {
-		return PasskeyUser{}, PasskeyCredential{}, ErrCeremonyInvalid
-	}
-	credential, err := adapter.library.ValidateLogin(webAuthnUserFromDomain(user), session, parsed)
+	var user PasskeyUser
+	_, credential, err := adapter.library.ValidatePasskeyLogin(
+		func(_, userHandle []byte) (webauthn.User, error) {
+			resolved, resolveErr := resolve(userHandle)
+			if resolveErr != nil {
+				return nil, resolveErr
+			}
+			user = resolved
+			return webAuthnUserFromDomain(resolved), nil
+		},
+		session,
+		parsed,
+	)
 	if err != nil {
 		return PasskeyUser{}, PasskeyCredential{}, err
 	}
