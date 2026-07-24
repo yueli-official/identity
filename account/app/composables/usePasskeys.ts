@@ -118,6 +118,7 @@ function serializeCredential(credential: PublicKeyCredential) {
 
 export function passkeyErrorMessage(error: unknown): string {
   if (error instanceof DOMException) {
+    if (error.name === 'AbortError') return '操作已取消。'
     if (error.name === 'NotAllowedError') return '操作已取消、超时，或此设备上没有可用的通行密钥。'
     if (error.name === 'InvalidStateError') return '这个验证器已经为该账户保存了通行密钥。'
     if (error.name === 'SecurityError') return '当前域名未被允许使用通行密钥，请联系管理员检查 WebAuthn 配置。'
@@ -128,6 +129,9 @@ export function passkeyErrorMessage(error: unknown): string {
 
 export function usePasskeys() {
   const { call } = useApi()
+  let activeCeremony: AbortController | undefined
+
+  onScopeDispose(() => activeCeremony?.abort())
 
   const isSupported = () => import.meta.client &&
     'PublicKeyCredential' in window &&
@@ -139,11 +143,23 @@ export function usePasskeys() {
 
   async function register(label: string) {
     if (!isSupported()) throw new Error('此浏览器不支持通行密钥。')
+    activeCeremony?.abort()
     const begin = await call<BeginPasskeyCeremony>(
       '/api/v1/account/passkeys/registration/begin',
       { method: 'POST' },
     )
-    const credential = await navigator.credentials.create(decodeCreationOptions(begin.options))
+    const options = decodeCreationOptions(begin.options)
+    const controller = new AbortController()
+    activeCeremony = controller
+    let credential: Credential | null
+    try {
+      credential = await navigator.credentials.create({
+        ...options,
+        signal: controller.signal,
+      })
+    } finally {
+      if (activeCeremony === controller) activeCeremony = undefined
+    }
     if (!(credential instanceof PublicKeyCredential)) throw new Error('浏览器没有返回通行密钥。')
     return call<{ passkey: PasskeyEntry }>(
       '/api/v1/account/passkeys/registration/finish',
@@ -160,11 +176,23 @@ export function usePasskeys() {
 
   async function authenticate() {
     if (!isSupported()) throw new Error('此浏览器不支持通行密钥。')
+    activeCeremony?.abort()
     const begin = await call<BeginPasskeyCeremony>(
       '/api/v1/auth/passkeys/login/begin',
       { method: 'POST' },
     )
-    const credential = await navigator.credentials.get(decodeRequestOptions(begin.options))
+    const options = decodeRequestOptions(begin.options)
+    const controller = new AbortController()
+    activeCeremony = controller
+    let credential: Credential | null
+    try {
+      credential = await navigator.credentials.get({
+        ...options,
+        signal: controller.signal,
+      })
+    } finally {
+      if (activeCeremony === controller) activeCeremony = undefined
+    }
     if (!(credential instanceof PublicKeyCredential)) throw new Error('浏览器没有返回通行密钥。')
     return call<FinishPasskeyLogin>(
       '/api/v1/auth/passkeys/login/finish',
@@ -189,5 +217,10 @@ export function usePasskeys() {
     return call(`/api/v1/account/passkeys/${id}`, { method: 'DELETE' })
   }
 
-  return { isSupported, list, register, authenticate, rename, remove }
+  function cancelCeremony() {
+    activeCeremony?.abort()
+    activeCeremony = undefined
+  }
+
+  return { isSupported, list, register, authenticate, rename, remove, cancelCeremony }
 }

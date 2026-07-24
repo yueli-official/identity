@@ -50,6 +50,10 @@ async function addPasskey() {
   }
 }
 
+function cancelAddPasskey() {
+  passkeys.cancelCeremony()
+}
+
 function openRename(entry: PasskeyEntry) {
   selected.value = entry
   renameLabel.value = entry.label
@@ -115,9 +119,17 @@ function formatDate(value?: string) {
           <p class="mt-1 text-xs text-muted">使用指纹、面容或设备 PIN 登录，无需输入密码。</p>
         </div>
         <UButton
+          v-if="adding"
+          color="neutral"
+          variant="outline"
+          icon="i-tabler-x"
+          label="取消添加"
+          @click="cancelAddPasskey"
+        />
+        <UButton
+          v-else
           icon="i-tabler-plus"
           label="添加通行密钥"
-          :loading="adding"
           :disabled="!browserSupported"
           @click="addPasskey"
         />

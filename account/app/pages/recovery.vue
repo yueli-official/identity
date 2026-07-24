@@ -8,6 +8,8 @@ const { data, pending, error } = await useAsyncData(
   'restricted-recovery-session',
   () => call<{ identityId: string, expiresAt: string }>('/api/v1/account/recovery'),
 )
+const recoveryExpiry = useExpiryCountdown(() => data.value?.expiresAt ?? '')
+const recoveryUnavailable = computed(() => !!error.value || !data.value || recoveryExpiry.expired.value)
 
 async function returnToLogin() {
   leaving.value = true
@@ -34,7 +36,7 @@ async function returnToLogin() {
         <USkeleton class="h-32 w-full rounded-lg" />
       </UCard>
       <UAlert
-        v-else-if="error || !data"
+        v-else-if="recoveryUnavailable"
         color="error"
         variant="soft"
         icon="i-tabler-clock-x"
@@ -63,7 +65,8 @@ async function returnToLogin() {
           variant="soft"
           icon="i-tabler-lock-access"
           title="受限恢复会话"
-          :description="`会话将在 ${new Date(data.expiresAt).toLocaleString('zh-CN')} 过期，只能用于重建身份验证器。`"
+          :description="`会话将在 ${recoveryExpiry.label.value} 后过期，只能用于重建身份验证器。`"
+          aria-live="polite"
         />
         <TOTPManager recovery @recovered="completed = true" />
       </template>

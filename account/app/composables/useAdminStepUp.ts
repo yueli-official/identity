@@ -80,9 +80,9 @@ export function useAdminStepUp() {
     }
   }
 
-  function cancel() {
+  function cancel(message = '已取消额外身份验证。') {
     state.value.open = false
-    rejectProof?.(new Error('已取消额外身份验证。'))
+    rejectProof?.(new Error(message))
     resolveProof = undefined
     rejectProof = undefined
   }

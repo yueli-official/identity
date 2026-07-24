@@ -14,9 +14,20 @@ const passkeyLoading = ref(false)
 const passkeyAvailable = ref(false)
 const passkeys = usePasskeys()
 const mfaTransaction = ref(String(route.query.mfa_transaction ?? ''))
+const mfaExpiresAt = ref('')
 const mfaCode = ref('')
 const mfaLoading = ref(false)
 const useRecoveryCode = ref(false)
+const mfaExpiry = useExpiryCountdown(mfaExpiresAt)
+
+watch(mfaExpiry.expired, (expired) => {
+  if (!expired || !mfaTransaction.value) return
+  mfaTransaction.value = ''
+  mfaExpiresAt.value = ''
+  mfaCode.value = ''
+  useRecoveryCode.value = false
+  error.value = '双重验证已过期，请重新输入邮箱和密码。'
+})
 
 onMounted(() => {
   passkeyAvailable.value = passkeys.isSupported()
@@ -52,6 +63,7 @@ async function onSubmit(e: FormSubmitEvent<Schema>) {
     }>('/api/v1/auth/login', { method: 'POST', body: e.data })
     if (result.mfaRequired && result.mfaTransaction) {
       mfaTransaction.value = result.mfaTransaction
+      mfaExpiresAt.value = result.mfaExpiresAt ?? ''
       state.password = ''
       return
     }
@@ -92,6 +104,7 @@ async function onMFASubmit() {
 
 function cancelMFA() {
   mfaTransaction.value = ''
+  mfaExpiresAt.value = ''
   mfaCode.value = ''
   useRecoveryCode.value = false
   error.value = ''
@@ -115,6 +128,10 @@ async function onPasskeyLogin() {
   } finally {
     passkeyLoading.value = false
   }
+}
+
+function cancelPasskeyLogin() {
+  passkeys.cancelCeremony()
 }
 </script>
 
@@ -149,6 +166,14 @@ async function onPasskeyLogin() {
               ? '恢复代码只能使用一次，登录后仅可重建身份验证器。'
               : '输入身份验证器应用中显示的 6 位动态验证码。'"
           />
+          <p
+            v-if="mfaExpiresAt"
+            class="text-center text-xs text-muted"
+            role="status"
+            aria-live="polite"
+          >
+            验证将在 {{ mfaExpiry.label.value }} 后过期
+          </p>
           <UFormField :label="useRecoveryCode ? '恢复代码' : '动态验证码'">
             <UInput
               v-model="mfaCode"
@@ -204,12 +229,21 @@ async function onPasskeyLogin() {
         <USeparator v-if="!mfaTransaction" label="或" class="my-4" />
         <div v-if="!mfaTransaction" class="space-y-2">
           <UButton
+            v-if="passkeyLoading"
+            block
+            color="neutral"
+            variant="outline"
+            icon="i-tabler-x"
+            label="取消通行密钥登录"
+            @click="cancelPasskeyLogin"
+          />
+          <UButton
+            v-else
             block
             color="neutral"
             variant="outline"
             icon="i-tabler-key"
             label="使用通行密钥登录"
-            :loading="passkeyLoading"
             :disabled="!passkeyAvailable || loading"
             @click="onPasskeyLogin"
           />

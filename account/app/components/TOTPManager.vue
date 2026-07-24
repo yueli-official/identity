@@ -19,6 +19,7 @@ const recoveryCodes = ref<string[]>([])
 const code = ref('')
 const selected = ref<TOTPEntry>()
 const qrCanvas = useTemplateRef<HTMLCanvasElement>('qrCanvas')
+const enrollmentExpiry = useExpiryCountdown(() => enrollment.value?.expiresAt ?? '')
 
 const { data, pending, refresh } = await useAsyncData(
   props.recovery ? 'recovery-totp-authenticators' : 'account-totp-authenticators',
@@ -27,9 +28,24 @@ const { data, pending, refresh } = await useAsyncData(
 )
 const entries = computed(() => data.value.entries)
 
+function clearEnrollment() {
+  code.value = ''
+  enrollment.value = undefined
+}
+
+function cancelEnrollment() {
+  clearEnrollment()
+  modalOpen.value = false
+}
+
+watch(modalOpen, (open) => {
+  if (!open && stage.value === 'verify') clearEnrollment()
+})
+
 async function startEnrollment() {
   starting.value = true
   try {
+    clearEnrollment()
     enrollment.value = await mfa.beginTOTP('身份验证器')
     stage.value = 'verify'
     code.value = ''
@@ -73,8 +89,16 @@ async function confirmEnrollment() {
 }
 
 async function copyRecoveryCodes() {
-  await navigator.clipboard.writeText(recoveryCodes.value.join('\n'))
-  toast.add({ title: '恢复代码已复制', color: 'success' })
+  try {
+    await navigator.clipboard.writeText(recoveryCodes.value.join('\n'))
+    toast.add({ title: '恢复代码已复制', color: 'success' })
+  } catch {
+    toast.add({
+      title: '无法复制恢复代码',
+      description: '浏览器未授予剪贴板权限，请改用下载或手动保存。',
+      color: 'error',
+    })
+  }
 }
 
 function downloadRecoveryCodes() {
@@ -201,6 +225,19 @@ function formatDate(value?: string) {
   >
     <template #body>
       <div v-if="stage === 'verify'" class="space-y-5">
+        <UAlert
+          v-if="enrollmentExpiry.expired.value"
+          color="error"
+          variant="soft"
+          icon="i-tabler-clock-x"
+          title="设置已过期"
+          description="二维码和密钥已经失效，请重新开始设置。"
+        >
+          <template #actions>
+            <UButton label="重新开始" :loading="starting" @click="startEnrollment" />
+          </template>
+        </UAlert>
+        <template v-else>
         <div class="grid gap-5 sm:grid-cols-[208px_1fr] sm:items-center">
           <div class="mx-auto overflow-hidden rounded-xl border border-default bg-white p-2">
             <canvas ref="qrCanvas" class="block size-52" aria-label="身份验证器设置二维码" />
@@ -214,6 +251,14 @@ function formatDate(value?: string) {
             </code>
           </div>
         </div>
+        <p
+          v-if="enrollment?.expiresAt"
+          class="text-center text-xs text-muted"
+          role="status"
+          aria-live="polite"
+        >
+          设置将在 {{ enrollmentExpiry.label.value }} 后过期
+        </p>
         <form class="space-y-4" @submit.prevent="confirmEnrollment">
           <UFormField label="6 位动态验证码">
             <UInput
@@ -227,7 +272,14 @@ function formatDate(value?: string) {
             />
           </UFormField>
           <div class="flex justify-end gap-2">
-            <UButton color="neutral" variant="ghost" label="取消" @click="() => { modalOpen = false }" />
+            <UButton
+              type="button"
+              color="neutral"
+              variant="ghost"
+              label="取消"
+              :disabled="confirming"
+              @click="cancelEnrollment"
+            />
             <UButton
               type="submit"
               label="验证并启用"
@@ -236,6 +288,7 @@ function formatDate(value?: string) {
             />
           </div>
         </form>
+        </template>
       </div>
 
       <div v-else class="space-y-5">

@@ -1,9 +1,16 @@
 <script setup lang="ts">
 const stepUp = useAdminStepUp()
 const code = ref('')
+const expiry = useExpiryCountdown(() => stepUp.state.value.expiresAt)
 
 watch(() => stepUp.state.value.open, (open) => {
   if (open) code.value = ''
+})
+
+watch(expiry.expired, (expired) => {
+  if (!expired || !stepUp.state.value.open) return
+  code.value = ''
+  stepUp.cancel('额外身份验证已过期，请重新发起操作。')
 })
 
 function cancel() {
@@ -33,6 +40,14 @@ async function submit() {
           title="输入动态验证码"
           description="验证仅授权当前操作和目标，不能用于其他管理操作。"
         />
+        <p
+          v-if="stepUp.state.value.expiresAt"
+          class="text-center text-xs text-muted"
+          role="status"
+          aria-live="polite"
+        >
+          验证将在 {{ expiry.label.value }} 后过期
+        </p>
         <UFormField label="6 位动态验证码">
           <UInput
             v-model="code"
