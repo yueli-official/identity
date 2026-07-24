@@ -15,6 +15,7 @@ import type {
   AssetMaintenanceTask,
   AssetSite,
 } from "~/types/asset-admin";
+import { assetSecurityPresentation } from "~/utils/asset-security";
 
 type SelectOption = { label: string; value: string };
 
@@ -315,9 +316,19 @@ function formatBytes(value: number) {
             </UDropdownMenu>
           </div>
           <div class="min-w-0 p-3">
-            <h2 class="truncate text-sm font-semibold text-highlighted">
-              {{ asset.filename || asset.id }}
-            </h2>
+            <div class="flex min-w-0 items-center gap-2">
+              <h2 class="min-w-0 flex-1 truncate text-sm font-semibold text-highlighted">
+                {{ asset.filename || asset.id }}
+              </h2>
+              <UBadge
+                :label="assetSecurityPresentation(asset).label"
+                :icon="assetSecurityPresentation(asset).icon"
+                :color="assetSecurityPresentation(asset).color"
+                variant="soft"
+                size="sm"
+                class="shrink-0"
+              />
+            </div>
             <p class="mt-1 truncate text-xs text-muted">
               {{ siteName(asset.siteKey) }} ·
               {{ asset.profileKey || "default" }}
@@ -360,9 +371,19 @@ function formatBytes(value: number) {
             <UIcon v-else name="i-tabler-file" class="size-5 text-muted" />
           </div>
           <div class="min-w-0">
-            <p class="truncate text-sm font-semibold text-highlighted">
-              {{ asset.filename || asset.id }}
-            </p>
+            <div class="flex min-w-0 items-center gap-2">
+              <p class="min-w-0 flex-1 truncate text-sm font-semibold text-highlighted">
+                {{ asset.filename || asset.id }}
+              </p>
+              <UBadge
+                :label="assetSecurityPresentation(asset).label"
+                :icon="assetSecurityPresentation(asset).icon"
+                :color="assetSecurityPresentation(asset).color"
+                variant="soft"
+                size="sm"
+                class="shrink-0"
+              />
+            </div>
             <p class="mt-0.5 truncate text-xs text-muted">
               {{ asset.mime }} · {{ formatBytes(asset.size)
               }}<span v-if="asset.width && asset.height">

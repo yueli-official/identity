@@ -126,7 +126,44 @@ export interface AssetItem {
   storageBackend: string
   refCount: number
   cdnUrl?: string
+  securityState: 'legacy_unverified' | 'quarantined' | 'ready' | 'rejected' | string
+  scanStatus: 'legacy_unverified' | 'pending' | 'running' | 'failed' | 'clean' | 'malicious' | 'policy_rejected' | 'admin_rejected' | string
+  detectedMime?: string
+  sanitized: boolean
+  scanFailureCode?: string
+  readyAt?: string
+  rejectedAt?: string
+  quarantinePurgedAt?: string
   createdAt: string
+}
+
+export interface AssetScanAttempt {
+  id: string
+  status: string
+  scannerEngine?: string
+  engineVersion?: string
+  signatureVersion?: string
+  detectedMime?: string
+  sourceHash?: string
+  contentHash?: string
+  sanitized: boolean
+  threat?: string
+  failureCode?: string
+  startedAt: string
+  finishedAt?: string
+}
+
+export interface AssetSecurityDetail {
+  asset: AssetItem
+  sourceHash: string
+  contentHash: string
+  scannerEngine?: string
+  scannerEngineVersion?: string
+  scannerSignatureVersion?: string
+  detectedThreat?: string
+  lastScanAt?: string
+  quarantineAvailable: boolean
+  attempts: AssetScanAttempt[]
 }
 
 export interface AssetSpaceUsage {

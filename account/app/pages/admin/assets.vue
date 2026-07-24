@@ -340,6 +340,19 @@ const {
   deletingAsset,
   requestDeleteAsset,
   confirmDeleteAsset,
+  securityAsset,
+  securityDetail,
+  securityOpen,
+  loadingSecurity,
+  retryingSecurity,
+  openSecurity,
+  retrySecurity,
+  deleteFromSecurity,
+  securityRejectTarget,
+  securityRejectOpen,
+  rejectingSecurity,
+  requestRejectSecurity,
+  confirmRejectSecurity,
 } = useAssetLibraryActions({ reloadAll })
 const {
   maintenanceTasks,
@@ -641,6 +654,11 @@ function assetActions(asset: AssetItem): DropdownMenuItem[][] {
   return [
     [
       {
+        label: '安全详情',
+        icon: 'i-tabler-shield-search',
+        onSelect: () => openSecurity(asset),
+      },
+      {
         label: '查看引用',
         icon: 'i-tabler-link',
         disabled: !asset.refCount,
@@ -649,7 +667,7 @@ function assetActions(asset: AssetItem): DropdownMenuItem[][] {
       {
         label: '打开文件',
         icon: 'i-tabler-external-link',
-        disabled: !asset.cdnUrl,
+        disabled: asset.securityState !== 'ready' || !asset.cdnUrl,
         onSelect: () => {
           if (asset.cdnUrl) window.open(asset.cdnUrl, '_blank')
         },
@@ -657,12 +675,13 @@ function assetActions(asset: AssetItem): DropdownMenuItem[][] {
       {
         label: '签发交付链接',
         icon: 'i-tabler-key',
+        disabled: asset.securityState !== 'ready',
         onSelect: () => openCreateGrant(asset),
       },
       {
         label: '重建派生图',
         icon: 'i-tabler-refresh-dot',
-        disabled: !asset.mime.startsWith('image/') || rebuildingAssetId.value === asset.id,
+        disabled: asset.securityState !== 'ready' || !asset.mime.startsWith('image/') || rebuildingAssetId.value === asset.id,
         onSelect: () => rebuildDerivatives(asset),
       },
     ],
@@ -974,6 +993,24 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
     />
 
     <AssetReferencesModal v-model:open="referencesOpen" :asset-id="referenceAsset?.id" :references="references" :loading="loadingReferences" />
+
+    <AssetSecurityModal
+      v-model:open="securityOpen"
+      :asset="securityAsset"
+      :detail="securityDetail"
+      :loading="loadingSecurity"
+      :retrying="retryingSecurity"
+      @retry="retrySecurity"
+      @reject="requestRejectSecurity"
+      @delete="deleteFromSecurity"
+    />
+
+    <AssetSecurityRejectModal
+      v-model:open="securityRejectOpen"
+      :asset="securityRejectTarget"
+      :rejecting="rejectingSecurity"
+      @confirm="confirmRejectSecurity"
+    />
 
     <AssetDeleteConfirmModal
       v-model:open="deleteVariantOpen"

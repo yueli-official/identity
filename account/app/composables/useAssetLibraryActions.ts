@@ -1,4 +1,4 @@
-import type { AssetItem, AssetReference } from '~/types/asset-admin'
+import type { AssetItem, AssetReference, AssetSecurityDetail } from '~/types/asset-admin'
 import { createPlatformNotifier } from '@platform/ui/feedback'
 
 interface UseAssetLibraryActionsOptions {
@@ -15,6 +15,25 @@ export function useAssetLibraryActions(options: UseAssetLibraryActionsOptions) {
   const deleteAssetTarget = ref<AssetItem | null>(null)
   const deleteAssetOpen = computed({ get: () => !!deleteAssetTarget.value, set: value => { if (!value) deleteAssetTarget.value = null } })
   const deletingAsset = ref(false)
+  const securityAsset = ref<AssetItem | null>(null)
+  const securityDetail = ref<AssetSecurityDetail | null>(null)
+  const securityOpen = computed({
+    get: () => !!securityAsset.value,
+    set: (value) => {
+      if (!value) {
+        securityAsset.value = null
+        securityDetail.value = null
+      }
+    }
+  })
+  const loadingSecurity = ref(false)
+  const retryingSecurity = ref(false)
+  const securityRejectTarget = ref<AssetItem | null>(null)
+  const securityRejectOpen = computed({
+    get: () => !!securityRejectTarget.value,
+    set: value => { if (!value) securityRejectTarget.value = null }
+  })
+  const rejectingSecurity = ref(false)
 
   function requestDeleteAsset(asset: AssetItem) {
     deleteAssetTarget.value = asset
@@ -50,10 +69,82 @@ export function useAssetLibraryActions(options: UseAssetLibraryActionsOptions) {
     }
   }
 
+  async function loadSecurity(asset: AssetItem) {
+    loadingSecurity.value = true
+    try {
+      const data = await call<{ security: AssetSecurityDetail }>(
+        `/api/v1/admin/assets-proxy/library/${asset.id}/security`,
+        { params: { limit: 20 } }
+      )
+      securityDetail.value = data.security
+      securityAsset.value = data.security.asset
+    } catch (error) {
+      toast.add({ title: '加载安全详情失败', description: (error as Error)?.message, color: 'error' })
+    } finally {
+      loadingSecurity.value = false
+    }
+  }
+
+  async function openSecurity(asset: AssetItem) {
+    securityAsset.value = asset
+    securityDetail.value = null
+    await loadSecurity(asset)
+  }
+
+  async function retrySecurity() {
+    if (!securityAsset.value) return
+    retryingSecurity.value = true
+    try {
+      await call(`/api/v1/admin/assets-proxy/library/${securityAsset.value.id}/security/retry`, { method: 'POST' })
+      toast.add({ title: '已重新进入安全处理队列', color: 'success' })
+      await Promise.all([loadSecurity(securityAsset.value), options.reloadAll()])
+    } catch (error) {
+      toast.add({ title: '重新处理失败', description: (error as Error)?.message, color: 'error' })
+    } finally {
+      retryingSecurity.value = false
+    }
+  }
+
+  function deleteFromSecurity() {
+    if (!securityAsset.value) return
+    const asset = securityAsset.value
+    securityOpen.value = false
+    requestDeleteAsset(asset)
+  }
+
+  function requestRejectSecurity() {
+    if (!securityAsset.value) return
+    securityRejectTarget.value = securityAsset.value
+    securityOpen.value = false
+  }
+
+  async function confirmRejectSecurity(reason: string) {
+    if (!securityRejectTarget.value) return
+    rejectingSecurity.value = true
+    try {
+      await call(`/api/v1/admin/assets-proxy/library/${securityRejectTarget.value.id}/security/reject`, {
+        method: 'POST',
+        body: { reason }
+      })
+      toast.add({ title: '已拒绝素材交付', color: 'success' })
+      securityRejectTarget.value = null
+      await options.reloadAll()
+    } catch (error) {
+      toast.add({ title: '拒绝素材失败', description: (error as Error)?.message, color: 'error' })
+    } finally {
+      rejectingSecurity.value = false
+    }
+  }
+
   return {
     references: shallowReadonly(references), referenceAsset: shallowReadonly(referenceAsset), referencesOpen,
     loadingReferences: readonly(loadingReferences), openReferences,
     deleteAssetTarget: shallowReadonly(deleteAssetTarget), deleteAssetOpen, deletingAsset: readonly(deletingAsset),
-    requestDeleteAsset, confirmDeleteAsset
+    requestDeleteAsset, confirmDeleteAsset,
+    securityAsset: shallowReadonly(securityAsset), securityDetail: shallowReadonly(securityDetail), securityOpen,
+    loadingSecurity: readonly(loadingSecurity), retryingSecurity: readonly(retryingSecurity),
+    openSecurity, retrySecurity, deleteFromSecurity,
+    securityRejectTarget: shallowReadonly(securityRejectTarget), securityRejectOpen,
+    rejectingSecurity: readonly(rejectingSecurity), requestRejectSecurity, confirmRejectSecurity
   }
 }
