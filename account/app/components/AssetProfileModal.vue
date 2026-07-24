@@ -33,6 +33,11 @@ const storageOptions = computed(() => {
   ]
 })
 
+const metadataPolicyOptions = [
+  { label: '移除隐私元数据并重写', value: 'strip' },
+  { label: '保留原始元数据（仅私有）', value: 'preserve' }
+]
+
 const canSave = computed(() => Boolean(
   form.siteKey.trim()
   && form.profileKey.trim()
@@ -42,6 +47,10 @@ const canSave = computed(() => Boolean(
 
 watch(open, (isOpen) => {
   if (isOpen) Object.assign(form, props.initialValue)
+})
+
+watch(() => form.defaultVisibility, (visibility) => {
+  if (visibility === 'public') form.metadataPolicy = 'strip'
 })
 
 function submit() {
@@ -94,6 +103,19 @@ function submit() {
           help="公开资源返回稳定公开地址；私有资源由业务授权后生成签名链接。"
         >
           <USelect v-model="form.defaultVisibility" :items="accessLevelOptions" value-key="value" class="w-full" />
+        </UFormField>
+
+        <UFormField
+          label="隐私元数据"
+          help="公开资源必须移除 EXIF/GPS；私有原件可显式保留。"
+        >
+          <USelect
+            v-model="form.metadataPolicy"
+            :items="metadataPolicyOptions"
+            value-key="value"
+            class="w-full"
+            :disabled="form.defaultVisibility === 'public'"
+          />
         </UFormField>
 
         <div class="flex items-end pb-1">

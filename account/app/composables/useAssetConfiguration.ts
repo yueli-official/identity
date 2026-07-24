@@ -31,7 +31,7 @@ export function useAssetConfiguration(options: UseAssetConfigurationOptions) {
   const savingProfile = ref(false)
   const profileForm = reactive<AssetProfile>({
     siteKey: 'platform', profileKey: '', purpose: '', storageBackend: '', allowedExt: 'jpg,jpeg,png,webp',
-    maxSizeBytes: 20 * 1024 * 1024, defaultVisibility: 'public', defaultDeliveryPolicy: 'public', keepOriginal: true,
+    maxSizeBytes: 20 * 1024 * 1024, defaultVisibility: 'public', defaultDeliveryPolicy: 'public', keepOriginal: true, metadataPolicy: 'strip',
     assetCount: 0, variantCount: 0
   })
   const siteOpen = ref(false)
@@ -55,6 +55,7 @@ export function useAssetConfiguration(options: UseAssetConfigurationOptions) {
   watch(() => profileForm.defaultVisibility, (visibility) => {
     if (visibility === 'public') {
       profileForm.defaultDeliveryPolicy = 'public'
+      profileForm.metadataPolicy = 'strip'
       return
     }
     if (!profileForm.defaultDeliveryPolicy || profileForm.defaultDeliveryPolicy === 'public') {
@@ -72,7 +73,7 @@ export function useAssetConfiguration(options: UseAssetConfigurationOptions) {
     Object.assign(profileForm, profile ?? {
       siteKey: sites.value[0]?.siteKey || 'platform', profileKey: '', purpose: '', storageBackend: '',
       allowedExt: 'jpg,jpeg,png,webp', maxSizeBytes: 20 * 1024 * 1024, defaultVisibility: 'public',
-      defaultDeliveryPolicy: 'public', keepOriginal: true, assetCount: 0, variantCount: 0
+      defaultDeliveryPolicy: 'public', keepOriginal: true, metadataPolicy: 'strip', assetCount: 0, variantCount: 0
     })
     profileOpen.value = true
   }

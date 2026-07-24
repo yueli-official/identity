@@ -91,6 +91,7 @@ export interface AssetProfile {
   defaultVisibility: string
   defaultDeliveryPolicy: string
   keepOriginal: boolean
+  metadataPolicy: 'strip' | 'preserve'
   assetCount: number
   variantCount: number
 }
