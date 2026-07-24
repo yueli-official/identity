@@ -22,6 +22,7 @@ useSeoMeta({ title: '用户管理 · 控制台' })
 
 const { me } = useSession()
 const { call } = useApi()
+const adminStepUp = useAdminStepUp()
 const toast = createPlatformNotifier(useToast())
 const router = useRouter()
 
@@ -199,7 +200,14 @@ const busy = ref('') // id currently mutating
 async function setStatus(u: AdminUser, next: AdminUser['status']) {
   busy.value = u.id
   try {
-    await call(`/api/v1/admin/users/${u.id}/status`, { method: 'PUT', body: { status: next } })
+    await adminStepUp.run(
+      'identity.admin.status.update',
+      adminStepUpResource.status(u.id, next),
+      (proof) => call(`/api/v1/admin/users/${u.id}/status`, {
+        method: 'PUT', body: { status: next },
+        headers: { 'X-Step-Up-Proof': proof },
+      }),
+    )
     if (workflow.isSelected(u.id)) workflow.toggleKey(u.id)
     await reloadAll()
   } catch (e) {
@@ -255,7 +263,21 @@ async function applyBatch() {
   const ids = selectedIds.value.filter((id) => id !== me.value?.id)
   batchRunning.value = true
   try {
-    const results = await Promise.allSettled(ids.map((id) => call(`/api/v1/admin/users/${id}/status`, { method: 'PUT', body: { status: batchAction.value } })))
+    const results: PromiseSettledResult<unknown>[] = []
+    for (const id of ids) {
+      const next = batchAction.value
+      results.push(await Promise.resolve(adminStepUp.run(
+        'identity.admin.status.update',
+        adminStepUpResource.status(id, next),
+        (proof) => call(`/api/v1/admin/users/${id}/status`, {
+          method: 'PUT', body: { status: next },
+          headers: { 'X-Step-Up-Proof': proof },
+        }),
+      )).then(
+        (value): PromiseFulfilledResult<unknown> => ({ status: 'fulfilled', value }),
+        (reason): PromiseRejectedResult => ({ status: 'rejected', reason }),
+      ))
+    }
     const failedIds = ids.filter((_, index) => results[index]?.status === 'rejected')
     batchResult.value = { success: ids.length - failedIds.length, failed: failedIds.length }
     if (failedIds.length) replaceSelection(failedIds)
@@ -285,8 +307,17 @@ async function toggleAdminRole() {
   const has = u.roles.includes('admin')
   togglingRole.value = true
   try {
-    if (has) await call(`/api/v1/admin/identities/${u.id}/roles/admin`, { method: 'DELETE' })
-    else await call(`/api/v1/admin/identities/${u.id}/roles`, { method: 'POST', body: { role: 'admin' } })
+    const action = has ? 'identity.admin.role.revoke' : 'identity.admin.role.grant'
+    await adminStepUp.run(action, adminStepUpResource.role(u.id, 'admin'), (proof) =>
+      has
+        ? call(`/api/v1/admin/identities/${u.id}/roles/admin`, {
+            method: 'DELETE', headers: { 'X-Step-Up-Proof': proof },
+          })
+        : call(`/api/v1/admin/identities/${u.id}/roles`, {
+            method: 'POST', body: { role: 'admin' },
+            headers: { 'X-Step-Up-Proof': proof },
+          }),
+    )
     u.roles = has ? u.roles.filter((r) => r !== 'admin') : [...u.roles, 'admin']
     await reload()
   } catch (e) {
@@ -310,7 +341,15 @@ async function confirmReset() {
   if (!resetTarget.value || newPw.value.length < 8) return
   resetting.value = true
   try {
-    await call(`/api/v1/admin/users/${resetTarget.value.id}/password`, { method: 'POST', body: { newPassword: newPw.value } })
+    const target = resetTarget.value
+    await adminStepUp.run(
+      'identity.admin.password.reset',
+      adminStepUpResource.identity(target.id),
+      (proof) => call(`/api/v1/admin/users/${target.id}/password`, {
+        method: 'POST', body: { newPassword: newPw.value },
+        headers: { 'X-Step-Up-Proof': proof },
+      }),
+    )
     resetTarget.value = null
   } catch (e) {
     toast.add({ title: '重置失败', description: (e as Error)?.message, color: 'error' })
@@ -332,7 +371,14 @@ async function confirmDelete() {
   if (!deleteTarget.value) return
   deleting.value = true
   try {
-    await call(`/api/v1/admin/users/${deleteTarget.value.id}`, { method: 'DELETE' })
+    const target = deleteTarget.value
+    await adminStepUp.run(
+      'identity.admin.user.delete',
+      adminStepUpResource.identity(target.id),
+      (proof) => call(`/api/v1/admin/users/${target.id}`, {
+        method: 'DELETE', headers: { 'X-Step-Up-Proof': proof },
+      }),
+    )
     deleteTarget.value = null
     await reloadAll()
   } catch (e) {
@@ -363,15 +409,21 @@ async function confirmCreate() {
   createError.value = ''
   creating.value = true
   try {
-    await call('/api/v1/admin/users', {
-      method: 'POST',
-      body: {
-        email: createForm.email,
-        password: createForm.password,
-        displayName: createForm.displayName,
-        roles: createForm.admin ? ['admin'] : []
-      }
-    })
+    const roles = createForm.admin ? ['admin'] : []
+    await adminStepUp.run(
+      'identity.admin.user.create',
+      adminStepUpResource.create(createForm.email, roles),
+      (proof) => call('/api/v1/admin/users', {
+        method: 'POST',
+        headers: { 'X-Step-Up-Proof': proof },
+        body: {
+          email: createForm.email,
+          password: createForm.password,
+          displayName: createForm.displayName,
+          roles,
+        },
+      }),
+    )
     createOpen.value = false
     page.value = 1
     await reloadAll()

@@ -5,6 +5,10 @@ export default defineNuxtConfig({
   modules: ["@nuxt/ui", "@yueli/ui"],
   css: ["~/assets/css/main.css"],
   runtimeConfig: {
+    public: {
+      identityAudience:
+        process.env.NUXT_PUBLIC_IDENTITY_AUDIENCE || "identity-api",
+    },
     // Server-side base for backend calls during SSR. The dev proxy below only
     // covers real browser requests; Nitro's internal SSR $fetch bypasses it, so
     // a relative /api on the server falls through to the SPA catch-all. Hitting

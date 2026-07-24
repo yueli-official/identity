@@ -40,5 +40,6 @@ const handleLogout = async () => {
       />
     </template>
     <slot />
+    <AdminStepUpModal />
   </ManageShell>
 </template>
