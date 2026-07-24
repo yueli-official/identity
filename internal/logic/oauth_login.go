@@ -49,13 +49,30 @@ func (s *Service) OAuthLogin(ctx context.Context, in OAuthLoginInput) (LoginOutp
 		return LoginOutput{}, iderr.AccountDisabled()
 	}
 
-	authenticatedAt := s.now()
+	authenticatedAt := s.now().UTC()
+	primary := authentication.Federated(
+		uuid.NewString(), authenticatedAt, in.Provider+":"+in.ProviderUID,
+	)
+	if s.secondFactor != nil {
+		secondFactor, err := s.secondFactor.BeginSecondFactor(
+			ctx, id.ID, primary, in.UserAgent, in.IP,
+		)
+		if err != nil {
+			return LoginOutput{}, err
+		}
+		if secondFactor.Required {
+			return LoginOutput{
+				Identity: id, MFARequired: true,
+				MFATransaction: secondFactor.TransactionID,
+				MFAExpiresAt:   secondFactor.ExpiresAt,
+				MFAMethods:     secondFactor.Methods,
+			}, nil
+		}
+	}
 	sess := model.Session{
 		ID: uuid.NewString(), IdentityID: id.ID,
 		CreatedAt: authenticatedAt, LastSeen: authenticatedAt, UserAgent: in.UserAgent, IP: in.IP,
-		Authentication: authentication.Federated(
-			uuid.NewString(), authenticatedAt, in.Provider+":"+in.ProviderUID,
-		),
+		Authentication: primary,
 	}
 	if err := s.store.CreateSession(ctx, sess, s.cfg.SessionIdleTTL); err != nil {
 		return LoginOutput{}, err

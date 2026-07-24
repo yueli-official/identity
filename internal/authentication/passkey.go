@@ -121,8 +121,10 @@ type WebAuthnVerifier interface {
 }
 
 type ModuleConfig struct {
-	SessionTTL  time.Duration
-	CeremonyTTL time.Duration
+	SessionTTL     time.Duration
+	CeremonyTTL    time.Duration
+	TransactionTTL time.Duration
+	RecoveryTTL    time.Duration
 }
 
 type Module struct {
@@ -147,6 +149,12 @@ func NewModule(store PasskeyStore, cache SessionCache, verifier WebAuthnVerifier
 	}
 	if cfg.CeremonyTTL <= 0 {
 		cfg.CeremonyTTL = 5 * time.Minute
+	}
+	if cfg.TransactionTTL <= 0 {
+		cfg.TransactionTTL = 5 * time.Minute
+	}
+	if cfg.RecoveryTTL <= 0 {
+		cfg.RecoveryTTL = 15 * time.Minute
 	}
 	return &Module{store: store, cache: cache, verifier: verifier, cfg: cfg, now: time.Now}, nil
 }

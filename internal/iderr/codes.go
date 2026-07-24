@@ -51,9 +51,17 @@ var (
 	CodeInvalidGuestSession      = errs.Register("identity.guest_session_invalid", http.StatusUnauthorized)
 	CodeInvalidGuestAudience     = errs.Register("identity.guest_audience_invalid", http.StatusForbidden)
 	CodeGuestClaimConflict       = errs.Register("identity.guest_claim_conflict", http.StatusConflict)
-	CodePasskeyUnavailable      = errs.Register("identity.passkey_unavailable", http.StatusServiceUnavailable)
-	CodePasskeyCeremonyInvalid  = errs.Register("identity.passkey_ceremony_invalid", http.StatusBadRequest)
-	CodePasskeyExists           = errs.Register("identity.passkey_exists", http.StatusConflict)
+	CodePasskeyUnavailable       = errs.Register("identity.passkey_unavailable", http.StatusServiceUnavailable)
+	CodePasskeyCeremonyInvalid   = errs.Register("identity.passkey_ceremony_invalid", http.StatusBadRequest)
+	CodePasskeyExists            = errs.Register("identity.passkey_exists", http.StatusConflict)
+	CodeMFAUnavailable           = errs.Register("identity.mfa_unavailable", http.StatusServiceUnavailable)
+	CodeTOTPEnrollmentInvalid    = errs.Register("identity.totp_enrollment_invalid", http.StatusBadRequest)
+	CodeTOTPCodeInvalid          = errs.Register("identity.totp_code_invalid", http.StatusUnauthorized)
+	CodeTOTPNotFound             = errs.Register("identity.totp_not_found", http.StatusNotFound)
+	CodeMFATransactionInvalid    = errs.Register("identity.mfa_transaction_invalid", http.StatusBadRequest)
+	CodeRecoveryCodeInvalid      = errs.Register("identity.recovery_code_invalid", http.StatusUnauthorized)
+	CodeStepUpRequestInvalid     = errs.Register("identity.step_up_request_invalid", http.StatusBadRequest)
+	CodeStepUpMethodUnavailable  = errs.Register("identity.step_up_method_unavailable", http.StatusConflict)
 )
 
 func EmailTaken(email string) *errs.Coded {
@@ -148,6 +156,38 @@ func PasskeyCeremonyInvalid() *errs.Coded {
 
 func PasskeyExists() *errs.Coded {
 	return errs.New(CodePasskeyExists, "passkey is already registered", nil)
+}
+
+func MFAUnavailable() *errs.Coded {
+	return errs.New(CodeMFAUnavailable, "multi-factor authentication is unavailable", nil)
+}
+
+func TOTPEnrollmentInvalid() *errs.Coded {
+	return errs.New(CodeTOTPEnrollmentInvalid, "TOTP enrollment is invalid or expired", nil)
+}
+
+func TOTPCodeInvalid() *errs.Coded {
+	return errs.New(CodeTOTPCodeInvalid, "TOTP code is invalid or already used", nil)
+}
+
+func TOTPNotFound() *errs.Coded {
+	return errs.New(CodeTOTPNotFound, "TOTP authenticator not found", nil)
+}
+
+func MFATransactionInvalid() *errs.Coded {
+	return errs.New(CodeMFATransactionInvalid, "MFA transaction is invalid or expired", nil)
+}
+
+func RecoveryCodeInvalid() *errs.Coded {
+	return errs.New(CodeRecoveryCodeInvalid, "recovery code is invalid or already used", nil)
+}
+
+func StepUpRequestInvalid() *errs.Coded {
+	return errs.New(CodeStepUpRequestInvalid, "step-up request is invalid", nil)
+}
+
+func StepUpMethodUnavailable() *errs.Coded {
+	return errs.New(CodeStepUpMethodUnavailable, "no enrolled method can satisfy this step-up requirement", nil)
 }
 
 // OAuthEmailConflict: the provider's (unverified) email collides with an

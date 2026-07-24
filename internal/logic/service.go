@@ -1,9 +1,11 @@
 package logic
 
 import (
+	"context"
 	"time"
 
 	"github.com/yueli-official/foundation/go/abuse"
+	"platform/services/identity/internal/authentication"
 	"platform/services/identity/internal/identityabuse"
 	"platform/services/identity/internal/mailer"
 	"platform/services/identity/internal/pat"
@@ -54,13 +56,24 @@ func DefaultConfig() Config {
 
 // Service is the identity-service application layer.
 type Service struct {
-	store   repo.Store
-	cfg     Config
-	now     func() time.Time
-	revoker RefreshRevoker // optional; nil before OIDC wiring
-	mailer  mailer.Mailer  // optional; nil sends no mail (links still issued)
-	patKey  []byte         // derived HMAC key for PAT hashing
-	abuse   identityabuse.Actions
+	store        repo.Store
+	cfg          Config
+	now          func() time.Time
+	revoker      RefreshRevoker // optional; nil before OIDC wiring
+	mailer       mailer.Mailer  // optional; nil sends no mail (links still issued)
+	patKey       []byte         // derived HMAC key for PAT hashing
+	abuse        identityabuse.Actions
+	secondFactor SecondFactorGate
+}
+
+type SecondFactorGate interface {
+	BeginSecondFactor(
+		context.Context,
+		string,
+		authentication.Context,
+		string,
+		string,
+	) (authentication.BeginSecondFactorResult, error)
 }
 
 func New(store repo.Store, cfg Config) *Service {
@@ -97,6 +110,10 @@ func (s *Service) SetRefreshRevoker(r RefreshRevoker) { s.revoker = r }
 // SetMailer wires the transactional mailer used by email-verify / password-reset.
 // Called in main after the mailer is built (mirrors SetRefreshRevoker).
 func (s *Service) SetMailer(m mailer.Mailer) { s.mailer = m }
+
+func (s *Service) SetSecondFactorGate(gate SecondFactorGate) {
+	s.secondFactor = gate
+}
 
 // SetAbuseModule replaces the deterministic in-memory test default with the
 // instance-local durable runtime assembled by main.

@@ -34,7 +34,7 @@ func NewWebAuthnVerifier(config WebAuthnConfig) (WebAuthnVerifier, error) {
 		AttestationPreference: protocol.PreferNoAttestation,
 		AuthenticatorSelection: protocol.AuthenticatorSelection{
 			ResidentKey: protocol.ResidentKeyRequirementRequired,
-			UserVerification: protocol.VerificationPreferred,
+			UserVerification: protocol.VerificationRequired,
 		},
 	})
 	if err != nil {
@@ -82,7 +82,7 @@ func (adapter *webAuthnAdapter) BeginDiscoverableAuthentication() (
 	error,
 ) {
 	assertion, session, err := adapter.library.BeginDiscoverableLogin(
-		webauthn.WithUserVerification(protocol.VerificationPreferred),
+		webauthn.WithUserVerification(protocol.VerificationRequired),
 	)
 	if err != nil {
 		return CeremonyMaterial{}, BrowserOptions{}, err

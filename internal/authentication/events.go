@@ -18,6 +18,7 @@ const (
 	EventTOTPRevoked       SecurityEventKind = "totp.revoked"
 	EventRecoveryGenerated SecurityEventKind = "recovery.generated"
 	EventRecoveryUsed      SecurityEventKind = "recovery.used"
+	EventTOTPLogin         SecurityEventKind = "totp.login"
 )
 
 type SecurityEvent struct {

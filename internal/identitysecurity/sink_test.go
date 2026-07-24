@@ -48,22 +48,30 @@ func TestSinkAuditsEveryEventButNotifiesCredentialLifecycle(t *testing.T) {
 		IdentityID: identity.ID, CredentialID: "credential-1",
 		OccurredAt: now.Add(time.Minute),
 	})
+	sink.RecordAuthenticationEvent(ctx, authentication.SecurityEvent{
+		ID: "event-totp", Kind: authentication.EventTOTPEnrolled,
+		IdentityID: identity.ID, CredentialID: "totp-1",
+		OccurredAt: now.Add(2 * time.Minute),
+	})
 
 	rows, err := store.QueryAudit(ctx, repo.AuditFilter{IdentityID: identity.ID})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rows) != 2 || rows[0].Event != string(authentication.EventPasskeyLogin) ||
-		rows[1].IP != "192.0.2.9" || rows[1].RequestID != "request-1" {
+	if len(rows) != 3 || rows[0].Event != string(authentication.EventTOTPEnrolled) ||
+		rows[2].IP != "192.0.2.9" || rows[2].RequestID != "request-1" {
 		t.Fatalf("audit rows = %+v", rows)
 	}
-	if len(notifier.alerts) != 1 {
+	if len(notifier.alerts) != 2 {
 		t.Fatalf("security alerts = %+v", notifier.alerts)
 	}
 	alert := notifier.alerts[0]
 	if alert.EventID != "event-register" || alert.To != identity.Email ||
 		alert.IP != "192.0.2.9" || alert.AccountURL == "" {
 		t.Fatalf("security alert = %+v", alert)
+	}
+	if notifier.alerts[1].Action != "启用了身份验证器动态口令" {
+		t.Fatalf("TOTP security alert = %+v", notifier.alerts[1])
 	}
 }
 

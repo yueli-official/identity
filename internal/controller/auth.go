@@ -86,8 +86,18 @@ func (c *Controller) Login(ctx context.Context, req *v1.LoginReq) (*v1.LoginRes,
 	if err != nil {
 		return nil, err
 	}
+	if out.MFARequired {
+		return &v1.LoginRes{
+			ID: out.Identity.ID, Email: out.Identity.Email, MFARequired: true,
+			MFATransaction: out.MFATransaction,
+			MFAExpiresAt:   out.MFAExpiresAt.Format(time.RFC3339),
+			MFAMethods:     out.MFAMethods,
+		}, nil
+	}
 	c.setSessionCookie(r, out.SessionID)
-	return &v1.LoginRes{ID: out.Identity.ID, Email: out.Identity.Email}, nil
+	return &v1.LoginRes{
+		ID: out.Identity.ID, Email: out.Identity.Email, MFARequired: false,
+	}, nil
 }
 
 func (c *Controller) Logout(ctx context.Context, _ *v1.LogoutReq) (*v1.LogoutRes, error) {

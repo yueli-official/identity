@@ -25,8 +25,12 @@ type LoginReq struct {
 	ChallengeProof string `json:"challengeProof,omitempty"`
 }
 type LoginRes struct {
-	ID    string `json:"id"`
-	Email string `json:"email"`
+	ID             string   `json:"id"`
+	Email          string   `json:"email"`
+	MFARequired    bool     `json:"mfaRequired"`
+	MFATransaction string   `json:"mfaTransaction,omitempty"`
+	MFAExpiresAt   string   `json:"mfaExpiresAt,omitempty"`
+	MFAMethods     []string `json:"mfaMethods,omitempty"`
 }
 
 type LogoutReq struct {

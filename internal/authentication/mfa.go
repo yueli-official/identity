@@ -57,6 +57,30 @@ type MFAStore interface {
 	) error
 	ListTOTP(context.Context, string) ([]TOTPAuthenticator, error)
 	RevokeTOTP(context.Context, string, string, string, time.Time) error
+	IsSecondFactorRequired(context.Context, string) (bool, error)
+	CreateAuthenticationTransaction(context.Context, AuthenticationTransaction) error
+	GetAuthenticationTransaction(context.Context, string) (AuthenticationTransaction, error)
+	RecordAuthenticationTransactionFailure(context.Context, string, int) error
+	CompleteTOTPLogin(
+		context.Context,
+		AuthenticationTransaction,
+		string,
+		int64,
+		Session,
+	) error
+	CompleteRecoveryLogin(
+		context.Context,
+		AuthenticationTransaction,
+		[]byte,
+		Session,
+	) error
+	CompleteTOTPTransaction(
+		context.Context,
+		AuthenticationTransaction,
+		string,
+		int64,
+		time.Time,
+	) error
 }
 
 func (module *Module) ConfigureMFA(
@@ -201,6 +225,36 @@ func (module *Module) FinishTOTPEnrollment(
 	return FinishTOTPEnrollmentResult{
 		Authenticator: authenticator, RecoveryCodes: plaintextCodes,
 	}, nil
+}
+
+func (module *Module) ListTOTP(
+	ctx context.Context,
+	identityID string,
+) ([]TOTPAuthenticator, error) {
+	if module.mfa == nil {
+		return nil, ErrMFAUnavailable
+	}
+	return module.mfa.ListTOTP(ctx, identityID)
+}
+
+func (module *Module) RevokeTOTP(
+	ctx context.Context,
+	identityID, authenticatorID string,
+) error {
+	if module.mfa == nil {
+		return ErrMFAUnavailable
+	}
+	now := module.now().UTC()
+	if err := module.mfa.RevokeTOTP(
+		ctx, identityID, authenticatorID, "removed by account owner", now,
+	); err != nil {
+		return err
+	}
+	module.recordEvent(ctx, SecurityEvent{
+		Kind: EventTOTPRevoked, IdentityID: identityID,
+		CredentialID: authenticatorID, OccurredAt: now,
+	})
+	return nil
 }
 
 func totpAdditionalData(identityID, authenticatorID string, keyVersion int) []byte {

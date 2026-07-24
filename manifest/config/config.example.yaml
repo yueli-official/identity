@@ -36,6 +36,13 @@ webauthn:
   topOrigins: [] # only needed for explicitly trusted cross-origin iframe ceremonies
   allowCrossOrigin: false
   ceremonyTtl: "5m"
+mfa:
+  transactionTtl: "5m"
+  recoverySessionTtl: "15m"
+  totp:
+    # Stable issuer shown by authenticator apps. Changing it does not invalidate
+    # enrolled secrets, but produces confusing duplicate-looking account labels.
+    issuer: "月离账户"
 abuse:
   turnstile:
     secret: "" # optional; set via secret manager to enable challenge escalation

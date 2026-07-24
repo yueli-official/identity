@@ -26,6 +26,7 @@ const (
 	FactorKnowledge             FactorClass = "knowledge"
 	FactorPossession            FactorClass = "possession"
 	FactorLocalUserVerification FactorClass = "local_user_verification"
+	FactorFederatedAssertion    FactorClass = "federated_assertion"
 )
 
 type Profile string
@@ -96,10 +97,34 @@ func Federated(eventID string, at time.Time, credentialRef string) Context {
 		EventID:         eventID,
 		AuthenticatedAt: at,
 		Methods:         []Method{MethodFederated},
+		FactorClasses:   []FactorClass{FactorFederatedAssertion},
 		Level:           LevelAAL1,
 		Profile:         ProfileBaseline,
 		CredentialRefs:  nonEmptyStrings(credentialRef),
 		PolicyVersion:   CurrentPolicyVersion,
+	}, at)
+}
+
+func MultiFactor(primary Context, eventID string, at time.Time, credentialRef string) Context {
+	methods := append(slices.Clone(primary.Methods), MethodOTP)
+	factors := append(slices.Clone(primary.FactorClasses), FactorPossession)
+	return normalize(Context{
+		EventID: eventID, AuthenticatedAt: at, Methods: methods,
+		FactorClasses: uniqueFactors(factors), Level: LevelAAL2,
+		Profile:        ProfileMultiFactor,
+		CredentialRefs: append(slices.Clone(primary.CredentialRefs), credentialRef),
+		PolicyVersion:  CurrentPolicyVersion,
+	}, at)
+}
+
+func Recovery(primary Context, eventID string, at time.Time) Context {
+	return normalize(Context{
+		EventID: eventID, AuthenticatedAt: at,
+		Methods:       append(slices.Clone(primary.Methods), MethodRecovery),
+		FactorClasses: slices.Clone(primary.FactorClasses),
+		Level:         LevelAAL1, Profile: ProfileBaseline, Recovery: true,
+		CredentialRefs: slices.Clone(primary.CredentialRefs),
+		PolicyVersion:  CurrentPolicyVersion,
 	}, at)
 }
 
@@ -164,6 +189,19 @@ func nonEmptyStrings(values ...string) []string {
 		if value != "" {
 			out = append(out, value)
 		}
+	}
+	return out
+}
+
+func uniqueFactors(values []FactorClass) []FactorClass {
+	seen := make(map[FactorClass]struct{}, len(values))
+	out := make([]FactorClass, 0, len(values))
+	for _, value := range values {
+		if _, exists := seen[value]; value == "" || exists {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
 	}
 	return out
 }

@@ -59,6 +59,7 @@ type runtimeRepositories struct {
 	audit        repo.AuditRepo
 	oidcBackend  oidc.Backend
 	passkeys     authentication.PasskeyStore
+	mfa          authentication.MFAStore
 	sessionCache authentication.SessionCache
 }
 
@@ -94,6 +95,7 @@ func newRuntimeRepositories(openAPIExport bool) runtimeRepositories {
 		audit:        postgres,
 		oidcBackend:  oidc.NewPGBackend(g.DB()),
 		passkeys:     postgres,
+		mfa:          postgres,
 		sessionCache: redis,
 	}
 }
@@ -150,12 +152,33 @@ func main() {
 			repositories.sessionCache,
 			webAuthnVerifier,
 			authentication.ModuleConfig{
-				SessionTTL:  cfg.SessionIdleTTL,
-				CeremonyTTL: g.Cfg().MustGet(ctx, "webauthn.ceremonyTtl", "5m").Duration(),
+				SessionTTL:     cfg.SessionIdleTTL,
+				CeremonyTTL:    g.Cfg().MustGet(ctx, "webauthn.ceremonyTtl", "5m").Duration(),
+				TransactionTTL: g.Cfg().MustGet(ctx, "mfa.transactionTtl", "5m").Duration(),
+				RecoveryTTL:    g.Cfg().MustGet(ctx, "mfa.recoverySessionTtl", "15m").Duration(),
 			},
 		)
 		if err != nil {
 			panic(fmt.Sprintf("identity authentication module: %v", err))
+		}
+		secretBox, secretErr := authentication.NewSecretBox([]byte(globalSecret))
+		if secretErr != nil {
+			panic(fmt.Sprintf("identity TOTP secret encryption: %v", secretErr))
+		}
+		recoveryCodes, recoveryErr := authentication.NewRecoveryCodeCodec([]byte(globalSecret))
+		if recoveryErr != nil {
+			panic(fmt.Sprintf("identity recovery-code codec: %v", recoveryErr))
+		}
+		totpVerifier, totpErr := authentication.NewTOTPVerifier(
+			g.Cfg().MustGet(ctx, "mfa.totp.issuer", "月离账户").String(),
+		)
+		if totpErr != nil {
+			panic(fmt.Sprintf("identity TOTP verifier: %v", totpErr))
+		}
+		if err := authenticationModule.ConfigureMFA(
+			repositories.mfa, totpVerifier, secretBox, recoveryCodes,
+		); err != nil {
+			panic(fmt.Sprintf("identity MFA module: %v", err))
 		}
 	}
 	var master *sql.DB
@@ -176,6 +199,9 @@ func main() {
 	}
 
 	svc := logic.New(repositories.store, cfg)
+	if authenticationModule != nil {
+		svc.SetSecondFactorGate(authenticationModule)
+	}
 	var (
 		challengeDefinition *foundationabuse.ChallengeDefinition
 		challengeVerifiers  map[foundationabuse.ChallengeKind]foundationabuse.ChallengeVerifier
@@ -377,6 +403,7 @@ func main() {
 	if err != nil {
 		panic(fmt.Sprintf("oidc.NewManager: %v", err))
 	}
+	stepUpCtl := controller.NewStepUp(svc, authenticationModule, mgr, issuer)
 	identityVerifier, err := foundationauth.NewVerifier(foundationauth.Config{
 		Keys: mgr, Issuer: issuer, Audiences: []string{g.Cfg().MustGet(ctx, "oidc.audience", "identity-api").String()},
 	})
@@ -510,6 +537,7 @@ func main() {
 			"redis":    healthcheck.Redis,
 		}))
 		grp.Bind(authCtl)
+		grp.Bind(stepUpCtl)
 		grp.Bind(avatarCtl)
 		grp.Bind(capabilityCtl)
 		grp.Bind(guestCtl)

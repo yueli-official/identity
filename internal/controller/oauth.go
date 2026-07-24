@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -118,6 +119,19 @@ func (c *OAuthController) GoogleCallback(r *ghttp.Request) {
 	})
 	if err != nil {
 		r.Response.RedirectTo(c.loginURL + "?error=oauth_login")
+		return
+	}
+	if out.MFARequired {
+		target, parseErr := url.Parse(c.loginURL)
+		if parseErr != nil {
+			r.Response.RedirectTo(c.loginURL + "?error=oauth_login")
+			return
+		}
+		query := target.Query()
+		query.Set("mfa_transaction", out.MFATransaction)
+		query.Set("return_to", returnTo)
+		target.RawQuery = query.Encode()
+		r.Response.RedirectTo(target.String())
 		return
 	}
 	cookie := &http.Cookie{

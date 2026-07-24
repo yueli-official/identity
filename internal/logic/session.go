@@ -36,7 +36,10 @@ func (s *Service) AuthenticatedSession(ctx context.Context, sessionID string) (m
 
 // Me resolves a session id to its identity (the account-center /session/me).
 func (s *Service) Me(ctx context.Context, sessionID string) (model.Identity, error) {
-	_, identity, err := s.AuthenticatedSession(ctx, sessionID)
+	session, identity, err := s.AuthenticatedSession(ctx, sessionID)
+	if err == nil && session.Authentication.Recovery {
+		return model.Identity{}, iderr.StepUpRequired([]string{"non_recovery_authentication"})
+	}
 	return identity, err
 }
 

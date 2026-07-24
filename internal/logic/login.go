@@ -3,6 +3,7 @@ package logic
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/yueli-official/foundation/go/abuse"
@@ -24,8 +25,12 @@ type LoginInput struct {
 }
 
 type LoginOutput struct {
-	SessionID string
-	Identity  model.Identity
+	SessionID      string
+	Identity       model.Identity
+	MFARequired    bool
+	MFATransaction string
+	MFAExpiresAt   time.Time
+	MFAMethods     []string
 }
 
 func (s *Service) Login(ctx context.Context, in LoginInput) (LoginOutput, error) {
@@ -102,11 +107,28 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (LoginOutput, error)
 		}
 	}
 	// Success: mint a fresh (rotated) session id after Abuse resolution.
-	authenticatedAt := s.now()
+	authenticatedAt := s.now().UTC()
+	primary := authentication.Password(uuid.NewString(), authenticatedAt)
+	if s.secondFactor != nil {
+		secondFactor, err := s.secondFactor.BeginSecondFactor(
+			ctx, id.ID, primary, in.UserAgent, in.IP,
+		)
+		if err != nil {
+			return LoginOutput{}, err
+		}
+		if secondFactor.Required {
+			return LoginOutput{
+				Identity: id, MFARequired: true,
+				MFATransaction: secondFactor.TransactionID,
+				MFAExpiresAt:   secondFactor.ExpiresAt,
+				MFAMethods:     secondFactor.Methods,
+			}, nil
+		}
+	}
 	sess := model.Session{
 		ID: uuid.NewString(), IdentityID: id.ID,
 		CreatedAt: authenticatedAt, LastSeen: authenticatedAt, UserAgent: in.UserAgent, IP: in.IP,
-		Authentication: authentication.Password(uuid.NewString(), authenticatedAt),
+		Authentication: primary,
 	}
 	if err := s.store.CreateSession(ctx, sess, s.cfg.SessionIdleTTL); err != nil {
 		return LoginOutput{}, err

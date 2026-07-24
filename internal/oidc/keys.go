@@ -6,7 +6,9 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"strings"
@@ -16,9 +18,59 @@ import (
 	"github.com/go-jose/go-jose/v3/jwt"
 	"github.com/google/uuid"
 
+	"platform/services/identity/internal/authentication"
 	"platform/services/identity/internal/model"
 	"platform/services/identity/internal/repo"
 )
+
+type StepUpProofInput struct {
+	Issuer         string
+	ID             string
+	Subject        string
+	SessionID      string
+	Audience       string
+	Action         string
+	ResourceDigest []byte
+	Authentication authentication.Context
+	IssuedAt       time.Time
+	TTL            time.Duration
+}
+
+func (m *Manager) MintStepUpProof(input StepUpProofInput) (string, error) {
+	if strings.TrimSpace(input.Issuer) == "" ||
+		strings.TrimSpace(input.Subject) == "" ||
+		strings.TrimSpace(input.SessionID) == "" ||
+		strings.TrimSpace(input.Audience) == "" ||
+		strings.TrimSpace(input.Action) == "" ||
+		len(input.ResourceDigest) != sha256.Size ||
+		input.ID == "" || input.TTL <= 0 {
+		return "", fmt.Errorf("step-up proof input is incomplete")
+	}
+	signer, err := jose.NewSigner(
+		jose.SigningKey{Algorithm: jose.RS256, Key: m.activeKey},
+		(&jose.SignerOptions{}).WithType("step-up+jwt").WithHeader("kid", m.activeKID),
+	)
+	if err != nil {
+		return "", err
+	}
+	claims := jwt.Claims{
+		Issuer: input.Issuer, Subject: input.Subject,
+		Audience:  jwt.Audience{strings.TrimSpace(input.Audience)},
+		IssuedAt:  jwt.NewNumericDate(input.IssuedAt),
+		NotBefore: jwt.NewNumericDate(input.IssuedAt),
+		Expiry:    jwt.NewNumericDate(input.IssuedAt.Add(input.TTL)),
+		ID:        input.ID,
+	}
+	return jwt.Signed(signer).Claims(claims).Claims(map[string]any{
+		"token_use": "step_up", "sid": input.SessionID,
+		"action":        input.Action,
+		"resource_hash": base64.RawURLEncoding.EncodeToString(input.ResourceDigest),
+		"auth_time":     input.Authentication.AuthenticatedAt.Unix(),
+		"amr":           authentication.MethodStrings(input.Authentication.Methods),
+		"acr":           string(input.Authentication.Profile),
+		"recovery":      input.Authentication.Recovery,
+	}).CompactSerialize()
+}
 
 // Manager holds the in-memory active private key (loaded once at startup) and
 // the public JWKS (active + retired), loaded once so we don't hit the DB per request.
