@@ -124,7 +124,7 @@ func (provider *LocalKeyProvider) VerificationKeys() []VerificationKey {
 		return nil
 	}
 	return []VerificationKey{{
-		KeyID: provider.keyID, Algorithm: "ES256", Purpose: KeyPurpose, Status: "active",
+		KeyID: provider.keyID, Algorithm: "ES256", Purpose: KeyPurpose, Status: KeyStatusActive,
 		PublicJWK: publicJWK(&provider.private.PublicKey), ActivatedAt: provider.activated,
 	}}
 }

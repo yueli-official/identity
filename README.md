@@ -27,6 +27,9 @@ Identity 是站群唯一身份提供方，负责账户、凭据、公开资料�
 - `POST /api/internal/privacy/owner`：供实例内协调协议调用的 Identity Owner Host，要求 `privacy:owner`。
 - `/api/v1/profiles*`：公开资料查询。
 - `/api/v1/pat*`：个人访问令牌生命周期和验证。
+- `POST /api/v1/account/publisher-attestations`：最近认证用户对精确消费者、命名空间与制品摘要签发发布者证明。
+- `/api/v1/publisher/verification-keys`、`/api/v1/publisher/trust-manifest`：在线 key 发现与 offline-root
+  签名的版本化离线信任快照；普通 key 列表不能代替 trust manifest。
 - `/api/v1/admin/*`：用户、能力、provider 运维，以及 Account 使用的限域平台服务代理。
 - `/.well-known/openid-configuration`、`/oauth2/*` 与 `/oauth2/jwks.json`：不使用平台信封的标准协议端点。
 - `/healthz`、`/readyz`、`/api.json`、`/swagger`：运维与接口发现。
@@ -60,9 +63,19 @@ pnpm platformctl dev status --root .
 隔离开发时，把 `manifest/config/config.example.yaml` 复制为忽略的 `config.yaml`。必须提供 PostgreSQL、Redis 和至少 32 字节且稳定的 `GF_OIDC_GLOBALSECRET`；`oidc.issuer` 必须等于外部可访问的 Identity origin。
 
 ```powershell
+go run ./services/identity/cmd/publishertrust `
+  -issuer http://localhost:8081 `
+  -publisher-key services/identity/.data/publisher/signing-key.pem `
+  -root-key services/identity/.data/publisher-offline/root-key.pem `
+  -root-public services/identity/.data/publisher/trust-root.json `
+  -manifest services/identity/.data/publisher/trust-manifest.json
 go run ./services/identity/cmd/identity
 go test ./services/identity/...
 ```
+
+`publishertrust` 是离线运维命令。Identity runtime 只配置 leaf signing key、root 公钥和已签 manifest；
+offline root 私钥不得复制到运行环境。生产环境使用 KMS/HSM leaf adapter，并通过受控发布流程递增
+`manifestVersion`。
 
 DAO 集成测试使用 `TEST_PG_LINK` 和 `TEST_REDIS_ADDR`；完整迁移 lifecycle 使用
 `IDENTITY_MIGRATION_PG_*` 创建并删除隔离临时库。不要把整套历史 integration suite 指向长期

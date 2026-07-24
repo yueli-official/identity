@@ -1,10 +1,12 @@
 package controller_test
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/cookiejar"
 	"testing"
+	"time"
 
 	"github.com/gogf/gf/v2/encoding/gjson"
 	"github.com/gogf/gf/v2/frame/g"
@@ -21,6 +23,25 @@ func TestPublisherAttestationHTTPJourney(t *testing.T) {
 	store := repo.NewMemory()
 	service := logic.New(store, logic.DefaultConfig())
 	keys, err := publisher.NewLocalKeyProvider()
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := publisher.NewOfflineRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := publisher.SignTrustManifest(context.Background(), publisher.TrustManifest{
+		Schema: publisher.TrustManifestSchema, ManifestVersion: 1,
+		Issuer:   "https://identity.publisher-http.test",
+		IssuedAt: time.Now().UTC(), PolicyVersion: "publisher-attestation/v1",
+		Keys: keys.VerificationKeys(),
+	}, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	trust, err := publisher.VerifyTrustManifest(
+		context.Background(), manifest, []publisher.TrustRoot{root.TrustRoot()},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +65,7 @@ func TestPublisherAttestationHTTPJourney(t *testing.T) {
 	server.Group("/", func(group *ghttp.RouterGroup) {
 		group.Middleware(ghttpx.Middleware)
 		group.Bind(controller.New(service, false))
-		group.Bind(controller.NewPublisher(service, module, keys))
+		group.Bind(controller.NewPublisher(service, module, keys, &trust))
 	})
 	server.Start()
 	defer server.Shutdown()
@@ -96,5 +117,12 @@ func TestPublisherAttestationHTTPJourney(t *testing.T) {
 	if keySet.Get("keys.0.purpose").String() != publisher.KeyPurpose ||
 		keySet.Get("keys.0.publicJwk.d").String() != "" {
 		t.Fatalf("verification keys = %s", keySet.MustToJsonString())
+	}
+	trustSet := getEnvelope(t, client, base+"/api/v1/publisher/trust-manifest")
+	if trustSet.Get("manifestVersion").Uint() != 1 ||
+		trustSet.Get("manifestSignature").String() == "" ||
+		trustSet.Get("snapshotHash").String() == "" ||
+		trustSet.Get("keys.0.status").String() != publisher.KeyStatusActive {
+		t.Fatalf("trust manifest is incomplete: %s", trustSet.MustToJsonString())
 	}
 }

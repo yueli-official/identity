@@ -421,9 +421,35 @@ func main() {
 		cfg.SessionIdleTTL, adminStepUpVerifier,
 	)
 
-	var publisherKeys *publisher.LocalKeyProvider
+	var publisherKeys publisher.KeyProvider
+	var publisherTrust *publisher.VerifiedTrustManifest
 	if openAPIExport {
 		publisherKeys, err = publisher.NewLocalKeyProvider()
+		if err == nil {
+			root, rootErr := publisher.NewOfflineRoot()
+			if rootErr != nil {
+				err = rootErr
+			} else {
+				manifest, signErr := publisher.SignTrustManifest(ctx, publisher.TrustManifest{
+					Schema: publisher.TrustManifestSchema, ManifestVersion: 1,
+					Issuer: issuer, IssuedAt: time.Now().UTC(),
+					PolicyVersion: "publisher-attestation/v1",
+					Keys:          publisherKeys.VerificationKeys(),
+				}, root)
+				if signErr != nil {
+					err = signErr
+				} else {
+					verified, verifyErr := publisher.VerifyTrustManifest(
+						ctx, manifest, []publisher.TrustRoot{root.TrustRoot()},
+					)
+					if verifyErr != nil {
+						err = verifyErr
+					} else {
+						publisherTrust = &verified
+					}
+				}
+			}
+		}
 	} else {
 		switch mode := g.Cfg().MustGet(ctx, "publisher.mode").String(); mode {
 		case "local-file":
@@ -439,6 +465,23 @@ func main() {
 	}
 	if err != nil {
 		panic(fmt.Sprintf("identity publisher key provider: %v", err))
+	}
+	if !openAPIExport {
+		activeKeyID, keyErr := publisherKeys.KeyID()
+		if keyErr != nil {
+			panic(fmt.Sprintf("identity publisher active key: %v", keyErr))
+		}
+		verified, trustErr := publisher.ReadTrustManifest(
+			g.Cfg().MustGet(ctx, "publisher.trustManifestFile").String(),
+			g.Cfg().MustGet(ctx, "publisher.trustRootFile").String(),
+			issuer,
+			activeKeyID,
+			g.Cfg().MustGet(ctx, "publisher.trustManifestMinVersion", 1).Uint64(),
+		)
+		if trustErr != nil {
+			panic(fmt.Sprintf("identity publisher trust manifest: %v", trustErr))
+		}
+		publisherTrust = &verified
 	}
 	var publisherConsumerConfigs []publisherConsumerConfig
 	if err := g.Cfg().MustGet(ctx, "publisher.consumers").Scan(&publisherConsumerConfigs); err != nil {
@@ -462,7 +505,7 @@ func main() {
 	if err != nil {
 		panic(fmt.Sprintf("identity publisher module: %v", err))
 	}
-	publisherCtl := controller.NewPublisher(svc, publisherModule, publisherKeys)
+	publisherCtl := controller.NewPublisher(svc, publisherModule, publisherKeys, publisherTrust)
 
 	// ── Bootstrap admin (RBAC) ───────────────────────────────────────────────
 	// If rbac.bootstrapAdminEmail is set and that identity already exists, grant

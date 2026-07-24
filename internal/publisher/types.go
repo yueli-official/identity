@@ -15,15 +15,23 @@ const (
 	PredicateType = "https://yueli.dev/attestations/publisher-intent/v1"
 	PayloadType   = "application/vnd.in-toto+json"
 	KeyPurpose    = "publisher-attestation"
+
+	KeyStatusPreactive   = "preactive"
+	KeyStatusActive      = "active"
+	KeyStatusRetired     = "retired"
+	KeyStatusCompromised = "compromised"
+	KeyStatusRevoked     = "revoked"
 )
 
 var (
-	ErrInvalidCommand      = errors.New("publisher attestation command is invalid")
-	ErrInvalidAttestation  = errors.New("publisher attestation is invalid")
-	ErrConsumerNotFound    = errors.New("publisher consumer is not registered")
-	ErrConsumerDisabled    = errors.New("publisher consumer is disabled")
-	ErrIdempotencyConflict = errors.New("publisher idempotency key was reused with different content")
-	ErrSigningUnavailable  = errors.New("publisher signing is unavailable")
+	ErrInvalidCommand       = errors.New("publisher attestation command is invalid")
+	ErrInvalidAttestation   = errors.New("publisher attestation is invalid")
+	ErrConsumerNotFound     = errors.New("publisher consumer is not registered")
+	ErrConsumerDisabled     = errors.New("publisher consumer is disabled")
+	ErrIdempotencyConflict  = errors.New("publisher idempotency key was reused with different content")
+	ErrSigningUnavailable   = errors.New("publisher signing is unavailable")
+	ErrInvalidTrustManifest = errors.New("publisher trust manifest is invalid")
+	ErrUntrustedRoot        = errors.New("publisher trust root is not trusted")
 )
 
 type ArtifactPolicy struct {
@@ -72,13 +80,17 @@ type Attestation struct {
 }
 
 type VerificationKey struct {
-	KeyID       string         `json:"keyId"`
-	Algorithm   string         `json:"algorithm"`
-	Purpose     string         `json:"purpose"`
-	Status      string         `json:"status"`
-	PublicJWK   map[string]any `json:"publicJwk"`
-	ActivatedAt time.Time      `json:"activatedAt"`
-	RetiredAt   *time.Time     `json:"retiredAt,omitempty"`
+	KeyID            string         `json:"keyId"`
+	Algorithm        string         `json:"algorithm"`
+	Purpose          string         `json:"purpose"`
+	Status           string         `json:"status"`
+	PublicJWK        map[string]any `json:"publicJwk"`
+	ActivatedAt      time.Time      `json:"validFrom"`
+	ValidUntil       *time.Time     `json:"validUntil,omitempty"`
+	RetiredAt        *time.Time     `json:"retiredAt,omitempty"`
+	CompromisedAt    *time.Time     `json:"compromisedAt,omitempty"`
+	RevokedAt        *time.Time     `json:"revokedAt,omitempty"`
+	RevocationReason string         `json:"revocationReason,omitempty"`
 }
 
 type VerificationPolicy struct {

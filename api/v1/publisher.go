@@ -53,3 +53,33 @@ type PublisherVerificationKeysRes struct {
 	ManifestVersion int                        `json:"manifestVersion"`
 	Keys            []PublisherVerificationKey `json:"keys"`
 }
+
+type PublisherTrustManifestReq struct {
+	g.Meta `path:"/api/v1/publisher/trust-manifest" method:"get" tags:"publisher" summary:"Get the root-signed publisher trust manifest"`
+}
+
+type PublisherTrustManifestKey struct {
+	KeyID            string         `json:"keyId"`
+	Algorithm        string         `json:"algorithm"`
+	Purpose          string         `json:"purpose"`
+	Status           string         `json:"status"`
+	PublicJWK        map[string]any `json:"publicJwk"`
+	ValidFrom        string         `json:"validFrom"`
+	ValidUntil       string         `json:"validUntil,omitempty"`
+	RetiredAt        string         `json:"retiredAt,omitempty"`
+	CompromisedAt    string         `json:"compromisedAt,omitempty"`
+	RevokedAt        string         `json:"revokedAt,omitempty"`
+	RevocationReason string         `json:"revocationReason,omitempty"`
+}
+
+type PublisherTrustManifestRes struct {
+	Schema            string                      `json:"schema"`
+	ManifestVersion   uint64                      `json:"manifestVersion"`
+	Issuer            string                      `json:"issuer"`
+	IssuedAt          string                      `json:"issuedAt"`
+	PolicyVersion     string                      `json:"policyVersion"`
+	RootKeyID         string                      `json:"rootKeyId"`
+	Keys              []PublisherTrustManifestKey `json:"keys"`
+	ManifestSignature string                      `json:"manifestSignature"`
+	SnapshotHash      string                      `json:"snapshotHash"`
+}

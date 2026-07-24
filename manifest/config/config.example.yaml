@@ -67,7 +67,13 @@ publisher:
   # local-file is development-only and creates a 0600 P-256 PEM at keyFile.
   # Production must provide a KMS/HSM KeyProvider adapter before enabling signing.
   mode: "local-file"
-  keyFile: "publisher-signing-key.pem"
+  keyFile: ".data/publisher/signing-key.pem"
+  # Generate these with cmd/publishertrust. Runtime reads only the signed
+  # manifest and public root; never copy the offline root private key here.
+  trustManifestFile: ".data/publisher/trust-manifest.json"
+  trustRootFile: ".data/publisher/trust-root.json"
+  # Raise with every deployed manifest to reject a validly signed rollback.
+  trustManifestMinVersion: 1
   consumers:
     - audience: "urn:yueli:registry:yotta"
       instance: "urn:yueli:platform-instance:local"
