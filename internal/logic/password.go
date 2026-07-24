@@ -2,40 +2,60 @@ package logic
 
 import (
 	"context"
-	"errors"
-
-	"golang.org/x/crypto/bcrypt"
 
 	"platform/services/identity/internal/iderr"
+	identitypassword "platform/services/identity/internal/password"
 )
 
-const bcryptCost = 12
-const minPasswordLen = 8
+var defaultPasswordManager = identitypassword.New(identitypassword.DefaultConfig())
 
-// dummyBcryptHash equalizes login timing on the unknown-email path to mitigate
+// dummyPasswordHash equalizes login timing on the unknown-email path to mitigate
 // account enumeration. Computed once at package init.
-var dummyBcryptHash, _ = bcrypt.GenerateFromPassword([]byte("timing-equalization-placeholder"), bcryptCost)
+var dummyPasswordHash, _ = defaultPasswordManager.Hash("timing-equalization-placeholder")
 
-// VerifyDummy runs a bcrypt comparison against a constant hash purely to spend
+// VerifyDummy runs a comparison against a constant hash purely to spend
 // the same time as a real verification (timing equalization). Result is ignored.
 func VerifyDummy(plain string) {
-	_ = bcrypt.CompareHashAndPassword(dummyBcryptHash, []byte(plain))
+	_ = defaultPasswordManager.Verify(dummyPasswordHash, plain)
 }
 
 func HashPassword(plain string) (string, error) {
-	b, err := bcrypt.GenerateFromPassword([]byte(plain), bcryptCost)
-	return string(b), err
+	return defaultPasswordManager.Hash(identitypassword.Normalize(plain))
 }
 
 func VerifyPassword(hash, plain string) bool {
-	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(plain)) == nil
+	return defaultPasswordManager.Verify(hash, plain)
 }
 
 func ValidatePasswordStrength(plain string) error {
-	if len(plain) < minPasswordLen {
-		return errors.New("password must be at least 8 characters")
+	_, err := defaultPasswordManager.Validate(
+		context.Background(), plain, identitypassword.Context{},
+	)
+	return err
+}
+
+func (s *Service) preparePassword(
+	ctx context.Context,
+	plain string,
+	account identitypassword.Context,
+) (string, error) {
+	normalized, err := s.passwords.Validate(ctx, plain, account)
+	if err != nil {
+		reason := identitypassword.ParseReason(err)
+		if reason != "" {
+			return "", iderr.WeakPassword(reason)
+		}
+		return "", err
 	}
-	return nil
+	return normalized, nil
+}
+
+func (s *Service) hashPassword(normalized string) (string, error) {
+	return s.passwords.Hash(normalized)
+}
+
+func (s *Service) PasswordPolicy() identitypassword.Policy {
+	return s.passwords.Policy()
 }
 
 // ChangePassword verifies the caller's current password, sets a new one, and
@@ -47,13 +67,20 @@ func (s *Service) ChangePassword(ctx context.Context, identityID, currentSession
 	if err != nil {
 		return err
 	}
-	if !VerifyPassword(hash, current) {
+	if !s.passwords.Verify(hash, current) {
 		return iderr.InvalidCredentials()
 	}
-	if err := ValidatePasswordStrength(newPassword); err != nil {
-		return iderr.WeakPassword(err.Error())
+	identity, err := s.store.GetByID(ctx, identityID)
+	if err != nil {
+		return err
 	}
-	newHash, err := HashPassword(newPassword)
+	normalized, err := s.preparePassword(ctx, newPassword, identitypassword.Context{
+		Email: identity.Email,
+	})
+	if err != nil {
+		return err
+	}
+	newHash, err := s.hashPassword(normalized)
 	if err != nil {
 		return err
 	}
@@ -78,10 +105,17 @@ func (s *Service) SetPassword(ctx context.Context, identityID, newPassword strin
 	if has {
 		return iderr.PasswordAlreadySet()
 	}
-	if err := ValidatePasswordStrength(newPassword); err != nil {
-		return iderr.WeakPassword(err.Error())
+	identity, err := s.store.GetByID(ctx, identityID)
+	if err != nil {
+		return err
 	}
-	hash, err := HashPassword(newPassword)
+	normalized, err := s.preparePassword(ctx, newPassword, identitypassword.Context{
+		Email: identity.Email,
+	})
+	if err != nil {
+		return err
+	}
+	hash, err := s.hashPassword(normalized)
 	if err != nil {
 		return err
 	}

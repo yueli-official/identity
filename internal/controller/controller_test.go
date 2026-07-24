@@ -83,7 +83,7 @@ func TestAuthFlow(t *testing.T) {
 		// ------------------------------------------------------------------
 		{
 			_, _ = doPost("/api/v1/auth/register",
-				`{"email":"a@b.com","password":"longenough123","displayName":"A"}`,
+				`{"email":"a@b.com","password":"correct horse battery","displayName":"A"}`,
 				nil)
 		}
 
@@ -93,7 +93,7 @@ func TestAuthFlow(t *testing.T) {
 		var sessionCookieValue string
 		{
 			_, resp := doPost("/api/v1/auth/login",
-				`{"email":"a@b.com","password":"longenough123"}`,
+				`{"email":"a@b.com","password":"correct horse battery"}`,
 				nil)
 
 			// Extract id_session from Set-Cookie header and assert security flags.

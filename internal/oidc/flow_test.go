@@ -85,12 +85,12 @@ func setupE2E(t *testing.T, clientID string) *e2eEnv {
 	// 2. User: register + login → session id + subject.
 	svc := logic.New(r, logic.DefaultConfig())
 	if _, err := svc.Register(ctx, logic.RegisterInput{
-		Email: "u@e.com", Password: "longenough123", DisplayName: "U",
+		Email: "u@e.com", Password: "correct horse battery", DisplayName: "U",
 	}); err != nil {
 		t.Fatalf("register: %v", err)
 	}
 	loginOut, err := svc.Login(ctx, logic.LoginInput{
-		Email: "u@e.com", Password: "longenough123", IP: "127.0.0.1",
+		Email: "u@e.com", Password: "correct horse battery", IP: "127.0.0.1",
 	})
 	if err != nil {
 		t.Fatalf("login: %v", err)
@@ -417,12 +417,12 @@ func TestOIDCFlow(t *testing.T) {
 	// -----------------------------------------------------------------------
 	svc := logic.New(r, logic.DefaultConfig())
 	if _, err := svc.Register(ctx, logic.RegisterInput{
-		Email: "u@e.com", Password: "longenough123", DisplayName: "U",
+		Email: "u@e.com", Password: "correct horse battery", DisplayName: "U",
 	}); err != nil {
 		t.Fatalf("register: %v", err)
 	}
 	loginOut, err := svc.Login(ctx, logic.LoginInput{
-		Email: "u@e.com", Password: "longenough123", IP: "127.0.0.1",
+		Email: "u@e.com", Password: "correct horse battery", IP: "127.0.0.1",
 	})
 	if err != nil {
 		t.Fatalf("login: %v", err)

@@ -13,6 +13,7 @@ require (
 	github.com/ory/fosite v0.49.0
 	github.com/pquerna/otp v1.5.0
 	golang.org/x/crypto v0.52.0
+	golang.org/x/text v0.38.0
 )
 
 require (
@@ -96,7 +97,6 @@ require (
 	golang.org/x/oauth2 v0.34.0 // indirect
 	golang.org/x/sync v0.21.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect
-	golang.org/x/text v0.38.0 // indirect
 	golang.org/x/tools v0.45.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260128011058-8636f8732409 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260128011058-8636f8732409 // indirect

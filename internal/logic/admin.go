@@ -7,6 +7,7 @@ import (
 	"platform/services/identity/internal/actor"
 	"platform/services/identity/internal/iderr"
 	"platform/services/identity/internal/model"
+	identitypassword "platform/services/identity/internal/password"
 	"platform/services/identity/internal/repo"
 )
 
@@ -92,16 +93,20 @@ func (s *Service) AdminDeleteUser(ctx context.Context, targetID string) error {
 // check — this is the admin override path) and revokes the target's sessions so
 // the old credential cannot keep a live session. Validates strength.
 func (s *Service) AdminResetPassword(ctx context.Context, targetID, newPassword string) error {
-	if _, err := s.store.GetByID(ctx, targetID); err != nil {
+	identity, err := s.store.GetByID(ctx, targetID)
+	if err != nil {
 		if errors.Is(err, repo.ErrIdentityMissing) {
 			return iderr.IdentityNotFound()
 		}
 		return err
 	}
-	if err := ValidatePasswordStrength(newPassword); err != nil {
-		return iderr.WeakPassword(err.Error())
+	normalized, err := s.preparePassword(ctx, newPassword, identitypassword.Context{
+		Email: identity.Email,
+	})
+	if err != nil {
+		return err
 	}
-	hash, err := HashPassword(newPassword)
+	hash, err := s.hashPassword(normalized)
 	if err != nil {
 		return err
 	}

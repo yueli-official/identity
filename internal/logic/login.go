@@ -12,6 +12,7 @@ import (
 	"platform/services/identity/internal/identityabuse"
 	"platform/services/identity/internal/iderr"
 	"platform/services/identity/internal/model"
+	identitypassword "platform/services/identity/internal/password"
 	"platform/services/identity/internal/repo"
 )
 
@@ -91,7 +92,7 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (LoginOutput, error)
 		return LoginOutput{}, err
 	}
 	hash, err := s.store.GetPasswordHash(ctx, id.ID)
-	if err != nil || !VerifyPassword(hash, in.Password) {
+	if err != nil || !s.passwords.Verify(hash, in.Password) {
 		return fail("bad_password")
 	}
 	if id.Status == model.StatusDisabled {
@@ -99,6 +100,16 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (LoginOutput, error)
 	}
 	if id.Status == model.StatusDeleted {
 		return fail("deleted")
+	}
+	// Successful verification is the migration boundary for legacy bcrypt or
+	// older Argon2id parameters. A rehash failure must not turn valid
+	// credentials into a login outage.
+	if s.passwords.NeedsRehash(hash) {
+		if upgraded, hashErr := s.passwords.Hash(
+			identitypassword.Normalize(in.Password),
+		); hashErr == nil {
+			_ = s.store.UpdatePasswordHash(ctx, id.ID, upgraded)
+		}
 	}
 
 	if gated {

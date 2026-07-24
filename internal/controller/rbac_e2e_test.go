@@ -74,10 +74,10 @@ func TestE2E_RBAC(t *testing.T) {
 		//     bootstrap) and a target user; both registered + logged-in. ---------
 		mkUser := func(email string) (id, sid string) {
 			out, err := svc.Register(ctx, logic.RegisterInput{
-				Email: email, Password: "longenough123", DisplayName: email,
+				Email: email, Password: "correct horse battery", DisplayName: email,
 			})
 			t.AssertNil(err)
-			lo, err := svc.Login(ctx, logic.LoginInput{Email: email, Password: "longenough123", IP: "127.0.0.1"})
+			lo, err := svc.Login(ctx, logic.LoginInput{Email: email, Password: "correct horse battery", IP: "127.0.0.1"})
 			t.AssertNil(err)
 			return out.ID, lo.SessionID
 		}

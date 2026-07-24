@@ -23,7 +23,7 @@ func TestValidatePasswordStrength(t *testing.T) {
 	if err := logic.ValidatePasswordStrength("short"); err == nil {
 		t.Error("short password accepted")
 	}
-	if err := logic.ValidatePasswordStrength("longenough123"); err != nil {
+	if err := logic.ValidatePasswordStrength("correct horse battery"); err != nil {
 		t.Errorf("valid password rejected: %v", err)
 	}
 }

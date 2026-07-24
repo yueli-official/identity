@@ -68,16 +68,21 @@ func TestPasswordReset_Flow_ForceLogout(t *testing.T) {
 	revoker := &capRevoker{}
 	s.SetRefreshRevoker(revoker)
 	ctx := context.Background()
-	reg, _ := s.Register(ctx, logic.RegisterInput{Email: "r@example.com", Password: "oldpass12", DisplayName: "R"})
+	reg, _ := s.Register(ctx, logic.RegisterInput{Email: "r@example.com", Password: "old password phrase", DisplayName: "R"})
 	// establish a session, then reset, then ensure it's gone
-	login, _ := s.Login(ctx, logic.LoginInput{Email: "r@example.com", Password: "oldpass12"})
+	login, _ := s.Login(ctx, logic.LoginInput{Email: "r@example.com", Password: "old password phrase"})
 	if err := s.RequestPasswordReset(ctx, "r@example.com", "1.1.1.1"); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(cm.resetLink, "/reset?token=") {
 		t.Fatalf("no reset link: %q", cm.resetLink)
 	}
-	if err := s.ResetPassword(ctx, tokenFromLink(cm.resetLink), "newpass12"); err != nil {
+	if err := s.ResetPassword(ctx, tokenFromLink(cm.resetLink), "short"); err == nil {
+		t.Fatal("weak password must be rejected")
+	}
+	// A policy rejection happens before token consumption, so the user can
+	// correct the new password without requesting another email.
+	if err := s.ResetPassword(ctx, tokenFromLink(cm.resetLink), "new password phrase"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := m.GetSession(ctx, login.SessionID); err == nil {
@@ -86,10 +91,10 @@ func TestPasswordReset_Flow_ForceLogout(t *testing.T) {
 	if len(revoker.identities) != 1 || revoker.identities[0] != reg.ID {
 		t.Fatalf("refresh revocations = %v, want [%s]", revoker.identities, reg.ID)
 	}
-	if _, err := s.Login(ctx, logic.LoginInput{Email: "r@example.com", Password: "newpass12"}); err != nil {
+	if _, err := s.Login(ctx, logic.LoginInput{Email: "r@example.com", Password: "new password phrase"}); err != nil {
 		t.Fatal("new password must work")
 	}
-	if _, err := s.Login(ctx, logic.LoginInput{Email: "r@example.com", Password: "oldpass12"}); err == nil {
+	if _, err := s.Login(ctx, logic.LoginInput{Email: "r@example.com", Password: "old password phrase"}); err == nil {
 		t.Fatal("old password must fail")
 	}
 }

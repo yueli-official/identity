@@ -90,12 +90,12 @@ func TestAudit_LoginSuccess(t *testing.T) {
 	ctx := actorCtx("9.9.9.9")
 
 	// seed user
-	id, err := svc.Register(ctx, logic.RegisterInput{Email: "audit@example.com", Password: "longenough123"})
+	id, err := svc.Register(ctx, logic.RegisterInput{Email: "audit@example.com", Password: "correct horse battery"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = svc.Login(ctx, logic.LoginInput{Email: "audit@example.com", Password: "longenough123", IP: "9.9.9.9"})
+	_, err = svc.Login(ctx, logic.LoginInput{Email: "audit@example.com", Password: "correct horse battery", IP: "9.9.9.9"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +123,7 @@ func TestAudit_LoginFailure_BadPassword(t *testing.T) {
 	svc := newSvcWithStore(m)
 	ctx := actorCtx("1.2.3.4")
 
-	if _, err := svc.Register(ctx, logic.RegisterInput{Email: "fail@example.com", Password: "longenough123"}); err != nil {
+	if _, err := svc.Register(ctx, logic.RegisterInput{Email: "fail@example.com", Password: "correct horse battery"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -152,7 +152,7 @@ func TestAudit_LoginFailure_BadPassword(t *testing.T) {
 func TestAudit_LoginFailure_Deleted(t *testing.T) {
 	base := repo.NewMemory()
 	if _, err := newSvcWithStore(base).Register(
-		context.Background(), logic.RegisterInput{Email: "gone@example.com", Password: "longenough123"},
+		context.Background(), logic.RegisterInput{Email: "gone@example.com", Password: "correct horse battery"},
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func TestAudit_LoginFailure_Deleted(t *testing.T) {
 	svc := newSvcWithStore(&deletedIdentityStore{Store: base})
 	ctx := actorCtx("6.6.6.6")
 
-	_, err := svc.Login(ctx, logic.LoginInput{Email: "gone@example.com", Password: "longenough123", IP: "6.6.6.6"})
+	_, err := svc.Login(ctx, logic.LoginInput{Email: "gone@example.com", Password: "correct horse battery", IP: "6.6.6.6"})
 	if err == nil {
 		t.Fatal("expected login error")
 	}
@@ -210,7 +210,7 @@ func TestAudit_Register(t *testing.T) {
 	svc := newSvcWithStore(m)
 	ctx := context.Background()
 
-	id, err := svc.Register(ctx, logic.RegisterInput{Email: "reg@example.com", Password: "longenough123"})
+	id, err := svc.Register(ctx, logic.RegisterInput{Email: "reg@example.com", Password: "correct horse battery"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -246,7 +246,7 @@ func TestAudit_RoleGranted(t *testing.T) {
 	svc := newSvcWithStore(m)
 	ctx := context.Background()
 
-	id, err := svc.Register(ctx, logic.RegisterInput{Email: "admin@example.com", Password: "longenough123"})
+	id, err := svc.Register(ctx, logic.RegisterInput{Email: "admin@example.com", Password: "correct horse battery"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -279,13 +279,13 @@ func TestAudit_BestEffort(t *testing.T) {
 	ctx := context.Background()
 
 	// Register must succeed even though audit fails.
-	_, err := svc.Register(ctx, logic.RegisterInput{Email: "betest@example.com", Password: "longenough123"})
+	_, err := svc.Register(ctx, logic.RegisterInput{Email: "betest@example.com", Password: "correct horse battery"})
 	if err != nil {
 		t.Fatalf("Register with failing audit must not error: %v", err)
 	}
 
 	// Login must succeed even though audit fails.
-	_, err = svc.Login(ctx, logic.LoginInput{Email: "betest@example.com", Password: "longenough123", IP: "1.1.1.1"})
+	_, err = svc.Login(ctx, logic.LoginInput{Email: "betest@example.com", Password: "correct horse battery", IP: "1.1.1.1"})
 	if err != nil {
 		t.Fatalf("Login with failing audit must not error: %v", err)
 	}

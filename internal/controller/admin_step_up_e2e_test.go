@@ -52,11 +52,11 @@ func TestAdminMutationRequiresActionBoundOneTimeProof(t *testing.T) {
 
 		makeUser := func(email string) (string, string) {
 			identity, createErr := svc.Register(ctx, logic.RegisterInput{
-				Email: email, Password: "longenough123", DisplayName: email,
+				Email: email, Password: "correct horse battery", DisplayName: email,
 			})
 			t.AssertNil(createErr)
 			login, loginErr := svc.Login(ctx, logic.LoginInput{
-				Email: email, Password: "longenough123",
+				Email: email, Password: "correct horse battery",
 			})
 			t.AssertNil(loginErr)
 			return identity.ID, "id_session=" + login.SessionID

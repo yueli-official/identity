@@ -25,7 +25,7 @@ func codeOfErr(err error) string {
 func TestRegisterSuccess(t *testing.T) {
 	svc := newSvc()
 	id, err := svc.Register(context.Background(), logic.RegisterInput{
-		Email: " New@User.com ", Password: "longenough123", DisplayName: "New",
+		Email: " New@User.com ", Password: "correct horse battery", DisplayName: "New",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -37,7 +37,7 @@ func TestRegisterSuccess(t *testing.T) {
 
 func TestRegisterRejectsDuplicate(t *testing.T) {
 	svc := newSvc()
-	in := logic.RegisterInput{Email: "a@b.com", Password: "longenough123"}
+	in := logic.RegisterInput{Email: "a@b.com", Password: "correct horse battery"}
 	if _, err := svc.Register(context.Background(), in); err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +57,7 @@ func TestRegisterRejectsWeakPassword(t *testing.T) {
 
 func TestRegisterRejectsInvalidEmail(t *testing.T) {
 	svc := newSvc()
-	_, err := svc.Register(context.Background(), logic.RegisterInput{Email: "bad", Password: "longenough123"})
+	_, err := svc.Register(context.Background(), logic.RegisterInput{Email: "bad", Password: "correct horse battery"})
 	if codeOfErr(err) != iderr.CodeInvalidEmail {
 		t.Fatalf("want invalid_email, got %v", err)
 	}

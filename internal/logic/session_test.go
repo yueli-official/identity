@@ -10,8 +10,8 @@ import (
 
 func TestMeReturnsIdentityForValidSession(t *testing.T) {
 	svc := newSvc()
-	seedUser(t, svc, "a@b.com", "longenough123")
-	out, _ := svc.Login(context.Background(), logic.LoginInput{Email: "a@b.com", Password: "longenough123"})
+	seedUser(t, svc, "a@b.com", "correct horse battery")
+	out, _ := svc.Login(context.Background(), logic.LoginInput{Email: "a@b.com", Password: "correct horse battery"})
 	id, err := svc.Me(context.Background(), out.SessionID)
 	if err != nil || id.Email != "a@b.com" {
 		t.Fatalf("me failed: %v %#v", err, id)
@@ -28,8 +28,8 @@ func TestMeRejectsUnknownSession(t *testing.T) {
 
 func TestLogoutClearsSession(t *testing.T) {
 	svc := newSvc()
-	seedUser(t, svc, "a@b.com", "longenough123")
-	out, _ := svc.Login(context.Background(), logic.LoginInput{Email: "a@b.com", Password: "longenough123"})
+	seedUser(t, svc, "a@b.com", "correct horse battery")
+	out, _ := svc.Login(context.Background(), logic.LoginInput{Email: "a@b.com", Password: "correct horse battery"})
 	if err := svc.Logout(context.Background(), out.SessionID); err != nil {
 		t.Fatal(err)
 	}

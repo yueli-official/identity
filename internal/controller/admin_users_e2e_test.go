@@ -67,10 +67,10 @@ func TestAdminUserManagement(t *testing.T) {
 
 		mkUser := func(email string) (string, map[string]string) {
 			id, err := svc.Register(ctx, logic.RegisterInput{
-				Email: email, Password: "longenough123", DisplayName: email,
+				Email: email, Password: "correct horse battery", DisplayName: email,
 			})
 			t.AssertNil(err)
-			out, err := svc.Login(ctx, logic.LoginInput{Email: email, Password: "longenough123"})
+			out, err := svc.Login(ctx, logic.LoginInput{Email: email, Password: "correct horse battery"})
 			t.AssertNil(err)
 			return id.ID, map[string]string{"Cookie": "id_session=" + out.SessionID}
 		}
@@ -135,7 +135,7 @@ func TestAdminUserManagement(t *testing.T) {
 			t.Assert(status, 200)
 			t.Assert(gjson.New(body).Get("user.status").String(), "disabled")
 
-			_, err := svc.Login(ctx, logic.LoginInput{Email: "target@b.com", Password: "longenough123"})
+			_, err := svc.Login(ctx, logic.LoginInput{Email: "target@b.com", Password: "correct horse battery"})
 			t.Assert(errors.Is(err, iderr.AccountDisabled()) || err != nil, true)
 		}
 
@@ -150,26 +150,26 @@ func TestAdminUserManagement(t *testing.T) {
 		// 9. Admin reset target's password → 200; new password works after unban.
 		{
 			path := "/api/v1/admin/users/" + targetID + "/password"
-			_, status := do(http.MethodPost, path, `{"newPassword":"brandnewpw99"}`, adminHdr)
+			_, status := do(http.MethodPost, path, `{"newPassword":"admin reset password phrase"}`, adminHdr)
 			t.Assert(status, 200)
 			// unban so login can proceed, then verify the new password.
 			unban := "/api/v1/admin/users/" + targetID + "/status"
 			_, st := do(http.MethodPut, unban, `{"status":"active"}`, adminHdr)
 			t.Assert(st, 200)
-			_, err := svc.Login(ctx, logic.LoginInput{Email: "target@b.com", Password: "brandnewpw99"})
+			_, err := svc.Login(ctx, logic.LoginInput{Email: "target@b.com", Password: "admin reset password phrase"})
 			t.AssertNil(err)
 		}
 
 		// 10. Admin create user (with admin role) → 200; appears in list; can log in.
 		{
 			body, status := do(http.MethodPost, "/api/v1/admin/users",
-				`{"email":"created@b.com","password":"createdpw123","displayName":"Created","roles":["admin"]}`, adminHdr)
+				`{"email":"created@b.com","password":"created account password","displayName":"Created","roles":["admin"]}`, adminHdr)
 			t.Assert(status, 200)
 			j := gjson.New(body)
 			t.Assert(j.Get("user.email").String(), "created@b.com")
 			roles := j.Get("user.roles").Strings()
 			t.Assert(contains(roles, "admin"), true)
-			_, err := svc.Login(ctx, logic.LoginInput{Email: "created@b.com", Password: "createdpw123"})
+			_, err := svc.Login(ctx, logic.LoginInput{Email: "created@b.com", Password: "created account password"})
 			t.AssertNil(err)
 		}
 
@@ -180,7 +180,7 @@ func TestAdminUserManagement(t *testing.T) {
 			t.Assert(status, 200)
 			body, _ := do(http.MethodGet, "/api/v1/admin/users?keyword=target", "", adminHdr)
 			t.Assert(gjson.New(body).Get("total").Int(), 0)
-			_, err := svc.Login(ctx, logic.LoginInput{Email: "target@b.com", Password: "brandnewpw99"})
+			_, err := svc.Login(ctx, logic.LoginInput{Email: "target@b.com", Password: "admin reset password phrase"})
 			t.AssertNE(err, nil)
 		}
 	})

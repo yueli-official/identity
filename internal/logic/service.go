@@ -8,6 +8,7 @@ import (
 	"platform/services/identity/internal/authentication"
 	"platform/services/identity/internal/identityabuse"
 	"platform/services/identity/internal/mailer"
+	identitypassword "platform/services/identity/internal/password"
 	"platform/services/identity/internal/pat"
 	"platform/services/identity/internal/repo"
 )
@@ -19,6 +20,7 @@ type Config struct {
 	LoginFailWindow time.Duration
 	LoginLockFor    time.Duration
 	IPMaxFails      int
+	PasswordPolicy  identitypassword.Config
 
 	// Email verification + password reset.
 	AccountBaseURL     string        // base URL the action links point at
@@ -41,6 +43,7 @@ func DefaultConfig() Config {
 		LoginFailWindow: 15 * time.Minute,
 		LoginLockFor:    15 * time.Minute,
 		IPMaxFails:      50,
+		PasswordPolicy:  identitypassword.DefaultConfig(),
 
 		AccountBaseURL:     "http://localhost:3000",
 		VerifyTokenTTL:     24 * time.Hour,
@@ -64,6 +67,7 @@ type Service struct {
 	patKey       []byte         // derived HMAC key for PAT hashing
 	abuse        identityabuse.Actions
 	secondFactor SecondFactorGate
+	passwords    *identitypassword.Manager
 }
 
 type SecondFactorGate interface {
@@ -83,10 +87,11 @@ func New(store repo.Store, cfg Config) *Service {
 		cfg.PATMaxPerUser = 20
 	}
 	service := &Service{
-		store:  store,
-		cfg:    cfg,
-		now:    time.Now,
-		patKey: pat.DeriveKey(cfg.PATHMACSecret),
+		store:     store,
+		cfg:       cfg,
+		now:       time.Now,
+		patKey:    pat.DeriveKey(cfg.PATHMACSecret),
+		passwords: identitypassword.New(cfg.PasswordPolicy),
 	}
 	catalog := abuse.MustCompile(identityabuse.Definition(identityabuse.Policy{
 		LoginAccountCapacity: int64(cfg.LoginMaxFails),

@@ -12,7 +12,7 @@ func TestRegister_GrantsDefaultRole(t *testing.T) {
 	m := repo.NewMemory()
 	s := logic.New(m, logic.DefaultConfig())
 	id, err := s.Register(context.Background(), logic.RegisterInput{
-		Email: "d@example.com", Password: "longenough123", DisplayName: "D",
+		Email: "d@example.com", Password: "correct horse battery", DisplayName: "D",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -31,7 +31,7 @@ func TestGrantRevokeRole(t *testing.T) {
 	s := logic.New(m, logic.DefaultConfig())
 	ctx := context.Background()
 	id, err := s.Register(ctx, logic.RegisterInput{
-		Email: "g@example.com", Password: "longenough123", DisplayName: "G",
+		Email: "g@example.com", Password: "correct horse battery", DisplayName: "G",
 	})
 	if err != nil {
 		t.Fatal(err)

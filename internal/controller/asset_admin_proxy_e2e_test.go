@@ -38,7 +38,7 @@ func TestAssetAdminProxyAcceptsVerifiedAdminBearerAndAdminCookie(t *testing.T) {
 
 	newIdentity := func(email string, admin bool) (string, string) {
 		identity, err := service.Register(ctx, logic.RegisterInput{
-			Email: email, Password: "longenough123", DisplayName: email,
+			Email: email, Password: "correct horse battery", DisplayName: email,
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -48,7 +48,7 @@ func TestAssetAdminProxyAcceptsVerifiedAdminBearerAndAdminCookie(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		login, err := service.Login(ctx, logic.LoginInput{Email: email, Password: "longenough123"})
+		login, err := service.Login(ctx, logic.LoginInput{Email: email, Password: "correct horse battery"})
 		if err != nil {
 			t.Fatal(err)
 		}

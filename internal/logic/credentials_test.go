@@ -114,7 +114,7 @@ func TestSetPassword_OAuthOnlyThenUnbind(t *testing.T) {
 	}
 
 	// Set an initial password — no current password required for a no-password account.
-	if err := svc.SetPassword(ctx, id, "longenough123"); err != nil {
+	if err := svc.SetPassword(ctx, id, "correct horse battery"); err != nil {
 		t.Fatalf("SetPassword: %v", err)
 	}
 	cs, _ := svc.ListCredentials(ctx, id)
@@ -133,7 +133,7 @@ func TestSetPassword_OAuthOnlyThenUnbind(t *testing.T) {
 func TestSetPassword_RejectsWhenAlreadySet(t *testing.T) {
 	ctx := context.Background()
 	_, svc, id, _ := setupAccount(t) // password account
-	if err := svc.SetPassword(ctx, id, "anotherpass123"); codeOf(t, err) != iderr.CodePasswordAlreadySet {
+	if err := svc.SetPassword(ctx, id, "another password phrase"); codeOf(t, err) != iderr.CodePasswordAlreadySet {
 		t.Fatalf("want CodePasswordAlreadySet, got %v", err)
 	}
 }

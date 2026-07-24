@@ -63,8 +63,8 @@ func tokenFromLink(link string) string {
 func TestE2E_Email(t *testing.T) {
 	const (
 		email   = "u@example.com"
-		oldPass = "oldpass12"
-		newPass = "newpass34"
+		oldPass = "old password phrase"
+		newPass = "new password phrase"
 	)
 
 	r := repo.NewMemory()

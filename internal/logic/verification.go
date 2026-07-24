@@ -9,6 +9,7 @@ import (
 	"errors"
 
 	"platform/services/identity/internal/iderr"
+	identitypassword "platform/services/identity/internal/password"
 	"platform/services/identity/internal/repo"
 )
 
@@ -146,8 +147,14 @@ func (s *Service) ResetPassword(ctx context.Context, token, newPassword string) 
 	if token == "" {
 		return iderr.VerificationInvalid()
 	}
-	if err := ValidatePasswordStrength(newPassword); err != nil {
-		return iderr.WeakPassword(err.Error())
+	// Reject length and global blocklist failures before consuming the
+	// single-use token. Account-specific checks are repeated after resolving
+	// the token's identity.
+	normalized, err := s.preparePassword(
+		ctx, newPassword, identitypassword.Context{},
+	)
+	if err != nil {
+		return err
 	}
 	rec, err := s.store.ConsumeVerification(ctx, hashToken(token), repo.PurposePasswordReset)
 	if errors.Is(err, repo.ErrVerificationInvalid) {
@@ -156,7 +163,13 @@ func (s *Service) ResetPassword(ctx context.Context, token, newPassword string) 
 	if err != nil {
 		return err
 	}
-	hash, err := HashPassword(newPassword)
+	normalized, err = s.preparePassword(ctx, normalized, identitypassword.Context{
+		Email: rec.Email,
+	})
+	if err != nil {
+		return err
+	}
+	hash, err := s.hashPassword(normalized)
 	if err != nil {
 		return err
 	}

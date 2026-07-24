@@ -9,6 +9,7 @@ import (
 	"platform/services/identity/internal/identityabuse"
 	"platform/services/identity/internal/iderr"
 	"platform/services/identity/internal/model"
+	identitypassword "platform/services/identity/internal/password"
 	"platform/services/identity/internal/repo"
 )
 
@@ -57,10 +58,13 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (model.Identit
 	if err := ValidateEmail(email); err != nil {
 		return model.Identity{}, iderr.InvalidEmail(email)
 	}
-	if err := ValidatePasswordStrength(in.Password); err != nil {
-		return model.Identity{}, iderr.WeakPassword(err.Error())
+	normalized, err := s.preparePassword(ctx, in.Password, identitypassword.Context{
+		Email: email, DisplayName: in.DisplayName,
+	})
+	if err != nil {
+		return model.Identity{}, err
 	}
-	hash, err := HashPassword(in.Password)
+	hash, err := s.hashPassword(normalized)
 	if err != nil {
 		return model.Identity{}, err
 	}

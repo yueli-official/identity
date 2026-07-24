@@ -46,7 +46,7 @@ Identity 是站群唯一身份提供方，负责账户、凭据、公开资料�
 
 ## 开发
 
-正常开发使用 Catalog 生命周期，它会一致地 provision OIDC 客户端和共享本地账户（`test@example.com` / `Test12345`）：
+正常开发使用 Catalog 生命周期，它会一致地 provision OIDC 客户端和共享本地账户（`test@example.com` / `Yueli local development 2026`）：
 
 ```powershell
 pnpm platformctl dev up --file catalog/overlays/local.yaml --root . docs-main

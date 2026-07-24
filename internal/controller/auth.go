@@ -156,6 +156,17 @@ func (c *Controller) PasswordReset(ctx context.Context, req *v1.PasswordResetReq
 	return &v1.PasswordResetRes{}, nil
 }
 
+func (c *Controller) PasswordPolicy(
+	context.Context,
+	*v1.PasswordPolicyReq,
+) (*v1.PasswordPolicyRes, error) {
+	policy := c.svc.PasswordPolicy()
+	return &v1.PasswordPolicyRes{
+		MinLength: policy.MinLength, MaxLength: policy.MaxLength,
+		Normalization: policy.Normalization, Blocklist: policy.Blocklist,
+	}, nil
+}
+
 func (c *Controller) setSessionCookie(r *ghttp.Request, sid string) {
 	cookie := &http.Cookie{
 		Name: sessionCookie, Value: sid, Path: "/",

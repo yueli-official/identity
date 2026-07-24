@@ -59,10 +59,10 @@ func TestAdminRoleEndpoint(t *testing.T) {
 		// helper: register an identity and log it in, returning (id, sessionCookieHeader).
 		mkUser := func(email string) (string, map[string]string) {
 			id, err := svc.Register(ctx, logic.RegisterInput{
-				Email: email, Password: "longenough123", DisplayName: email,
+				Email: email, Password: "correct horse battery", DisplayName: email,
 			})
 			t.AssertNil(err)
-			out, err := svc.Login(ctx, logic.LoginInput{Email: email, Password: "longenough123"})
+			out, err := svc.Login(ctx, logic.LoginInput{Email: email, Password: "correct horse battery"})
 			t.AssertNil(err)
 			return id.ID, map[string]string{"Cookie": "id_session=" + out.SessionID}
 		}

@@ -76,9 +76,9 @@ func TestCapabilityEndpointsRequireAdminAndAuditProbes(t *testing.T) {
 			return body.String(), response.StatusCode
 		}
 		newUser := func(email string) (string, map[string]string) {
-			identity, createErr := svc.Register(ctx, logic.RegisterInput{Email: email, Password: "longenough123", DisplayName: email})
+			identity, createErr := svc.Register(ctx, logic.RegisterInput{Email: email, Password: "correct horse battery", DisplayName: email})
 			t.AssertNil(createErr)
-			login, loginErr := svc.Login(ctx, logic.LoginInput{Email: email, Password: "longenough123"})
+			login, loginErr := svc.Login(ctx, logic.LoginInput{Email: email, Password: "correct horse battery"})
 			t.AssertNil(loginErr)
 			return identity.ID, map[string]string{"Cookie": "id_session=" + login.SessionID}
 		}

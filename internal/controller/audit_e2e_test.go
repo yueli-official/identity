@@ -124,7 +124,7 @@ func TestE2E_AuditLogging(t *testing.T) {
 
 		// Create admin via service seam (mirrors main.go bootstrap):
 		adminOut, err := svc.Register(ctx, logic.RegisterInput{
-			Email: "admin@audit.test", Password: "longenough123", DisplayName: "Admin",
+			Email: "admin@audit.test", Password: "correct horse battery", DisplayName: "Admin",
 		})
 		t.AssertNil(err)
 		t.AssertNil(svc.GrantRole(ctx, adminOut.ID, logic.AdminRole))
@@ -132,7 +132,7 @@ func TestE2E_AuditLogging(t *testing.T) {
 
 		// Log the admin in over HTTP so we get a real session cookie:
 		_, adminLoginHdr := doPost("/api/v1/auth/login",
-			`{"email":"admin@audit.test","password":"longenough123"}`, nil)
+			`{"email":"admin@audit.test","password":"correct horse battery"}`, nil)
 		adminSID := extractSessionCookie(adminLoginHdr)
 		t.AssertNE(adminSID, "")
 
@@ -142,7 +142,7 @@ func TestE2E_AuditLogging(t *testing.T) {
 
 		// Register the regular user via HTTP (so ActorMiddleware runs for it):
 		const userEmail = "user@audit.test"
-		const userPassword = "longenough123"
+		const userPassword = "correct horse battery"
 		const testUA = "TestBrowser/1.0 (audit-e2e)"
 
 		_, _ = doPost("/api/v1/auth/register",
@@ -288,11 +288,11 @@ func TestE2E_AuditLogging(t *testing.T) {
 			t.Assert(status, 200)
 
 			_, _ = doPost("/api/v1/auth/register",
-				`{"email":"plain@audit.test","password":"longenough123","displayName":"Plain"}`,
+				`{"email":"plain@audit.test","password":"correct horse battery","displayName":"Plain"}`,
 				nil,
 			)
 			_, plainLoginHdr := doPost("/api/v1/auth/login",
-				`{"email":"plain@audit.test","password":"longenough123"}`,
+				`{"email":"plain@audit.test","password":"correct horse battery"}`,
 				nil,
 			)
 			plainSID := extractSessionCookie(plainLoginHdr)

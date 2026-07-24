@@ -19,12 +19,12 @@ func setupAccount(t *testing.T) (*repo.Memory, *logic.Service, string, string) {
 	store := repo.NewMemory()
 	svc := logic.New(store, logic.DefaultConfig())
 	id, err := svc.Register(ctx, logic.RegisterInput{
-		Email: "u@e.com", Password: "longenough123", DisplayName: "U",
+		Email: "u@e.com", Password: "correct horse battery", DisplayName: "U",
 	})
 	if err != nil {
 		t.Fatalf("register: %v", err)
 	}
-	out, err := svc.Login(ctx, logic.LoginInput{Email: "u@e.com", Password: "longenough123", IP: "127.0.0.1"})
+	out, err := svc.Login(ctx, logic.LoginInput{Email: "u@e.com", Password: "correct horse battery", IP: "127.0.0.1"})
 	if err != nil {
 		t.Fatalf("login: %v", err)
 	}
@@ -76,17 +76,17 @@ func TestChangePassword_SuccessKeepsCurrentRevokesOthers(t *testing.T) {
 	ctx := context.Background()
 	store, svc, id, sid1 := setupAccount(t)
 	// A second session (another device).
-	out2, err := svc.Login(ctx, logic.LoginInput{Email: "u@e.com", Password: "longenough123", IP: "10.0.0.2"})
+	out2, err := svc.Login(ctx, logic.LoginInput{Email: "u@e.com", Password: "correct horse battery", IP: "10.0.0.2"})
 	if err != nil {
 		t.Fatalf("second login: %v", err)
 	}
 	sid2 := out2.SessionID
 
-	if err := svc.ChangePassword(ctx, id, sid1, "longenough123", "brandnewpassword"); err != nil {
+	if err := svc.ChangePassword(ctx, id, sid1, "correct horse battery", "brand new password phrase"); err != nil {
 		t.Fatalf("ChangePassword: %v", err)
 	}
 	// New password works, old fails.
-	if !logic.VerifyPassword(mustHash(t, store, id), "brandnewpassword") {
+	if !logic.VerifyPassword(mustHash(t, store, id), "brand new password phrase") {
 		t.Errorf("stored hash does not verify against the new password")
 	}
 	// Current session preserved, other session revoked.
@@ -101,7 +101,7 @@ func TestChangePassword_SuccessKeepsCurrentRevokesOthers(t *testing.T) {
 func TestChangePassword_WrongCurrentRejected(t *testing.T) {
 	ctx := context.Background()
 	_, svc, id, sid := setupAccount(t)
-	err := svc.ChangePassword(ctx, id, sid, "wrongcurrent", "brandnewpassword")
+	err := svc.ChangePassword(ctx, id, sid, "wrongcurrent", "brand new password phrase")
 	if codeOf(t, err) != iderr.CodeInvalidCredentials {
 		t.Fatalf("want CodeInvalidCredentials, got %v", err)
 	}
@@ -110,7 +110,7 @@ func TestChangePassword_WrongCurrentRejected(t *testing.T) {
 func TestChangePassword_WeakNewRejected(t *testing.T) {
 	ctx := context.Background()
 	_, svc, id, sid := setupAccount(t)
-	err := svc.ChangePassword(ctx, id, sid, "longenough123", "short")
+	err := svc.ChangePassword(ctx, id, sid, "correct horse battery", "short")
 	if codeOf(t, err) != iderr.CodeWeakPassword {
 		t.Fatalf("want CodeWeakPassword, got %v", err)
 	}
@@ -119,7 +119,7 @@ func TestChangePassword_WeakNewRejected(t *testing.T) {
 func TestRevokeSession_OwnedSucceeds(t *testing.T) {
 	ctx := context.Background()
 	_, svc, id, sid1 := setupAccount(t)
-	out2, _ := svc.Login(ctx, logic.LoginInput{Email: "u@e.com", Password: "longenough123", IP: "10.0.0.2"})
+	out2, _ := svc.Login(ctx, logic.LoginInput{Email: "u@e.com", Password: "correct horse battery", IP: "10.0.0.2"})
 	sid2 := out2.SessionID
 
 	if err := svc.RevokeSession(ctx, id, sid2); err != nil {
@@ -137,7 +137,7 @@ func TestRevokeSession_NotOwnedHidden(t *testing.T) {
 	ctx := context.Background()
 	_, svc, _, victimSID := setupAccount(t)
 	// A different identity tries to revoke the victim's session.
-	other, err := svc.Register(ctx, logic.RegisterInput{Email: "other@e.com", Password: "longenough123", DisplayName: "O"})
+	other, err := svc.Register(ctx, logic.RegisterInput{Email: "other@e.com", Password: "correct horse battery", DisplayName: "O"})
 	if err != nil {
 		t.Fatalf("register other: %v", err)
 	}

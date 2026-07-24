@@ -7,7 +7,7 @@ import "github.com/gogf/gf/v2/frame/g"
 type RegisterReq struct {
 	g.Meta         `path:"/api/v1/auth/register" method:"post" tags:"auth" summary:"Register with email+password"`
 	Email          string `json:"email" v:"required|email"`
-	Password       string `json:"password" v:"required|length:8,128"`
+	Password       string `json:"password" v:"required"`
 	DisplayName    string `json:"displayName"`
 	AbuseAttemptID string `json:"abuseAttemptId,omitempty"`
 	ChallengeProof string `json:"challengeProof,omitempty"`
@@ -64,6 +64,17 @@ type PasswordForgotRes struct{}
 type PasswordResetReq struct {
 	g.Meta   `path:"/api/v1/auth/password/reset" method:"post" tags:"auth" summary:"Reset password via token"`
 	Token    string `json:"token" v:"required"`
-	Password string `json:"password" v:"required|length:8,128"`
+	Password string `json:"password" v:"required"`
 }
 type PasswordResetRes struct{}
+
+type PasswordPolicyReq struct {
+	g.Meta `path:"/api/v1/auth/password-policy" method:"get" tags:"auth" summary:"Get the active password creation policy"`
+}
+
+type PasswordPolicyRes struct {
+	MinLength     int    `json:"minLength"`
+	MaxLength     int    `json:"maxLength"`
+	Normalization string `json:"normalization"`
+	Blocklist     bool   `json:"blocklist"`
+}

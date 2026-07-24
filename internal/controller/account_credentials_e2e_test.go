@@ -102,7 +102,7 @@ func TestE2E_OAuthOnlyUnbindClosedLoop(t *testing.T) {
 	}
 
 	// --- Set an initial password via the new endpoint (no current password) -----
-	postJSON(t, client, base+"/api/v1/auth/password/set", map[string]any{"newPassword": "longenough123"})
+	postJSON(t, client, base+"/api/v1/auth/password/set", map[string]any{"newPassword": "correct horse battery"})
 
 	// --- Now google is no longer the last credential → unbind succeeds ----------
 	if creds2 := getEnvelope(t, client, base+"/api/v1/session/credentials"); !creds2.Get("hasPassword").Bool() {
@@ -120,7 +120,7 @@ func TestE2E_OAuthOnlyUnbindClosedLoop(t *testing.T) {
 	}
 
 	// --- set-password is initial-only: a second call is refused -----------------
-	setAgain := postJSON(t, client, base+"/api/v1/auth/password/set", map[string]any{"newPassword": "anotherpass123"})
+	setAgain := postJSON(t, client, base+"/api/v1/auth/password/set", map[string]any{"newPassword": "another password phrase"})
 	if code := gjson.New(setAgain).Get("code").String(); code != "identity.password_already_set" {
 		t.Fatalf("second set: code=%q, want identity.password_already_set (body=%s)", code, setAgain)
 	}

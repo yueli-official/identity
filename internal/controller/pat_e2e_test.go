@@ -148,7 +148,7 @@ func TestE2E_PAT(t *testing.T) {
 		// =====================================================================
 		// Step 1: Register + login user A
 		// =====================================================================
-		userAID, userASID := registerAndLogin("usera@pat.test", "longenough123", "UserA")
+		userAID, userASID := registerAndLogin("usera@pat.test", "correct horse battery", "UserA")
 		t.AssertNE(userAID, "")
 		t.AssertNE(userASID, "")
 
@@ -266,7 +266,7 @@ func TestE2E_PAT(t *testing.T) {
 		// Step 7: Cross-user isolation — user B cannot revoke user A's token
 		// =====================================================================
 		// Create user B.
-		_, userBSID := registerAndLogin("userb@pat.test", "longenough123", "UserB")
+		_, userBSID := registerAndLogin("userb@pat.test", "correct horse battery", "UserB")
 
 		// Create a fresh PAT for user A so there is a live id for B to attempt.
 		freshCreateBody, _, freshCreateStatus := doPost("/api/v1/pat",
