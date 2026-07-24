@@ -62,6 +62,8 @@ var (
 	CodeRecoveryCodeInvalid      = errs.Register("identity.recovery_code_invalid", http.StatusUnauthorized)
 	CodeStepUpRequestInvalid     = errs.Register("identity.step_up_request_invalid", http.StatusBadRequest)
 	CodeStepUpMethodUnavailable  = errs.Register("identity.step_up_method_unavailable", http.StatusConflict)
+	CodeStepUpProofInvalid       = errs.Register("identity.step_up_proof_invalid", http.StatusUnauthorized)
+	CodeStepUpProofReplayed      = errs.Register("identity.step_up_proof_replayed", http.StatusConflict)
 )
 
 func EmailTaken(email string) *errs.Coded {
@@ -188,6 +190,14 @@ func StepUpRequestInvalid() *errs.Coded {
 
 func StepUpMethodUnavailable() *errs.Coded {
 	return errs.New(CodeStepUpMethodUnavailable, "no enrolled method can satisfy this step-up requirement", nil)
+}
+
+func StepUpProofInvalid() *errs.Coded {
+	return errs.New(CodeStepUpProofInvalid, "step-up proof is invalid or does not match this action", nil)
+}
+
+func StepUpProofReplayed() *errs.Coded {
+	return errs.New(CodeStepUpProofReplayed, "step-up proof was already used", nil)
 }
 
 // OAuthEmailConflict: the provider's (unverified) email collides with an

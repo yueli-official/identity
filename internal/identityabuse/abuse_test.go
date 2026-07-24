@@ -98,3 +98,45 @@ func TestPasskeyCeremonyBudgetIsNetworkBound(t *testing.T) {
 		}
 	}
 }
+
+func TestMFAVerificationFailureBudgetSpansTransactionsByNetwork(t *testing.T) {
+	module, err := abuse.NewMemory(
+		abuse.MustCompile(Definition(Policy{
+			MFANetworkCapacity: 2, MFATargetCapacity: 5, MFAWindow: time.Hour,
+		})),
+		abuse.MemoryOptions{Secret: []byte("identity-abuse-test-secret-at-least-32-bytes")},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actions, err := Bind(module)
+	if err != nil {
+		t.Fatal(err)
+	}
+	network, _ := NetworkPrefix("192.0.2.19")
+	for index := 0; index < 2; index++ {
+		admission, err := Admit(
+			context.Background(), actions.MFAVerification,
+			"mfa-"+string(rune('a'+index)), network,
+			"transaction-"+string(rune('a'+index)), "",
+		)
+		if err != nil || admission.Disposition != abuse.DispositionAllow {
+			t.Fatalf("admission %d = %+v, %v", index, admission, err)
+		}
+		if err := actions.MFAVerification.Resolve(
+			context.Background(), admission.Receipt, "verification_rejected",
+		); err != nil {
+			t.Fatal(err)
+		}
+	}
+	third, err := Admit(
+		context.Background(), actions.MFAVerification,
+		"mfa-c", network, "transaction-c", "",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if third.Disposition != abuse.DispositionReject {
+		t.Fatalf("third MFA admission = %+v, want reject", third)
+	}
+}

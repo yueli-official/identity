@@ -149,12 +149,27 @@ func TestPGTOTPEnrollmentLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := store.CompleteTOTPTransaction(
-		ctx, stepUpTransaction, authenticator.ID, 126, now.Add(4*time.Second),
+		ctx, stepUpTransaction, authenticator.ID, 126,
+		authentication.Session{
+			ID: mfaSession.ID, IdentityID: identity.ID,
+			LastSeen: now.Add(4 * time.Second),
+			Authentication: authentication.MultiFactor(
+				authentication.Password(uuid.NewString(), now),
+				uuid.NewString(), now.Add(4*time.Second), authenticator.ID,
+			),
+		},
 	); err != nil {
 		t.Fatalf("CompleteTOTPTransaction() error = %v", err)
 	}
 	if err := store.CompleteTOTPTransaction(
-		ctx, stepUpTransaction, authenticator.ID, 127, now.Add(5*time.Second),
+		ctx, stepUpTransaction, authenticator.ID, 127,
+		authentication.Session{
+			ID: mfaSession.ID, IdentityID: identity.ID,
+			Authentication: authentication.MultiFactor(
+				authentication.Password(uuid.NewString(), now),
+				uuid.NewString(), now.Add(5*time.Second), authenticator.ID,
+			),
+		},
 	); !errors.Is(err, authentication.ErrAuthenticationTransactionInvalid) {
 		t.Fatalf("step-up replay error = %v", err)
 	}

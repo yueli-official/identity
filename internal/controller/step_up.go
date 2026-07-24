@@ -90,12 +90,17 @@ func (controller *StepUpController) StepUpTOTPFinish(
 	if err != nil {
 		return nil, err
 	}
+	receipt, err := admitMFAVerification(ctx, controller.svc, req.TransactionID)
+	if err != nil {
+		return nil, err
+	}
 	material, err := controller.authn.FinishTOTPAction(
 		ctx, authentication.FinishTOTPActionRequest{
-			TransactionID: req.TransactionID, SessionID: session.ID,
-			Context: session.Authentication, Code: strings.TrimSpace(req.Code),
+			TransactionID: req.TransactionID, Session: session,
+			Code: strings.TrimSpace(req.Code),
 		},
 	)
+	resolveMFAVerification(ctx, controller.svc, receipt, err)
 	if err != nil {
 		return nil, mapStepUpError(err)
 	}

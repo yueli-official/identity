@@ -13,6 +13,7 @@ const (
 	ActionRegister        abuse.ActionKey = "identity.register"
 	ActionLogin           abuse.ActionKey = "identity.password_login"
 	ActionPasskeyCeremony abuse.ActionKey = "identity.passkey_ceremony"
+	ActionMFAVerification abuse.ActionKey = "identity.mfa_verification"
 )
 
 type Policy struct {
@@ -23,6 +24,9 @@ type Policy struct {
 	RegisterWindow         time.Duration
 	PasskeyNetworkCapacity int64
 	PasskeyWindow          time.Duration
+	MFANetworkCapacity     int64
+	MFATargetCapacity      int64
+	MFAWindow              time.Duration
 	Challenge              *abuse.ChallengeDefinition
 }
 
@@ -47,6 +51,15 @@ func Definition(policy Policy) abuse.Definition {
 	}
 	if policy.PasskeyWindow <= 0 {
 		policy.PasskeyWindow = 10 * time.Minute
+	}
+	if policy.MFANetworkCapacity <= 0 {
+		policy.MFANetworkCapacity = 30
+	}
+	if policy.MFATargetCapacity <= 0 {
+		policy.MFATargetCapacity = 5
+	}
+	if policy.MFAWindow <= 0 {
+		policy.MFAWindow = 10 * time.Minute
 	}
 	challengeAt := int64(0)
 	if policy.Challenge != nil {
@@ -128,6 +141,46 @@ func Definition(policy Policy) abuse.Definition {
 					},
 				},
 			},
+			{
+				Key: ActionMFAVerification,
+				Required: abuse.SignalRequirements{
+					Network: abuse.Required, Target: abuse.Required,
+				},
+				Meters: []abuse.MeterDefinition{
+					{
+						ID: "identity.mfa.network_requests", Slot: abuse.SlotNetwork,
+						Algorithm: abuse.TokenBucket(
+							policy.MFANetworkCapacity*2,
+							policy.MFANetworkCapacity*2,
+							policy.MFAWindow,
+						),
+					},
+					{
+						ID: "identity.mfa.network_failures", Slot: abuse.SlotNetwork,
+						Mode: abuse.MeterOutcome,
+						Algorithm: abuse.SlidingWindow(
+							policy.MFANetworkCapacity, policy.MFAWindow,
+						),
+						ChargeOn: []abuse.OutcomeKey{"verification_rejected"},
+					},
+					{
+						ID: "identity.mfa.transaction_failures", Slot: abuse.SlotTarget,
+						Mode: abuse.MeterOutcome,
+						Algorithm: abuse.SlidingWindow(
+							policy.MFATargetCapacity, policy.MFAWindow,
+						),
+						ChargeOn: []abuse.OutcomeKey{"verification_rejected"},
+						ResetOn:  []abuse.OutcomeKey{"verified"},
+					},
+				},
+				Resolution: &abuse.ResolutionDefinition{
+					Outcomes: []abuse.OutcomeKey{
+						"verified", "verification_rejected", "verification_aborted",
+					},
+					DefaultOutcome: "verification_aborted",
+					PendingTTL:     time.Minute,
+				},
+			},
 		},
 	}
 }
@@ -136,6 +189,7 @@ type Actions struct {
 	Register        abuse.Action
 	Login           abuse.Action
 	PasskeyCeremony abuse.Action
+	MFAVerification abuse.Action
 }
 
 func Bind(module abuse.Module) (Actions, error) {
@@ -151,8 +205,13 @@ func Bind(module abuse.Module) (Actions, error) {
 	if err != nil {
 		return Actions{}, err
 	}
+	mfaVerification, err := module.Action(ActionMFAVerification)
+	if err != nil {
+		return Actions{}, err
+	}
 	return Actions{
 		Register: register, Login: login, PasskeyCeremony: passkeyCeremony,
+		MFAVerification: mfaVerification,
 	}, nil
 }
 

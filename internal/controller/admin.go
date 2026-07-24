@@ -59,7 +59,9 @@ func (c *Controller) requireAdmin(ctx context.Context) (string, error) {
 // The resolved admin identity is injected into ctx so the audit record
 // attributes the mutation to the correct actor.
 func (c *Controller) AdminGrantRole(ctx context.Context, req *v1.AdminGrantRoleReq) (*v1.AdminGrantRoleRes, error) {
-	adminID, err := c.requireAdmin(ctx)
+	adminID, err := c.requireAdminAction(
+		ctx, "identity.admin.role.grant", adminRoleResource(req.IdentityID, req.Role),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +83,9 @@ func (c *Controller) AdminGrantRole(ctx context.Context, req *v1.AdminGrantRoleR
 // AdminRevokeRole revokes a role from the target identity. Same admin guard and
 // actor injection as AdminGrantRole.
 func (c *Controller) AdminRevokeRole(ctx context.Context, req *v1.AdminRevokeRoleReq) (*v1.AdminRevokeRoleRes, error) {
-	adminID, err := c.requireAdmin(ctx)
+	adminID, err := c.requireAdminAction(
+		ctx, "identity.admin.role.revoke", adminRoleResource(req.IdentityID, req.Role),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +188,9 @@ func (c *Controller) AdminGetUser(ctx context.Context, req *v1.AdminGetUserReq) 
 
 // AdminUpdateStatus sets a user's lifecycle status (ban / unban).
 func (c *Controller) AdminUpdateStatus(ctx context.Context, req *v1.AdminUpdateStatusReq) (*v1.AdminUpdateStatusRes, error) {
-	adminID, err := c.requireAdmin(ctx)
+	adminID, err := c.requireAdminAction(
+		ctx, "identity.admin.status.update", adminStatusResource(req.ID, req.Status),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +207,9 @@ func (c *Controller) AdminUpdateStatus(ctx context.Context, req *v1.AdminUpdateS
 
 // AdminDeleteUser soft-deletes a user.
 func (c *Controller) AdminDeleteUser(ctx context.Context, req *v1.AdminDeleteUserReq) (*v1.AdminDeleteUserRes, error) {
-	adminID, err := c.requireAdmin(ctx)
+	adminID, err := c.requireAdminAction(
+		ctx, "identity.admin.user.delete", adminIdentityResource(req.ID),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +222,9 @@ func (c *Controller) AdminDeleteUser(ctx context.Context, req *v1.AdminDeleteUse
 
 // AdminResetPassword overrides a user's password.
 func (c *Controller) AdminResetPassword(ctx context.Context, req *v1.AdminResetPasswordReq) (*v1.AdminResetPasswordRes, error) {
-	adminID, err := c.requireAdmin(ctx)
+	adminID, err := c.requireAdminAction(
+		ctx, "identity.admin.password.reset", adminIdentityResource(req.ID),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -227,7 +237,9 @@ func (c *Controller) AdminResetPassword(ctx context.Context, req *v1.AdminResetP
 
 // AdminCreateUser provisions a new account from the admin console.
 func (c *Controller) AdminCreateUser(ctx context.Context, req *v1.AdminCreateUserReq) (*v1.AdminCreateUserRes, error) {
-	adminID, err := c.requireAdmin(ctx)
+	adminID, err := c.requireAdminAction(
+		ctx, "identity.admin.user.create", adminCreateResource(req.Email, req.Roles),
+	)
 	if err != nil {
 		return nil, err
 	}

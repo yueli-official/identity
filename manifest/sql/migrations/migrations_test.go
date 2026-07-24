@@ -194,3 +194,23 @@ func TestMFARecoveryAndStepUpMigrationOwnsSecurityState(t *testing.T) {
 		t.Errorf("0022 down migration missing: %v", err)
 	}
 }
+
+func TestStepUpProofReplayMigrationUsesAtomicJTIKey(t *testing.T) {
+	up, err := os.ReadFile("0023_step_up_proof_replay.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(up)
+	for _, want := range []string{
+		"CREATE TABLE step_up_proof_uses",
+		"jti         UUID PRIMARY KEY",
+		"expires_at  TIMESTAMPTZ NOT NULL",
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("0023 up missing %q", want)
+		}
+	}
+	if _, err := os.Stat("0023_step_up_proof_replay.down.sql"); err != nil {
+		t.Errorf("0023 down migration missing: %v", err)
+	}
+}

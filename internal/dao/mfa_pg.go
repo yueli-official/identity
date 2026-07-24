@@ -503,8 +503,9 @@ func (p *PG) CompleteTOTPTransaction(
 	transaction authentication.AuthenticationTransaction,
 	authenticatorID string,
 	lastUsedStep int64,
-	now time.Time,
+	elevatedSession authentication.Session,
 ) error {
+	now := elevatedSession.Authentication.AuthenticatedAt
 	return p.db.Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
 		tx = tx.Ctx(ctx)
 		session, err := tx.GetValue(`
@@ -555,6 +556,42 @@ RETURNING id
 		}
 		if updated.IsNil() || updated.String() == "" {
 			return authentication.ErrTOTPCodeInvalid
+		}
+		credentialRefs := elevatedSession.Authentication.CredentialRefs
+		if credentialRefs == nil {
+			credentialRefs = []string{}
+		}
+		if _, err := tx.Model("authentication_events").Ctx(ctx).Data(g.Map{
+			"id":                 elevatedSession.Authentication.EventID,
+			"identity_id":        elevatedSession.IdentityID,
+			"session_id":         elevatedSession.ID,
+			"authenticated_at":   elevatedSession.Authentication.AuthenticatedAt,
+			"methods":            authentication.MethodStrings(elevatedSession.Authentication.Methods),
+			"factor_classes":     authentication.FactorStrings(elevatedSession.Authentication.FactorClasses),
+			"assurance_level":    elevatedSession.Authentication.Level,
+			"assurance_profile":  elevatedSession.Authentication.Profile,
+			"user_verified":      elevatedSession.Authentication.UserVerified,
+			"phishing_resistant": elevatedSession.Authentication.PhishingResistant,
+			"recovery":           elevatedSession.Authentication.Recovery,
+			"credential_refs":    credentialRefs,
+			"policy_version":     elevatedSession.Authentication.PolicyVersion,
+		}).Insert(); err != nil {
+			return err
+		}
+		sessionUpdated, err := tx.GetValue(`
+UPDATE identity_sessions
+SET authentication_event_id = ?, last_seen = ?
+WHERE id = ? AND identity_id = ? AND expires_at > ?
+RETURNING id
+`,
+			elevatedSession.Authentication.EventID, elevatedSession.LastSeen,
+			elevatedSession.ID, elevatedSession.IdentityID, now,
+		)
+		if err != nil {
+			return err
+		}
+		if sessionUpdated.IsNil() || sessionUpdated.String() == "" {
+			return authentication.ErrAuthenticationTransactionInvalid
 		}
 		return nil
 	})

@@ -140,16 +140,18 @@ func (store *mfaTestStore) CompleteTOTPTransaction(
 	transaction AuthenticationTransaction,
 	authenticatorID string,
 	step int64,
-	now time.Time,
+	session Session,
 ) error {
 	if store.transaction.ConsumedAt != nil ||
 		store.transaction.ID != transaction.ID ||
 		store.authenticator.ID != authenticatorID {
 		return ErrAuthenticationTransactionInvalid
 	}
+	now := session.Authentication.AuthenticatedAt
 	store.transaction.ConsumedAt = &now
 	store.authenticator.LastUsedStep = &step
 	store.authenticator.LastUsedAt = &now
+	store.session = session
 	return nil
 }
 
@@ -325,8 +327,12 @@ func TestTOTPLoginCreatesAAL2SessionAndConsumesTransaction(t *testing.T) {
 		t.Fatal(err)
 	}
 	proof, err := module.FinishTOTPAction(context.Background(), FinishTOTPActionRequest{
-		TransactionID: stepUp.TransactionID, SessionID: "session-existing",
-		Context: baseContext, Code: stepUpCode,
+		TransactionID: stepUp.TransactionID,
+		Session: Session{
+			ID: "session-existing", IdentityID: "identity-1",
+			Authentication: baseContext,
+		},
+		Code: stepUpCode,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -336,8 +342,12 @@ func TestTOTPLoginCreatesAAL2SessionAndConsumesTransaction(t *testing.T) {
 		t.Fatalf("step-up proof material = %+v", proof)
 	}
 	if _, err := module.FinishTOTPAction(context.Background(), FinishTOTPActionRequest{
-		TransactionID: stepUp.TransactionID, SessionID: "session-existing",
-		Context: baseContext, Code: stepUpCode,
+		TransactionID: stepUp.TransactionID,
+		Session: Session{
+			ID: "session-existing", IdentityID: "identity-1",
+			Authentication: baseContext,
+		},
+		Code: stepUpCode,
 	}); !errors.Is(err, ErrAuthenticationTransactionInvalid) {
 		t.Fatalf("step-up replay error = %v", err)
 	}

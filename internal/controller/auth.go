@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/yueli-official/foundation/go/privacy"
 
+	"platform/gokit/stepup"
 	v1 "platform/services/identity/api/v1"
 	"platform/services/identity/internal/authentication"
 	"platform/services/identity/internal/logic"
@@ -23,6 +24,7 @@ type Controller struct {
 	sessionTTL   time.Duration
 	privacy      PrivacyService
 	authn        *authentication.Module
+	adminStepUp  *stepup.Verifier
 }
 
 type PrivacyService interface {
@@ -49,10 +51,12 @@ func NewPrivacyAware(
 	secureCookie bool,
 	privacyService PrivacyService,
 	sessionTTL time.Duration,
+	adminStepUp *stepup.Verifier,
 ) *Controller {
 	controller := New(svc, secureCookie, sessionTTL)
 	controller.privacy = privacyService
 	controller.authn = authn
+	controller.adminStepUp = adminStepUp
 	return controller
 }
 

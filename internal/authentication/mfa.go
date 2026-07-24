@@ -79,7 +79,7 @@ type MFAStore interface {
 		AuthenticationTransaction,
 		string,
 		int64,
-		time.Time,
+		Session,
 	) error
 }
 

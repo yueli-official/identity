@@ -34,6 +34,7 @@ import (
 	"platform/gokit/openapiexport"
 	"platform/gokit/privacycatalog"
 	"platform/gokit/privacyhttp"
+	"platform/gokit/stepup"
 	"platform/services/identity/internal/assetclient"
 	"platform/services/identity/internal/authentication"
 	"platform/services/identity/internal/cache"
@@ -339,8 +340,31 @@ func main() {
 			}
 		}()
 	}
+	// OIDC and step-up proofs share the same rotating RS256 trust root.
+	mgr, err := oidc.NewManager(ctx, repositories.signingKeys)
+	if err != nil {
+		panic(fmt.Sprintf("oidc.NewManager: %v", err))
+	}
+	identityAudience := g.Cfg().MustGet(ctx, "oidc.audience", "identity-api").String()
+	identityVerifier, err := foundationauth.NewVerifier(foundationauth.Config{
+		Keys: mgr, Issuer: issuer, Audiences: []string{identityAudience},
+	})
+	if err != nil {
+		panic(fmt.Sprintf("identity capability token verifier: %v", err))
+	}
+	var adminStepUpVerifier *stepup.Verifier
+	if !openAPIExport {
+		adminStepUpVerifier, err = stepup.New(stepup.Config{
+			Keys: mgr, Issuer: issuer, Audience: identityAudience,
+			Replay: stepup.PostgreSQLReplayStore{DB: master},
+		})
+		if err != nil {
+			panic(fmt.Sprintf("identity admin step-up verifier: %v", err))
+		}
+	}
 	authCtl := controller.NewPrivacyAware(
-		svc, authenticationModule, secureCookie, privacyService, cfg.SessionIdleTTL,
+		svc, authenticationModule, secureCookie, privacyService,
+		cfg.SessionIdleTTL, adminStepUpVerifier,
 	)
 
 	// ── Bootstrap admin (RBAC) ───────────────────────────────────────────────
@@ -399,17 +423,7 @@ func main() {
 	}
 
 	// ── OIDC / OAuth2 ───────────────────────────────────────────────────────
-	mgr, err := oidc.NewManager(ctx, repositories.signingKeys)
-	if err != nil {
-		panic(fmt.Sprintf("oidc.NewManager: %v", err))
-	}
 	stepUpCtl := controller.NewStepUp(svc, authenticationModule, mgr, issuer)
-	identityVerifier, err := foundationauth.NewVerifier(foundationauth.Config{
-		Keys: mgr, Issuer: issuer, Audiences: []string{g.Cfg().MustGet(ctx, "oidc.audience", "identity-api").String()},
-	})
-	if err != nil {
-		panic(fmt.Sprintf("identity capability token verifier: %v", err))
-	}
 	// Durable PG-backed OIDC store: persists OAuth requests and refresh tokens
 	// across restarts. Access tokens remain stateless JWTs.
 	oidcStore := oidc.NewStore(repositories.oidcBackend, repositories.clients)

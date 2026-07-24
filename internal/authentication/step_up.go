@@ -96,8 +96,7 @@ func (module *Module) BeginStepUp(
 
 type FinishTOTPActionRequest struct {
 	TransactionID string
-	SessionID     string
-	Context       Context
+	Session       Session
 	Code          string
 }
 
@@ -113,7 +112,7 @@ func (module *Module) FinishTOTPAction(
 		return StepUpProofMaterial{}, ErrAuthenticationTransactionInvalid
 	}
 	now := module.now().UTC()
-	if transaction.Kind != "step_up" || transaction.SessionID != request.SessionID ||
+	if transaction.Kind != "step_up" || transaction.SessionID != request.Session.ID ||
 		transaction.ConsumedAt != nil || !transaction.ExpiresAt.After(now) ||
 		transaction.FailedAttempts >= 5 {
 		return StepUpProofMaterial{}, ErrAuthenticationTransactionInvalid
@@ -154,14 +153,23 @@ func (module *Module) FinishTOTPAction(
 		_ = module.mfa.RecordAuthenticationTransactionFailure(ctx, transaction.ID, 5)
 		return StepUpProofMaterial{}, ErrTOTPCodeInvalid
 	}
-	elevated := MultiFactor(request.Context, uuid.NewString(), now, matched.ID)
+	elevated := MultiFactor(request.Session.Authentication, uuid.NewString(), now, matched.ID)
 	if !Evaluate(elevated, requirement, now).Satisfied {
 		return StepUpProofMaterial{}, ErrStepUpMethodUnavailable
 	}
+	elevatedSession := request.Session
+	elevatedSession.Authentication = elevated
+	elevatedSession.LastSeen = now
 	if err := module.mfa.CompleteTOTPTransaction(
-		ctx, transaction, matched.ID, matchedStep, now,
+		ctx, transaction, matched.ID, matchedStep, elevatedSession,
 	); err != nil {
 		return StepUpProofMaterial{}, err
+	}
+	if module.cache != nil {
+		remaining := elevatedSession.ExpiresAt.Sub(now)
+		if remaining > 0 {
+			_ = module.cache.CreateSession(ctx, elevatedSession, remaining)
+		}
 	}
 	return StepUpProofMaterial{
 		ID: uuid.NewString(), IdentityID: transaction.IdentityID,

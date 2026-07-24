@@ -22,11 +22,16 @@ func (c *Controller) TOTPLogin(
 	if c.authn == nil {
 		return nil, iderr.MFAUnavailable()
 	}
+	receipt, err := admitMFAVerification(ctx, c.svc, req.TransactionID)
+	if err != nil {
+		return nil, err
+	}
 	result, err := c.authn.FinishTOTPLogin(
 		ctx, authentication.FinishTOTPLoginRequest{
 			TransactionID: req.TransactionID, Code: strings.TrimSpace(req.Code),
 		},
 	)
+	resolveMFAVerification(ctx, c.svc, receipt, err)
 	if err != nil {
 		return nil, mapMFAError(err)
 	}
@@ -45,11 +50,16 @@ func (c *Controller) RecoveryLogin(
 	if c.authn == nil {
 		return nil, iderr.MFAUnavailable()
 	}
+	receipt, err := admitMFAVerification(ctx, c.svc, req.TransactionID)
+	if err != nil {
+		return nil, err
+	}
 	result, err := c.authn.FinishRecoveryLogin(
 		ctx, authentication.FinishRecoveryLoginRequest{
 			TransactionID: req.TransactionID, Code: strings.TrimSpace(req.Code),
 		},
 	)
+	resolveMFAVerification(ctx, c.svc, receipt, err)
 	if err != nil {
 		return nil, mapMFAError(err)
 	}
@@ -136,12 +146,17 @@ func (c *Controller) TOTPEnrollmentFinish(
 	if err != nil {
 		return nil, err
 	}
+	receipt, err := admitMFAVerification(ctx, c.svc, req.AuthenticatorID)
+	if err != nil {
+		return nil, err
+	}
 	result, err := c.authn.FinishTOTPEnrollment(
 		ctx, authentication.FinishTOTPEnrollmentRequest{
 			IdentityID: identity.ID, SessionID: sessionID,
 			AuthenticatorID: req.AuthenticatorID, Code: strings.TrimSpace(req.Code),
 		},
 	)
+	resolveMFAVerification(ctx, c.svc, receipt, err)
 	if err != nil {
 		return nil, mapMFAError(err)
 	}
