@@ -14,6 +14,10 @@ const (
 	EventPasskeyLogin      SecurityEventKind = "passkey.login"
 	EventPasskeyRenamed    SecurityEventKind = "passkey.renamed"
 	EventPasskeyRevoked    SecurityEventKind = "passkey.revoked"
+	EventTOTPEnrolled      SecurityEventKind = "totp.enrolled"
+	EventTOTPRevoked       SecurityEventKind = "totp.revoked"
+	EventRecoveryGenerated SecurityEventKind = "recovery.generated"
+	EventRecoveryUsed      SecurityEventKind = "recovery.used"
 )
 
 type SecurityEvent struct {

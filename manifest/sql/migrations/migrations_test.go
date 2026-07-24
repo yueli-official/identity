@@ -165,3 +165,32 @@ func TestPasskeyMigrationPersistsCredentialAndCeremonyState(t *testing.T) {
 		t.Errorf("0021 down migration missing: %v", err)
 	}
 }
+
+func TestMFARecoveryAndStepUpMigrationOwnsSecurityState(t *testing.T) {
+	up, err := os.ReadFile("0022_mfa_recovery_step_up.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(up)
+	for _, want := range []string{
+		"CREATE TABLE authentication_policies",
+		"second_factor_required",
+		"CREATE TABLE totp_authenticators",
+		"secret_ciphertext",
+		"last_used_step",
+		"CREATE TABLE recovery_code_sets",
+		"CREATE TABLE recovery_codes",
+		"code_digest",
+		"consumed_at",
+		"CREATE TABLE authentication_transactions",
+		"resource_digest",
+		"requirement",
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("0022 up missing %q", want)
+		}
+	}
+	if _, err := os.Stat("0022_mfa_recovery_step_up.down.sql"); err != nil {
+		t.Errorf("0022 down migration missing: %v", err)
+	}
+}

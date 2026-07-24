@@ -130,6 +130,10 @@ type Module struct {
 	cache    SessionCache
 	verifier WebAuthnVerifier
 	events   SecurityEventSink
+	mfa      MFAStore
+	totp     TOTPVerifier
+	secrets  *SecretBox
+	recovery *RecoveryCodeCodec
 	cfg      ModuleConfig
 	now      func() time.Time
 }
