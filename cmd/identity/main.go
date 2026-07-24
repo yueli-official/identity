@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"os"
@@ -20,6 +21,10 @@ import (
 	foundationabuse "github.com/yueli-official/foundation/go/abuse"
 	"github.com/yueli-official/foundation/go/abuse/turnstile"
 	foundationauth "github.com/yueli-official/foundation/go/auth"
+	"github.com/yueli-official/foundation/go/privacy"
+	privacyadapter "github.com/yueli-official/foundation/go/privacy/httpadapter"
+	"github.com/yueli-official/foundation/go/work"
+	workpostgres "github.com/yueli-official/foundation/go/work/postgres"
 	"platform/gokit/authhttp"
 	"platform/gokit/capability"
 	"platform/gokit/ghttpx"
@@ -27,6 +32,8 @@ import (
 	"platform/gokit/notificationclient"
 	"platform/gokit/observability"
 	"platform/gokit/openapiexport"
+	"platform/gokit/privacycatalog"
+	"platform/gokit/privacyhttp"
 	"platform/services/identity/internal/assetclient"
 	"platform/services/identity/internal/cache"
 	"platform/services/identity/internal/controller"
@@ -34,6 +41,7 @@ import (
 	"platform/services/identity/internal/guest"
 	"platform/services/identity/internal/identityabuse"
 	"platform/services/identity/internal/identitycap"
+	"platform/services/identity/internal/identityprivacy"
 	"platform/services/identity/internal/logic"
 	"platform/services/identity/internal/mailer"
 	"platform/services/identity/internal/oauthlogin"
@@ -48,6 +56,15 @@ type runtimeRepositories struct {
 	signingKeys repo.SigningKeyRepo
 	audit       repo.AuditRepo
 	oidcBackend oidc.Backend
+}
+
+type privacyOwnerConfig struct {
+	Key               string `json:"key"`
+	Kind              string `json:"kind"`
+	URL               string `json:"url"`
+	ClientID          string `json:"clientId"`
+	ClientSecret      string `json:"clientSecret"`
+	AllowInsecureHTTP bool   `json:"allowInsecureHttp"`
 }
 
 func newRuntimeRepositories(openAPIExport bool) runtimeRepositories {
@@ -77,6 +94,7 @@ func newRuntimeRepositories(openAPIExport bool) runtimeRepositories {
 
 func main() {
 	ctx := gctx.New()
+	var err error
 	openAPIExport := os.Getenv(openapiexport.OutputEnv) != ""
 	if !openAPIExport {
 		shutdown, err := observability.StartFromEnvironment(ctx, "identity-api")
@@ -109,6 +127,13 @@ func main() {
 		cfg.SessionIdleTTL = sessionIdleTTL
 	}
 	repositories := newRuntimeRepositories(openAPIExport)
+	var master *sql.DB
+	if !openAPIExport {
+		master, err = g.DB().Master()
+		if err != nil {
+			panic(fmt.Sprintf("identity database: %v", err))
+		}
+	}
 
 	// PAT HMAC secret: warn at startup when falling back to the insecure dev key.
 	cfg.PATHMACSecret = g.Cfg().MustGet(ctx, "pat.hmacSecret").String()
@@ -161,10 +186,6 @@ func main() {
 			Verifiers: challengeVerifiers,
 		})
 	} else {
-		master, masterErr := g.DB().Master()
-		if masterErr != nil {
-			panic(fmt.Sprintf("identity abuse database: %v", masterErr))
-		}
 		abuseModule, abuseErr = foundationabuse.NewPostgres(ctx, abuseCatalog, foundationabuse.PostgresOptions{
 			DB: master, InstanceKey: "identity", Verifiers: challengeVerifiers,
 		})
@@ -173,7 +194,95 @@ func main() {
 		panic(fmt.Sprintf("identity abuse module: %v", abuseErr))
 	}
 	svc.SetAbuseModule(abuseModule)
-	authCtl := controller.New(svc, secureCookie, cfg.SessionIdleTTL)
+	var privacyOwner privacy.OwnerHost
+	var privacyService controller.PrivacyService
+	if !openAPIExport {
+		workCatalog, err := work.Compile(identityprivacy.WorkDefinition())
+		if err != nil {
+			panic(fmt.Sprintf("identity privacy work catalog: %v", err))
+		}
+		workAdapter, err := workpostgres.New(ctx, workCatalog, workpostgres.Options{
+			DB: master, InstanceKey: "identity:privacy",
+		})
+		if err != nil {
+			panic(fmt.Sprintf("identity privacy work: %v", err))
+		}
+		var ownerConfigs []privacyOwnerConfig
+		if err := g.Cfg().MustGet(ctx, "privacy.owners").Scan(&ownerConfigs); err != nil {
+			panic(fmt.Sprintf("identity privacy owners: %v", err))
+		}
+		remoteOwners := map[privacy.OwnerKey]privacy.OwnerHost{}
+		seenOwners := map[privacy.OwnerKey]struct{}{}
+		var configuredOwners []privacy.OwnerDefinition
+		for _, configured := range ownerConfigs {
+			owner := privacy.OwnerKey(configured.Key)
+			if _, exists := seenOwners[owner]; exists {
+				panic(fmt.Sprintf("identity privacy owner %q is duplicated", owner))
+			}
+			seenOwners[owner] = struct{}{}
+			switch configured.Kind {
+			case "blog":
+				configuredOwners = append(configuredOwners, privacycatalog.BlogFor(owner))
+			case "notification":
+				if owner != privacycatalog.NotificationOwner {
+					panic(fmt.Sprintf("identity privacy notification owner key must be %q", privacycatalog.NotificationOwner))
+				}
+				configuredOwners = append(configuredOwners, privacycatalog.Notification())
+			default:
+				panic(fmt.Sprintf("identity privacy owner %q has unsupported kind %q", owner, configured.Kind))
+			}
+			if configured.URL == "" {
+				continue
+			}
+			tokenSource := &privacyhttp.ClientCredentialsTokenSource{
+				TokenURL: g.Cfg().MustGet(ctx, "privacy.tokenUrl").String(),
+				ClientID: configured.ClientID, ClientSecret: configured.ClientSecret,
+				Scope: "privacy:owner",
+			}
+			client, err := privacyadapter.NewClient(privacyadapter.ClientOptions{
+				Endpoint: configured.URL, TokenSource: tokenSource.Token,
+				AllowInsecureHTTP: configured.AllowInsecureHTTP,
+			})
+			if err != nil {
+				panic(fmt.Sprintf("identity privacy owner %s: %v", owner, err))
+			}
+			remoteOwners[owner] = client
+		}
+		identityPrivacy, err := identityprivacy.NewPostgres(ctx, identityprivacy.Options{
+			DB: master, InstanceKey: "identity", Remote: remoteOwners,
+			Owners: configuredOwners, Work: workAdapter,
+		})
+		if err != nil {
+			panic(fmt.Sprintf("identity privacy: %v", err))
+		}
+		privacyService = identityPrivacy
+		privacyOwner = identityPrivacy.OwnerHost()
+		workerID := "identity-privacy-worker"
+		if hostname, hostnameErr := os.Hostname(); hostnameErr == nil && hostname != "" {
+			workerID += ":" + hostname
+		}
+		runner, err := work.NewRunner(
+			workCatalog, workAdapter,
+			map[work.Kind]work.Handler{identityprivacy.DriveKind: identityPrivacy.WorkHandler()},
+			work.RunnerOptions{
+				WorkerID: workerID, PollInterval: time.Second,
+				OnError: func(err error) {
+					g.Log().Warningf(ctx, "identity privacy work runner error: %v", err)
+				},
+			},
+		)
+		if err != nil {
+			panic(fmt.Sprintf("identity privacy runner: %v", err))
+		}
+		workerContext, stopWorker := context.WithCancel(ctx)
+		defer stopWorker()
+		go func() {
+			if err := runner.Run(workerContext); err != nil && !errors.Is(err, context.Canceled) {
+				g.Log().Errorf(ctx, "identity privacy work runner stopped: %v", err)
+			}
+		}()
+	}
+	authCtl := controller.NewPrivacyAware(svc, secureCookie, privacyService, cfg.SessionIdleTTL)
 
 	// ── Bootstrap admin (RBAC) ───────────────────────────────────────────────
 	// If rbac.bootstrapAdminEmail is set and that identity already exists, grant
@@ -360,6 +469,9 @@ func main() {
 		grp.Bind(avatarCtl)
 		grp.Bind(capabilityCtl)
 		grp.Bind(guestCtl)
+		if privacyOwner != nil {
+			grp.POST("/api/internal/privacy/owner", privacyhttp.OwnerHandler(privacyOwner, "privacy:owner"))
+		}
 		grp.ALL("/api/v1/admin/assets-proxy/*", assetAdminProxy.Forward)
 		grp.ALL("/api/v1/admin/platform-proxy/*", platformCapabilityProxy.Forward)
 	})

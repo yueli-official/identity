@@ -7,6 +7,7 @@ import (
 
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/google/uuid"
+	"github.com/yueli-official/foundation/go/privacy"
 
 	v1 "platform/services/identity/api/v1"
 	"platform/services/identity/internal/logic"
@@ -19,6 +20,12 @@ type Controller struct {
 	svc          *logic.Service
 	secureCookie bool
 	sessionTTL   time.Duration
+	privacy      PrivacyService
+}
+
+type PrivacyService interface {
+	OpenErasure(context.Context, string, string, privacy.IdempotencyKey, string, time.Time, privacy.VerificationEvidence) (privacy.RightsRequestView, error)
+	GetByToken(context.Context, string, privacy.RightsRequestID) (privacy.RightsRequestView, error)
 }
 
 // New builds the controller. secureCookie should be true in production (HTTPS);
@@ -29,6 +36,17 @@ func New(svc *logic.Service, secureCookie bool, sessionTTL ...time.Duration) *Co
 		ttl = sessionTTL[0]
 	}
 	return &Controller{svc: svc, secureCookie: secureCookie, sessionTTL: ttl}
+}
+
+// NewPrivacyAware builds the runtime controller with the coordinator seam.
+// Keeping dependency wiring in a constructor prevents GoFrame from treating a
+// public setter method as an HTTP action during reflection-based binding.
+func NewPrivacyAware(
+	svc *logic.Service, secureCookie bool, privacyService PrivacyService, sessionTTL time.Duration,
+) *Controller {
+	controller := New(svc, secureCookie, sessionTTL)
+	controller.privacy = privacyService
+	return controller
 }
 
 func (c *Controller) Register(ctx context.Context, req *v1.RegisterReq) (*v1.RegisterRes, error) {

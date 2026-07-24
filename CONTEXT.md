@@ -36,6 +36,10 @@ _Avoid_: Identity 全局站点默认、浏览器可控值
 Identity 校验并应用安全上限后实际批准的期限；BFF 必须用它设置 cookie。
 _Avoid_: Access Token TTL
 
+**Privacy Status Capability（隐私状态能力）**:
+用户生成并自行保存的高熵秘密；Identity 只保存 digest，用于账号删除后读取同一 Rights Request。
+_Avoid_: 登录会话、公开 Request ID、跨站用户画像
+
 **Device Risk Signal（设备风险信号）**:
 可选的指纹、IP、UA 或行为特征，只参与滥用判断。
 _Avoid_: 身份、所有权键、认领证明
@@ -48,3 +52,4 @@ _Avoid_: 身份、所有权键、认领证明
 - client 必须已注册，token audience 必须属于该 client 的允许列表。
 - 同一 Guest Session 只能认领给一个 User；同 User 重试幂等，其他 User 冲突。
 - 浏览器指纹永远不能替代 Guest Session。
+- Identity 只编排其他 Data Owner；账号删除是最终化任务，状态能力不授予任何其他账户权限。

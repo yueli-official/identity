@@ -21,6 +21,9 @@ Identity 是站群唯一身份提供方，负责账户、凭据、公开资料�
 
 - `/api/v1/auth/*`：注册、密码登录/退出、验证、密码重置/修改和可选 Google 登录。
 - `/api/v1/session/*`：当前身份、资料与媒体更新、凭据和会话/设备管理。
+- `POST /api/v1/session/privacy/erasure`：用稳定幂等键、请求时间和客户端生成的状态能力令牌发起删除。
+- `POST /api/v1/privacy/requests/{id}/status`：凭状态能力令牌继续驱动并读取聚合结果，账号删除后仍可用。
+- `POST /api/internal/privacy/owner`：供实例内协调协议调用的 Identity Owner Host，要求 `privacy:owner`。
 - `/api/v1/profiles*`：公开资料查询。
 - `/api/v1/pat*`：个人访问令牌生命周期和验证。
 - `/api/v1/admin/*`：用户、能力、provider 运维，以及 Account 使用的限域平台服务代理。
@@ -37,6 +40,7 @@ Identity 是站群唯一身份提供方，负责账户、凭据、公开资料�
 - `internal/oidc/`：Fosite store、PG 事务 adapter、claims 和密钥。
 - `internal/dao/`、`internal/repo/`：持久化与缓存 seam。
 - `internal/controller/`：业务、OIDC 与 OAuth 登录 HTTP seam。
+- `internal/identityprivacy/`：实例本地 Coordinator、最终化 Identity Owner 与状态能力映射。
 - `manifest/config/`：配置模板，真实配置被 Git 忽略。
 - `manifest/sql/migrations/`：唯一 schema 历史权威。
 
@@ -57,3 +61,10 @@ go test ./services/identity/...
 ```
 
 集成测试使用 `TEST_PG_LINK` 和 `TEST_REDIS_ADDR`。生产 wiring 绝不能把 PG 会话/OIDC store 替换为内存实现。
+
+Privacy 的远程 Owner URL 与 confidential OAuth client 在 `privacy.*` 配置，并由部署 Catalog 的
+`privacy:owner` service client 自动生成。每个独立站点使用 `site.<slug>` Owner key；协调器只冻结当前部署
+实际存在的 Owner，不假设所有产品或 Notification 永远同部署。Identity 只保存请求、任务和最小回执；
+Blog 与 Notification 仍直接拥有数据。Identity Owner 被声明为 finalizer，只有其他 Owner 全部终态后才
+删除账号。独立 `identity:privacy` Work 实例会持续恢复 Owner 不可用或响应丢失的请求。
+`PRIVACY_CONSUMER_PG_DSN` 可运行真实 PostgreSQL 编排测试。

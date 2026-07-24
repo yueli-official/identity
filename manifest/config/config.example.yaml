@@ -22,30 +22,30 @@ database:
     name: "identity"
 redis:
   default:
-    address: ""  # override via GF_REDIS_DEFAULT_ADDRESS env var at runtime
+    address: "" # override via GF_REDIS_DEFAULT_ADDRESS env var at runtime
     db: 0
 auth:
-  sessionIdleTtl: "720h"  # 30 days; Redis is a cache, PG remains the durable session source
+  sessionIdleTtl: "720h" # 30 days; Redis is a cache, PG remains the durable session source
 abuse:
   turnstile:
-    secret: ""              # optional; set via secret manager to enable challenge escalation
-    endpoint: ""            # empty uses Cloudflare Siteverify
-    hostnames: []           # trusted public account hostnames, never derive from the request Host
+    secret: "" # optional; set via secret manager to enable challenge escalation
+    endpoint: "" # empty uses Cloudflare Siteverify
+    hostnames: [] # trusted public account hostnames, never derive from the request Host
 guest:
-  maxSessionTtl: "720h"   # site BFF supplies its requested TTL; Identity enforces this ceiling
-  accessTokenTtl: "10m"   # short-lived resource JWT, independent of the durable guest session
+  maxSessionTtl: "720h" # site BFF supplies its requested TTL; Identity enforces this ceiling
+  accessTokenTtl: "10m" # short-lived resource JWT, independent of the durable guest session
 oidc:
   issuer: "http://localhost:8081"
   audience: "identity-api" # audience for scoped machine discovery tokens
-  refreshTtl: "720h"      # 30 days; access/id tokens stay 10m (set in code)
-  globalSecret: ""        # set via env GF_OIDC_GLOBALSECRET (>=32 bytes), never commit a real value
+  refreshTtl: "720h" # 30 days; access/id tokens stay 10m (set in code)
+  globalSecret: "" # set via env GF_OIDC_GLOBALSECRET (>=32 bytes), never commit a real value
   google:
-    clientId: ""        # set via env GF_OIDC_GOOGLE_CLIENTID
-    clientSecret: ""    # set via env GF_OIDC_GOOGLE_CLIENTSECRET
-    redirectUrl: "http://localhost:3000/api/v1/auth/oauth/google/callback"  # env GF_OIDC_GOOGLE_REDIRECTURL
+    clientId: "" # set via env GF_OIDC_GOOGLE_CLIENTID
+    clientSecret: "" # set via env GF_OIDC_GOOGLE_CLIENTSECRET
+    redirectUrl: "http://localhost:3000/api/v1/auth/oauth/google/callback" # env GF_OIDC_GOOGLE_REDIRECTURL
 account:
   loginUrl: "http://localhost:3000/login"
-  baseUrl: "http://localhost:3000"   # env GF_ACCOUNT_BASEURL — used to build email links
+  baseUrl: "http://localhost:3000" # env GF_ACCOUNT_BASEURL — used to build email links
 asset:
   baseUrl: "http://localhost:8082"
   audience: "asset-api"
@@ -59,8 +59,26 @@ notification:
   clientId: "identity-notification-svc"
   clientSecret: ""
   scope: "notification:send"
+privacy:
+  # Every independent site instance has its own Owner key and credential.
+  # Deployed endpoints use HTTPS unless an isolated internal network explicitly
+  # sets allowInsecureHttp while workload TLS is unavailable.
+  tokenUrl: "http://localhost:8081/oauth2/token"
+  owners:
+    - key: "notification"
+      kind: "notification"
+      url: "http://localhost:8089/api/internal/privacy/owner"
+      clientId: "identity-notification-privacy-svc"
+      clientSecret: ""
+      allowInsecureHttp: false
+    - key: "site.blog-local"
+      kind: "blog"
+      url: "http://localhost:8085/api/internal/privacy/owner"
+      clientId: "identity-blog-local-privacy"
+      clientSecret: ""
+      allowInsecureHttp: false
 rbac:
   # The default role granted to new identities is the DefaultRole const in
   # internal/logic/roles.go (kept in lockstep with the migration 0006 seed),
   # not a config value — so no defaultRole key here.
-  bootstrapAdminEmail: ""   # env GF_RBAC_BOOTSTRAPADMINEMAIL — granted admin at startup if the identity exists
+  bootstrapAdminEmail: "" # env GF_RBAC_BOOTSTRAPADMINEMAIL — granted admin at startup if the identity exists
