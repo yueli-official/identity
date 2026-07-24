@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import QRCode from 'qrcode'
 import { createPlatformNotifier } from '@platform/ui/feedback'
 import type { TOTPEnrollment, TOTPEntry } from '~/composables/useMFA'
 import { mfaErrorMessage } from '~/composables/useMFA'
@@ -18,7 +17,7 @@ const enrollment = ref<TOTPEnrollment>()
 const recoveryCodes = ref<string[]>([])
 const code = ref('')
 const selected = ref<TOTPEntry>()
-const qrCanvas = useTemplateRef<HTMLCanvasElement>('qrCanvas')
+const qrDataUrl = ref('')
 const enrollmentExpiry = useExpiryCountdown(() => enrollment.value?.expiresAt ?? '')
 
 const { data, pending, refresh } = await useAsyncData(
@@ -31,6 +30,7 @@ const entries = computed(() => data.value.entries)
 function clearEnrollment() {
   code.value = ''
   enrollment.value = undefined
+  qrDataUrl.value = ''
 }
 
 function cancelEnrollment() {
@@ -50,16 +50,12 @@ async function startEnrollment() {
     stage.value = 'verify'
     code.value = ''
     recoveryCodes.value = []
+    const qr = await $fetch<{ dataUrl: string }>('/api/totp-qr', {
+      method: 'POST',
+      body: { value: enrollment.value.uri },
+    })
+    qrDataUrl.value = qr.dataUrl
     modalOpen.value = true
-    await nextTick()
-    if (qrCanvas.value) {
-      await QRCode.toCanvas(qrCanvas.value, enrollment.value.uri, {
-        width: 208,
-        margin: 1,
-        errorCorrectionLevel: 'M',
-        color: { dark: '#111827', light: '#ffffff' },
-      })
-    }
   } catch (error) {
     toast.add({ title: '无法开始设置', description: mfaErrorMessage(error), color: 'error' })
   } finally {
@@ -75,12 +71,6 @@ async function confirmEnrollment() {
     recoveryCodes.value = result.recoveryCodes
     stage.value = 'recovery'
     await refresh()
-    toast.add({
-      title: '双重验证已启用',
-      description: '请立即保存恢复代码，它们不会再次显示。',
-      color: 'success',
-      icon: 'i-tabler-shield-check',
-    })
   } catch (error) {
     toast.add({ title: '验证码未通过', description: mfaErrorMessage(error), color: 'error' })
   } finally {
@@ -91,6 +81,7 @@ async function confirmEnrollment() {
 async function copyRecoveryCodes() {
   try {
     await navigator.clipboard.writeText(recoveryCodes.value.join('\n'))
+    // feedback-contract: Clipboard success has no durable inline state the page can observe.
     toast.add({ title: '恢复代码已复制', color: 'success' })
   } catch {
     toast.add({
@@ -135,7 +126,6 @@ async function confirmRemove() {
     await mfa.removeTOTP(selected.value.id)
     await refresh()
     removeOpen.value = false
-    toast.add({ title: '身份验证器已移除', color: 'success' })
   } catch (error) {
     toast.add({ title: '无法移除身份验证器', description: mfaErrorMessage(error), color: 'error' })
   } finally {
@@ -240,7 +230,13 @@ function formatDate(value?: string) {
         <template v-else>
         <div class="grid gap-5 sm:grid-cols-[208px_1fr] sm:items-center">
           <div class="mx-auto overflow-hidden rounded-xl border border-default bg-white p-2">
-            <canvas ref="qrCanvas" class="block size-52" aria-label="身份验证器设置二维码" />
+            <img
+              :src="qrDataUrl"
+              width="208"
+              height="208"
+              class="block size-52"
+              alt="身份验证器设置二维码"
+            >
           </div>
           <div class="space-y-3">
             <p class="text-sm text-muted">

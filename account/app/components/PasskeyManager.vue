@@ -37,12 +37,6 @@ async function addPasskey() {
     await passkeys.register(defaultLabel())
     await refresh()
     emit('changed')
-    toast.add({
-      title: '通行密钥已添加',
-      description: '现在可以使用设备解锁方式登录。',
-      color: 'success',
-      icon: 'i-tabler-key',
-    })
   } catch (error) {
     toast.add({ title: '未能添加通行密钥', description: passkeyErrorMessage(error), color: 'error' })
   } finally {
@@ -67,7 +61,6 @@ async function submitRename() {
     await passkeys.rename(selected.value.id, renameLabel.value.trim())
     await refresh()
     renameOpen.value = false
-    toast.add({ title: '名称已更新', color: 'success' })
   } catch (error) {
     toast.add({ title: '重命名失败', description: passkeyErrorMessage(error), color: 'error' })
   } finally {
@@ -88,7 +81,6 @@ async function confirmRemove() {
     await refresh()
     emit('changed')
     removeOpen.value = false
-    toast.add({ title: '通行密钥已移除', color: 'success' })
   } catch (error) {
     toast.add({
       title: '无法移除通行密钥',
