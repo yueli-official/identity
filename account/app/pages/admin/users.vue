@@ -50,7 +50,7 @@ interface UserStats {
 
 // ── Filters / paging ─────────────────────────────────────────────────────────
 const ALL = '__all__' as const
-type UserStatus = '' | AdminUser['status']
+type UserStatus = typeof ALL | AdminUser['status']
 type UserRole = typeof ALL | 'user' | 'admin'
 type UserSort = 'createdAt' | 'displayName'
 type UserDirection = 'asc' | 'desc'
@@ -64,11 +64,11 @@ interface UserCollectionQuery {
   size: number
 }
 
-const statuses = ['', 'active', 'disabled', 'deleted'] as const
+const statuses = [ALL, 'active', 'disabled', 'deleted'] as const
 const roles = [ALL, 'user', 'admin'] as const
 const sorts = ['createdAt', 'displayName'] as const
 const pageSizes = [20, 50, 100] as const
-const defaultQuery: UserCollectionQuery = { q: '', status: '', role: ALL, sort: 'createdAt', direction: 'desc', page: 1, size: 20 }
+const defaultQuery: UserCollectionQuery = { q: '', status: ALL, role: ALL, sort: 'createdAt', direction: 'desc', page: 1, size: 20 }
 const queryPolicy = createJsonCollectionQueryPolicy<UserCollectionQuery>()
 const searchInput = ref('')
 const sync = createVueRouterCollectionQuerySync({
@@ -95,7 +95,7 @@ async function load(nextQuery: Readonly<UserCollectionQuery>, activeWorkflow: Co
         page: nextQuery.page,
         size: nextQuery.size,
         keyword: nextQuery.q || undefined,
-        status: nextQuery.status || undefined,
+        status: nextQuery.status !== ALL ? nextQuery.status : undefined,
         role: nextQuery.role !== ALL ? nextQuery.role : undefined,
         orderBy: nextQuery.sort === 'displayName' ? 'display_name' : 'created_at',
         order: nextQuery.direction
@@ -445,7 +445,7 @@ const sortItems = [
   { label: '昵称', value: 'displayName' }
 ]
 const statusItems = computed(() => [
-  { label: `全部状态 (${stats.value.active + stats.value.disabled})`, value: '' },
+  { label: `全部状态 (${stats.value.active + stats.value.disabled})`, value: ALL },
   { label: `正常 (${stats.value.active})`, value: 'active' },
   { label: `已封禁 (${stats.value.disabled})`, value: 'disabled' },
   { label: `已删除 (${stats.value.deleted})`, value: 'deleted' }
@@ -507,7 +507,7 @@ const userLabel = (user: AdminUser) => user.displayName || user.email
 <template>
   <div>
     <PageHeader title="用户管理">
-      <template #subtitle>站群全局账户 —— 封禁、删除、重置密码、授予管理员</template>
+      <template #subtitle>Identity 全局账户 —— 状态、凭据与控制面管理员</template>
       <template #actions>
         <div class="flex items-center gap-3">
           <div class="hidden items-center gap-2 sm:flex">
@@ -656,7 +656,7 @@ const userLabel = (user: AdminUser) => user.displayName || user.email
           <div class="flex items-center justify-between gap-4 border-t border-default pt-4">
             <div>
               <p class="text-sm font-medium text-default">管理员权限</p>
-              <p class="text-xs text-muted">授予后该账户可访问站群所有管理后台</p>
+              <p class="text-xs text-muted">仅授予 Identity 与基础服务控制面；各产品站权限仍由实例本地角色决定</p>
             </div>
             <UButton
               :color="detailUser.roles.includes('admin') ? 'error' : 'primary'"

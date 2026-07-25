@@ -58,6 +58,10 @@ const manifestEnvelopeSchema = z.object({
   data: z.object({ manifest: capabilityManifestSchema }).strict(),
 }).strict()
 
+const manifestResponseSchema = z.object({
+  manifest: capabilityManifestSchema,
+}).strict()
+
 const providerEnvelopeSchema = z.object({
   code: z.literal('ok'),
   data: z.object({
@@ -65,9 +69,17 @@ const providerEnvelopeSchema = z.object({
   }).strict(),
 }).strict()
 
+const providerResponseSchema = z.object({
+  provider: providerItemSchema,
+}).strict()
+
+const sessionSchema = z.object({
+  roles: z.array(z.string()),
+})
+
 const sessionEnvelopeSchema = z.object({
   code: z.literal('ok'),
-  data: z.object({ roles: z.array(z.string()) }).strict(),
+  data: sessionSchema,
 }).strict()
 
 const capabilityConstraintSchema = z.string().regex(/^(?:>=|=)?\d+\.\d+(?:\.\d+)?$/)
@@ -90,8 +102,8 @@ export async function requirePlatformAdmin(event: H3Event) {
       headers: identityHeaders(event),
       signal: AbortSignal.timeout(2500),
     })
-    const session = sessionEnvelopeSchema.parse(response)
-    if (!session.data.roles.includes('admin')) {
+    const roles = parsePlatformAdminRoles(response)
+    if (!roles.includes('admin')) {
       throw createError({ statusCode: 403, statusMessage: 'Admin role required' })
     }
   } catch (error) {
@@ -100,6 +112,12 @@ export async function requirePlatformAdmin(event: H3Event) {
     if (status === 403) throw createError({ statusCode: 403, statusMessage: 'Admin role required' })
     throw createError({ statusCode: 503, statusMessage: 'Identity service unavailable' })
   }
+}
+
+export function parsePlatformAdminRoles(response: unknown): string[] {
+  const direct = sessionSchema.safeParse(response)
+  if (direct.success) return direct.data.roles
+  return sessionEnvelopeSchema.parse(response).data.roles
 }
 
 export async function fetchPlatformService(event: H3Event, key: PlatformServiceKey): Promise<PlatformServiceResult> {
@@ -133,6 +151,12 @@ export async function fetchPlatformService(event: H3Event, key: PlatformServiceK
 }
 
 export function parsePlatformManifest(key: PlatformServiceKey, response: unknown): CapabilityManifest | undefined {
+  const direct = manifestResponseSchema.safeParse(response)
+  if (direct.success) {
+    return direct.data.manifest.service.name === key
+      ? direct.data.manifest as CapabilityManifest
+      : undefined
+  }
   const envelope = manifestEnvelopeSchema.safeParse(response)
   if (!envelope.success || envelope.data.data.manifest.service.name !== key) return undefined
   return envelope.data.data.manifest as CapabilityManifest
@@ -262,11 +286,18 @@ export async function probePlatformProvider(event: H3Event, key: PlatformService
     const statusCode = platformProbeFailureStatus(error)
     throw createError({ statusCode, statusMessage: statusCode === 429 ? 'Provider probe rate limited' : 'Provider probe failed' })
   }
-  const parsed = providerEnvelopeSchema.safeParse(response)
-  if (!parsed.success) {
+  const parsedProvider = parsePlatformProviderResponse(response)
+  if (!parsedProvider) {
     throw createError({ statusCode: 502, statusMessage: 'Provider response does not match Manifest v1' })
   }
-  return parsed.data.data.provider as ProviderItem
+  return parsedProvider
+}
+
+export function parsePlatformProviderResponse(response: unknown): ProviderItem | undefined {
+  const direct = providerResponseSchema.safeParse(response)
+  if (direct.success) return direct.data.provider as ProviderItem
+  const envelope = providerEnvelopeSchema.safeParse(response)
+  return envelope.success ? envelope.data.data.provider as ProviderItem : undefined
 }
 
 function failure(key: PlatformServiceKey, status: PlatformServiceResult['status'], observedAt: string, startedAt: number, code: string, message: string): PlatformServiceResult {

@@ -743,7 +743,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
 <template>
   <div>
     <PageHeader title="资源管理">
-      <template #subtitle>站群共享素材控制面:站点、Profile、Variant、素材库和交付授权</template>
+      <template #subtitle>共享素材控制面：素材运营、安全授权、配置与存储维护</template>
       <template #actions>
         <div class="flex items-center gap-2">
           <UButton icon="i-tabler-refresh" label="刷新" color="neutral" variant="soft" @click="reloadAll()" />

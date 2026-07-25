@@ -121,7 +121,7 @@ async function probeProvider(provider: string) {
 
       <section aria-labelledby="capabilities-title">
         <div class="mb-3 flex items-center justify-between gap-3">
-          <h2 id="capabilities-title" class="font-display text-sm font-semibold text-highlighted">Capabilities</h2>
+          <h2 id="capabilities-title" class="font-display text-sm font-semibold text-highlighted">运行能力</h2>
           <UBadge color="neutral" variant="soft" :label="`${manifest.capabilities.length} 项`" />
         </div>
         <div class="space-y-3">
@@ -156,7 +156,7 @@ async function probeProvider(provider: string) {
 
       <section aria-labelledby="providers-title">
         <div class="mb-3 flex items-center justify-between gap-3">
-          <h2 id="providers-title" class="font-display text-sm font-semibold text-highlighted">Providers</h2>
+          <h2 id="providers-title" class="font-display text-sm font-semibold text-highlighted">Provider 实例</h2>
           <UBadge color="neutral" variant="soft" :label="`${manifest.providers.length} 项`" />
         </div>
         <div aria-live="polite" aria-atomic="true">

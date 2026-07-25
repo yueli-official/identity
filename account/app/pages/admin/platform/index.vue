@@ -17,6 +17,14 @@ const issues = computed(() => services.value.flatMap(service =>
     .filter(capability => capability.support === 'supported' && capability.enablement === 'enabled' && !capability.effective)
     .map(capability => ({ service: service.key, capability })),
 ))
+const unavailableServices = computed(() =>
+  data.value ? data.value.summary.total - data.value.summary.available : 0,
+)
+const attentionCount = computed(() =>
+  unavailableServices.value
+  + (data.value?.summary.capabilityIssues ?? 0)
+  + (data.value?.summary.applicationGaps ?? 0),
+)
 const gapLabels: Record<CapabilityGapReason, string> = {
   service_unavailable: '服务不可达',
   capability_missing: '能力未声明',
@@ -105,6 +113,23 @@ async function refreshStatus() {
           </UCard>
         </div>
       </section>
+
+      <UAlert
+        v-if="attentionCount"
+        color="warning"
+        variant="subtle"
+        icon="i-tabler-alert-triangle"
+        :title="`${attentionCount} 项运行问题需要检查`"
+        :description="`${unavailableServices} 个服务不可达，${data.summary.capabilityIssues} 项启用能力无效，${data.summary.applicationGaps} 项应用能力契约未满足。`"
+      />
+      <UAlert
+        v-else
+        color="success"
+        variant="subtle"
+        icon="i-tabler-circle-check"
+        title="平台能力与应用契约均处于可用状态"
+        description="所有基础服务可达，已启用能力有效，Catalog 中声明的应用要求均已满足。"
+      />
 
       <section aria-labelledby="platform-services-title">
         <h2 id="platform-services-title" class="font-display mb-3 text-sm font-semibold text-highlighted">基础服务</h2>

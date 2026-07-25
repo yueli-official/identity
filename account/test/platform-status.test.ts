@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
-import { aggregatePlatformServices, capabilityManifestSchema, capabilityVersionSatisfies, classifyPlatformServiceFailure, evaluateCapabilityRequirements, manifestAgeSeconds, mergeCapabilityRequirements, parsePlatformManifest, platformProbeFailureStatus, readCapabilityRequirements } from '../server/utils/platform-status'
+import { aggregatePlatformServices, capabilityManifestSchema, capabilityVersionSatisfies, classifyPlatformServiceFailure, evaluateCapabilityRequirements, manifestAgeSeconds, mergeCapabilityRequirements, parsePlatformAdminRoles, parsePlatformManifest, parsePlatformProviderResponse, platformProbeFailureStatus, readCapabilityRequirements } from '../server/utils/platform-status'
 import type { PlatformServiceResult } from '../shared/types/platform'
 
 function envelope(value = manifest()) {
@@ -26,6 +26,35 @@ function manifest() {
 }
 
 describe('platform capability BFF schema', () => {
+  it('accepts current raw and legacy envelope session responses', () => {
+    expect(parsePlatformAdminRoles({ id: 'user-1', roles: ['admin', 'user'] })).toEqual(['admin', 'user'])
+    expect(parsePlatformAdminRoles({ code: 'ok', data: { roles: ['admin'] } })).toEqual(['admin'])
+  })
+
+  it('accepts current raw and legacy envelope manifest responses', () => {
+    expect(parsePlatformManifest('asset', { manifest: manifest() })?.service.name).toBe('asset')
+    expect(parsePlatformManifest('asset', envelope())?.service.name).toBe('asset')
+  })
+
+  it('accepts current raw and legacy envelope provider responses', () => {
+    const provider = {
+      key: 'local-dev',
+      adapter: 'local',
+      registered: true,
+      capabilityKeys: ['asset.object-storage'],
+      verifiedCompatibility: ['1.0'],
+      configuration: 'complete',
+      enablement: 'enabled',
+      health: 'healthy',
+      effective: true,
+      operations: ['put'],
+      requiredConfig: [],
+      links: [],
+    }
+    expect(parsePlatformProviderResponse({ provider })?.key).toBe('local-dev')
+    expect(parsePlatformProviderResponse({ code: 'ok', data: { provider } })?.key).toBe('local-dev')
+  })
+
   it('accepts a strict Manifest v1 response', () => {
     const parsed = capabilityManifestSchema.parse(manifest())
     expect(parsed.capabilities[0]?.requiredConfig[0]).toEqual({ key: 'secret_key', state: 'present', secret: true })
