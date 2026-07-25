@@ -56,6 +56,12 @@ CREATE TABLE identities(id uuid PRIMARY KEY, email text NOT NULL, status text NO
 CREATE TABLE audit_logs(actor_identity_id uuid, target_identity_id uuid);
 CREATE TABLE oidc_oauth_requests(subject text);
 CREATE TABLE oidc_refresh_tokens(subject text);
+CREATE TABLE github_identity_bindings(
+  id uuid PRIMARY KEY, identity_id uuid NOT NULL, provider_account_id text NOT NULL,
+  provider_node_id text NOT NULL, login_snapshot text NOT NULL,
+  avatar_url_snapshot text NOT NULL, status text NOT NULL,
+  unbound_at timestamptz, erased_at timestamptz, updated_at timestamptz NOT NULL
+);
 CREATE TABLE identity_privacy_requests(
   request_id text PRIMARY KEY, identity_id uuid NOT NULL,
   status_token_hash text NOT NULL, created_at timestamptz NOT NULL DEFAULT now()
@@ -64,6 +70,15 @@ INSERT INTO identities(id,email,status)
 VALUES ('00000000-0000-0000-0000-000000000101','owner@example.com','active');
 INSERT INTO audit_logs(target_identity_id)
 VALUES ('00000000-0000-0000-0000-000000000101');
+INSERT INTO github_identity_bindings(
+  id, identity_id, provider_account_id, provider_node_id, login_snapshot,
+  avatar_url_snapshot, status, updated_at
+) VALUES (
+  '00000000-0000-0000-0000-000000000201',
+  '00000000-0000-0000-0000-000000000101',
+  '123456', 'U_123456', 'publisher-login', 'https://images.test/a',
+  'active', now()
+);
 `); err != nil {
 		t.Fatal(err)
 	}
@@ -142,6 +157,26 @@ SELECT EXISTS(SELECT 1 FROM identities WHERE id='00000000-0000-0000-0000-0000000
 	}
 	if accountExists {
 		t.Fatal("identity account was not finalized")
+	}
+	var (
+		accountID     string
+		login         string
+		bindingStatus string
+		erasedAt      *time.Time
+	)
+	if err := db.QueryRowContext(ctx, `
+SELECT provider_account_id, login_snapshot, status, erased_at
+FROM github_identity_bindings
+WHERE id='00000000-0000-0000-0000-000000000201'
+`).Scan(&accountID, &login, &bindingStatus, &erasedAt); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(accountID, "erased:") || login != "erased" ||
+		bindingStatus != "unbound" || erasedAt == nil {
+		t.Fatalf(
+			"GitHub binding was not privacy-scrubbed: account=%q login=%q status=%q erased=%v",
+			accountID, login, bindingStatus, erasedAt,
+		)
 	}
 	status, err := service.GetByToken(ctx, strings.Repeat("s", 48), view.ID)
 	if err != nil || status.Phase != privacy.RequestComplete {

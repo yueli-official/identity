@@ -32,6 +32,8 @@ var (
 	ErrSigningUnavailable   = errors.New("publisher signing is unavailable")
 	ErrInvalidTrustManifest = errors.New("publisher trust manifest is invalid")
 	ErrUntrustedRoot        = errors.New("publisher trust root is not trusted")
+	ErrRotationPending      = errors.New("publisher key rotation is already pending")
+	ErrInvalidKeyTransition = errors.New("publisher key state transition is invalid")
 )
 
 type ArtifactPolicy struct {

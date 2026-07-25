@@ -165,7 +165,9 @@ func jwkThumbprint(public *ecdsa.PublicKey) (string, error) {
 }
 
 func verifierFromKey(key VerificationKey) (ecdsaVerifier, error) {
-	if key.Purpose != KeyPurpose || (key.Status != "active" && key.Status != "retired") || key.Algorithm != "ES256" {
+	if key.Purpose != KeyPurpose ||
+		(key.Status != KeyStatusActive && key.Status != KeyStatusRetired) ||
+		key.Algorithm != "ES256" {
 		return ecdsaVerifier{}, ErrInvalidAttestation
 	}
 	if key.PublicJWK["kty"] != "EC" || key.PublicJWK["crv"] != "P-256" {

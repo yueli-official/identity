@@ -210,11 +210,12 @@ func coreCapabilities() []capability.Capability {
 		link       string
 	}{
 		{"identity.external-login", []string{"authorize", "callback", "link", "unlink"}, "/api/v1/session/credentials"},
+		{"identity.github-binding", []string{"authorize", "bind", "list", "unlink", "revoke", "authorize_submission"}, "/api/v1/account/github-bindings"},
 		{"identity.jwks", []string{"get"}, "/oauth2/jwks.json"},
 		{"identity.oidc", []string{"authorize", "end_session", "revoke", "token", "userinfo"}, "/.well-known/openid-configuration"},
 		{"identity.pat", []string{"create", "list", "revoke", "verify"}, "/api/v1/pat"},
 		{"identity.profile", []string{"get", "update", "upload_avatar", "upload_cover"}, "/api/v1/session/me"},
-		{"identity.publisher-attestation", []string{"issue", "verification_keys", "trust_manifest", "verify_offline"}, "/api/v1/account/publisher-attestations"},
+		{"identity.publisher-attestation", []string{"issue", "verification_keys", "trust_manifest", "verify_offline", "manage_keys"}, "/api/v1/account/publisher-attestations"},
 		{"identity.reset-password", []string{"request", "reset"}, "/api/v1/auth/password/forgot"},
 		{"identity.user-admin", []string{"audit", "create", "delete", "get", "list", "reset_password", "roles", "update_status"}, "/api/v1/admin/users"},
 		{"identity.verify-email", []string{"request", "verify"}, "/api/v1/auth/email/verify-request"},

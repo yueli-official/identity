@@ -5,6 +5,7 @@ import (
 
 	"github.com/gogf/gf/v2/frame/g"
 	"platform/services/identity/internal/actor"
+	"platform/services/identity/internal/githubbinding"
 	"platform/services/identity/internal/publisher"
 	"platform/services/identity/internal/repo"
 )
@@ -41,6 +42,16 @@ const (
 	EvAdminPasswordReset = "admin.password_reset"
 
 	EvPublisherAttestationIssued = "publisher.attestation_issued"
+	EvPublisherKeyPrepared       = "publisher.key_prepared"
+	EvPublisherManifestApplied   = "publisher.manifest_applied"
+
+	EvGitHubBindingVerified      = "github.binding_verified"
+	EvGitHubBindingRenamed       = "github.binding_login_refreshed"
+	EvGitHubBindingUnbound       = "github.binding_unbound"
+	EvGitHubAuthorizationRevoked = "github.authorization_revoked"
+	EvGitHubBindingFailed        = "github.binding_failed"
+	EvGitHubSubmissionAuthorized = "github.submission_authorized"
+	EvGitHubSubmissionDenied     = "github.submission_denied"
 )
 
 // AuditEvent is the logic-layer description of one auditable event. IP/UA/request-id
@@ -53,6 +64,38 @@ type AuditEvent struct {
 	ClientID string
 	Result   string // "" → "success"
 	Detail   map[string]any
+}
+
+func (s *Service) RecordPublisherKeyPrepared(
+	ctx context.Context,
+	adminID string,
+	key publisher.VerificationKey,
+) {
+	s.audit(ctx, AuditEvent{
+		Event: EvPublisherKeyPrepared, ActorID: adminID,
+		Detail: map[string]any{
+			"key_id": key.KeyID, "algorithm": key.Algorithm,
+			"purpose": key.Purpose, "status": key.Status,
+		},
+	})
+}
+
+func (s *Service) RecordPublisherManifestApplied(
+	ctx context.Context,
+	adminID string,
+	value publisher.VerifiedTrustManifest,
+	activeKeyID string,
+) {
+	s.audit(ctx, AuditEvent{
+		Event: EvPublisherManifestApplied, ActorID: adminID,
+		Detail: map[string]any{
+			"manifest_version": value.Manifest.ManifestVersion,
+			"snapshot_hash":    value.SnapshotHash,
+			"root_key_id":      value.Manifest.RootKeyID,
+			"active_key_id":    activeKeyID,
+			"signing_enabled":  activeKeyID != "",
+		},
+	})
 }
 
 // QueryAudit is a thin read-only passthrough to the store so the controller
@@ -103,6 +146,104 @@ func (s *Service) RecordPublisherAttestation(
 			"artifact_identity": value.Artifact.Identity,
 			"artifact_version":  value.Artifact.Version,
 			"key_id":            value.KeyID,
+		},
+	})
+}
+
+func (s *Service) RecordGitHubBindingVerified(
+	ctx context.Context,
+	binding githubbinding.Binding,
+	created bool,
+	renamed bool,
+) {
+	event := EvGitHubBindingVerified
+	if renamed {
+		event = EvGitHubBindingRenamed
+	}
+	s.audit(ctx, AuditEvent{
+		Event: event, ActorID: binding.IdentityID, TargetID: binding.IdentityID,
+		Detail: map[string]any{
+			"binding_id": binding.ID, "provider": binding.Provider,
+			"provider_account_id": binding.ProviderAccountID,
+			"login_snapshot":      binding.Login, "created": created,
+			"renamed": renamed,
+		},
+	})
+}
+
+func (s *Service) RecordGitHubBindingUnbound(
+	ctx context.Context,
+	binding githubbinding.Binding,
+) {
+	s.audit(ctx, AuditEvent{
+		Event:   EvGitHubBindingUnbound,
+		ActorID: binding.IdentityID, TargetID: binding.IdentityID,
+		Detail: map[string]any{
+			"binding_id":          binding.ID,
+			"provider_account_id": binding.ProviderAccountID,
+			"login_snapshot":      binding.Login,
+		},
+	})
+}
+
+func (s *Service) RecordGitHubAuthorizationRevoked(
+	ctx context.Context,
+	binding githubbinding.Binding,
+	deliveryID string,
+) {
+	s.audit(ctx, AuditEvent{
+		Event: EvGitHubAuthorizationRevoked, TargetID: binding.IdentityID,
+		Detail: map[string]any{
+			"binding_id":          binding.ID,
+			"provider_account_id": binding.ProviderAccountID,
+			"login_snapshot":      binding.Login, "delivery_id": deliveryID,
+		},
+	})
+}
+
+func (s *Service) RecordGitHubBindingFailure(ctx context.Context, reason string) {
+	s.audit(ctx, AuditEvent{
+		Event: EvGitHubBindingFailed, Result: "failure",
+		Detail: map[string]any{"reason": reason},
+	})
+}
+
+func (s *Service) RecordGitHubSubmissionAuthorized(
+	ctx context.Context,
+	clientID string,
+	publisherSubject string,
+	bindingID string,
+	manifestDigest string,
+	repositoryID string,
+	pullRequestNumber int64,
+	headCommitSHA string,
+) {
+	s.audit(ctx, AuditEvent{
+		Event: EvGitHubSubmissionAuthorized, TargetID: publisherSubject,
+		ClientID: clientID,
+		Detail: map[string]any{
+			"binding_id": bindingID, "manifest_digest": manifestDigest,
+			"repository_id":       repositoryID,
+			"pull_request_number": pullRequestNumber,
+			"head_commit_sha":     headCommitSHA,
+		},
+	})
+}
+
+func (s *Service) RecordGitHubSubmissionDenied(
+	ctx context.Context,
+	clientID string,
+	reason string,
+	accountID string,
+	repositoryID string,
+	pullRequestNumber int64,
+) {
+	s.audit(ctx, AuditEvent{
+		Event: EvGitHubSubmissionDenied, ClientID: clientID, Result: "failure",
+		Detail: map[string]any{
+			"reason": reason, "provider_account_id": accountID,
+			"repository_id":       repositoryID,
+			"pull_request_number": pullRequestNumber,
 		},
 	})
 }

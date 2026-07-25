@@ -64,10 +64,13 @@ account:
   loginUrl: "http://localhost:3000/login"
   baseUrl: "http://localhost:3000" # env GF_ACCOUNT_BASEURL — used to build email links
 publisher:
-  # local-file is development-only and creates a 0600 P-256 PEM at keyFile.
+  # local-file is development-only and creates a 0600 versioned key ring.
   # Production must provide a KMS/HSM KeyProvider adapter before enabling signing.
   mode: "local-file"
-  keyFile: ".data/publisher/signing-key.pem"
+  keyRingFile: ".data/publisher/key-ring.json"
+  # Production alternative: mode=secret-pem and inject only through
+  # GF_PUBLISHER_PRIVATEKEYPEM. KMS/HSM adapters use the crypto.Signer seam.
+  privateKeyPem: ""
   # Generate these with cmd/publishertrust. Runtime reads only the signed
   # manifest and public root; never copy the offline root private key here.
   trustManifestFile: ".data/publisher/trust-manifest.json"
@@ -81,6 +84,14 @@ publisher:
       artifactKinds:
         workflow-release: "application/vnd.yueli.workflow-release.v1+json"
         node-package-release: "application/vnd.yueli.node-package-release.v1+json"
+githubBinding:
+  # Independent from OAuth login credentials. Configure all four values
+  # together; the callback URL must exactly match the GitHub App registration.
+  clientId: "" # env GF_GITHUBBINDING_CLIENTID
+  clientSecret: "" # secret manager: GF_GITHUBBINDING_CLIENTSECRET
+  redirectUrl: "https://account.example.com/api/v1/account/github-bindings/callback"
+  webhookSecret: "" # secret manager: GF_GITHUBBINDING_WEBHOOKSECRET
+  attemptTtl: "10m"
 maintenance:
   securityRetention:
     enabled: true

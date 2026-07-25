@@ -63,11 +63,7 @@ func ReadTrustManifest(
 	expectedActiveKeyID string,
 	minimumVersion uint64,
 ) (VerifiedTrustManifest, error) {
-	rootRaw, err := os.ReadFile(strings.TrimSpace(rootPath))
-	if err != nil {
-		return VerifiedTrustManifest{}, err
-	}
-	root, err := LoadTrustRoot(rootRaw)
+	root, err := ReadTrustRoot(rootPath)
 	if err != nil {
 		return VerifiedTrustManifest{}, err
 	}
@@ -79,6 +75,14 @@ func ReadTrustManifest(
 		manifestRaw, []TrustRoot{root}, expectedIssuer, expectedActiveKeyID,
 		minimumVersion,
 	)
+}
+
+func ReadTrustRoot(path string) (TrustRoot, error) {
+	raw, err := os.ReadFile(strings.TrimSpace(path))
+	if err != nil {
+		return TrustRoot{}, err
+	}
+	return LoadTrustRoot(raw)
 }
 
 func WriteTrustBundle(
@@ -99,6 +103,14 @@ func WriteTrustBundle(
 		return err
 	}
 	return writeAtomicPublicFile(manifestPath, append(manifestRaw, '\n'))
+}
+
+func WriteTrustManifest(path string, manifest TrustManifest) error {
+	raw, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		return err
+	}
+	return writeAtomicPublicFile(path, append(raw, '\n'))
 }
 
 func newOfflineRoot(private *ecdsa.PrivateKey) (*OfflineRoot, error) {

@@ -69,6 +69,17 @@ var (
 	CodePublisherAttestationInvalid  = errs.Register("identity.publisher_attestation_invalid", http.StatusBadRequest)
 	CodePublisherIdempotencyConflict = errs.Register("identity.publisher_idempotency_conflict", http.StatusConflict)
 	CodePublisherSigningUnavailable  = errs.Register("identity.publisher_signing_unavailable", http.StatusServiceUnavailable)
+	CodePublisherRotationPending     = errs.Register("identity.publisher_rotation_pending", http.StatusConflict)
+	CodePublisherKeyTransition       = errs.Register("identity.publisher_key_transition_invalid", http.StatusConflict)
+	CodePublisherTrustInvalid        = errs.Register("identity.publisher_trust_manifest_invalid", http.StatusBadRequest)
+	CodePublisherRootUntrusted       = errs.Register("identity.publisher_root_untrusted", http.StatusBadRequest)
+	CodeGitHubBindingUnavailable     = errs.Register("identity.github_binding_unavailable", http.StatusServiceUnavailable)
+	CodeGitHubBindingAttemptInvalid  = errs.Register("identity.github_binding_attempt_invalid", http.StatusBadRequest)
+	CodeGitHubBindingConflict        = errs.Register("identity.github_binding_conflict", http.StatusConflict)
+	CodeGitHubBindingNotFound        = errs.Register("identity.github_binding_not_found", http.StatusNotFound)
+	CodeGitHubProviderFailed         = errs.Register("identity.github_provider_failed", http.StatusBadGateway)
+	CodeGitHubSubmissionInvalid      = errs.Register("identity.github_submission_invalid", http.StatusBadRequest)
+	CodeGitHubSubmissionUnauthorized = errs.Register("identity.github_submission_unauthorized", http.StatusForbidden)
 )
 
 func EmailTaken(email string) *errs.Coded {
@@ -223,6 +234,50 @@ func PublisherIdempotencyConflict() *errs.Coded {
 
 func PublisherSigningUnavailable() *errs.Coded {
 	return errs.New(CodePublisherSigningUnavailable, "publisher signing is temporarily unavailable", nil)
+}
+
+func PublisherRotationPending() *errs.Coded {
+	return errs.New(CodePublisherRotationPending, "a publisher key rotation is already pending", nil)
+}
+
+func PublisherKeyTransitionInvalid() *errs.Coded {
+	return errs.New(CodePublisherKeyTransition, "publisher key transition is invalid", nil)
+}
+
+func PublisherTrustManifestInvalid() *errs.Coded {
+	return errs.New(CodePublisherTrustInvalid, "publisher trust manifest is invalid", nil)
+}
+
+func PublisherRootUntrusted() *errs.Coded {
+	return errs.New(CodePublisherRootUntrusted, "publisher trust root is not trusted", nil)
+}
+
+func GitHubBindingUnavailable() *errs.Coded {
+	return errs.New(CodeGitHubBindingUnavailable, "GitHub binding is unavailable", nil)
+}
+
+func GitHubBindingAttemptInvalid() *errs.Coded {
+	return errs.New(CodeGitHubBindingAttemptInvalid, "GitHub binding attempt is invalid, expired, or used", nil)
+}
+
+func GitHubBindingConflict() *errs.Coded {
+	return errs.New(CodeGitHubBindingConflict, "GitHub account is already bound to another identity", nil)
+}
+
+func GitHubBindingNotFound() *errs.Coded {
+	return errs.New(CodeGitHubBindingNotFound, "GitHub binding not found", nil)
+}
+
+func GitHubProviderFailed() *errs.Coded {
+	return errs.New(CodeGitHubProviderFailed, "GitHub account verification failed", nil)
+}
+
+func GitHubSubmissionInvalid() *errs.Coded {
+	return errs.New(CodeGitHubSubmissionInvalid, "GitHub submission manifest is invalid", nil)
+}
+
+func GitHubSubmissionUnauthorized() *errs.Coded {
+	return errs.New(CodeGitHubSubmissionUnauthorized, "GitHub identity is not authorized for this publisher", nil)
 }
 
 // OAuthEmailConflict: the provider's (unverified) email collides with an

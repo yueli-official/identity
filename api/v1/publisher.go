@@ -83,3 +83,24 @@ type PublisherTrustManifestRes struct {
 	ManifestSignature string                      `json:"manifestSignature"`
 	SnapshotHash      string                      `json:"snapshotHash"`
 }
+
+type AdminPreparePublisherKeyReq struct {
+	g.Meta `path:"/api/v1/admin/publisher/keys" method:"post" tags:"admin,publisher" summary:"Prepare a publisher signing key for prepublication"`
+}
+
+type AdminPreparePublisherKeyRes struct {
+	Prepared PublisherTrustManifestKey   `json:"prepared"`
+	Keys     []PublisherTrustManifestKey `json:"keys"`
+}
+
+type AdminApplyPublisherTrustManifestReq struct {
+	g.Meta   `path:"/api/v1/admin/publisher/trust-manifest" method:"post" tags:"admin,publisher" summary:"Apply a root-signed publisher trust manifest"`
+	Manifest json.RawMessage `json:"manifest" v:"required"`
+}
+
+type AdminApplyPublisherTrustManifestRes struct {
+	ManifestVersion uint64 `json:"manifestVersion"`
+	SnapshotHash    string `json:"snapshotHash"`
+	ActiveKeyID     string `json:"activeKeyId,omitempty"`
+	SigningEnabled  bool   `json:"signingEnabled"`
+}

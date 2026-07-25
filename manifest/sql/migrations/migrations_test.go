@@ -214,3 +214,32 @@ func TestStepUpProofReplayMigrationUsesAtomicJTIKey(t *testing.T) {
 		t.Errorf("0023 down migration missing: %v", err)
 	}
 }
+
+func TestGitHubBindingMigrationSeparatesOneTimeAttemptsAndHistory(t *testing.T) {
+	up, err := os.ReadFile("0025_github_identity_bindings.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(up)
+	for _, want := range []string{
+		"CREATE TABLE github_binding_attempts",
+		"state_digest",
+		"session_digest",
+		"verifier_ciphertext",
+		"consumed_at",
+		"CREATE TABLE github_identity_bindings",
+		"provider_account_id",
+		"login_snapshot",
+		"status IN ('active', 'unbound', 'blocked')",
+		"erased_at",
+		"No FK by design",
+		"WHERE status = 'active'",
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("0025 up missing %q", want)
+		}
+	}
+	if _, err := os.Stat("0025_github_identity_bindings.down.sql"); err != nil {
+		t.Errorf("0025 down migration missing: %v", err)
+	}
+}

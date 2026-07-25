@@ -13,10 +13,11 @@ const (
 )
 
 type Result struct {
-	Ceremonies   int64
-	Transactions int64
-	PendingTOTP  int64
-	ProofUses    int64
+	Ceremonies      int64
+	Transactions    int64
+	PendingTOTP     int64
+	ProofUses       int64
+	BindingAttempts int64
 }
 
 type SecurityRetention struct {
@@ -66,6 +67,11 @@ func (cleaner SecurityRetention) RunOnce(ctx context.Context) (Result, error) {
 		ctx, cleaner.DB, "step_up_proof_uses", "jti", "expires_at", now, batchSize,
 	); err != nil {
 		return result, fmt.Errorf("delete step-up proof uses: %w", err)
+	}
+	if result.BindingAttempts, err = deleteBatch(
+		ctx, cleaner.DB, "github_binding_attempts", "id", "expires_at", now, batchSize,
+	); err != nil {
+		return result, fmt.Errorf("delete GitHub binding attempts: %w", err)
 	}
 	return result, nil
 }

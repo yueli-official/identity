@@ -49,11 +49,15 @@ func (controller *StepUpController) StepUpBegin(
 	if err != nil {
 		return nil, err
 	}
+	requirement, ok := stepUpRequirement(req.Requirement)
+	if !ok {
+		return nil, iderr.StepUpRequestInvalid()
+	}
 	result, err := controller.authn.BeginStepUp(
 		ctx, authentication.BeginStepUpRequest{
 			IdentityID: identity.ID, SessionID: session.ID,
 			Audience: req.Audience, Action: req.Action, Resource: req.Resource,
-			Requirement: stepUpRequirement(req.Requirement),
+			Requirement: requirement,
 			Context:     session.Authentication,
 		},
 	)
@@ -124,16 +128,29 @@ func (controller *StepUpController) sign(
 	})
 }
 
-func stepUpRequirement(value v1.StepUpRequirement) authentication.Requirement {
+func stepUpRequirement(value v1.StepUpRequirement) (authentication.Requirement, bool) {
+	level := authentication.Level(strings.TrimSpace(value.MinimumLevel))
+	switch level {
+	case "", authentication.LevelAAL1, authentication.LevelAAL2, authentication.LevelAAL3:
+	default:
+		return authentication.Requirement{}, false
+	}
+	profile := authentication.Profile(strings.TrimSpace(value.MinimumProfile))
+	switch profile {
+	case "", authentication.ProfileBaseline, authentication.ProfileMultiFactor,
+		authentication.ProfilePhishingResistant:
+	default:
+		return authentication.Requirement{}, false
+	}
 	return authentication.Requirement{
 		FreshWithin:        time.Duration(value.FreshWithinSeconds) * time.Second,
-		MinimumLevel:       authentication.Level(value.MinimumLevel),
-		MinimumProfile:     authentication.Profile(value.MinimumProfile),
+		MinimumLevel:       level,
+		MinimumProfile:     profile,
 		UserVerification:   value.UserVerification,
 		PhishingResistant:  value.PhishingResistant,
 		MinimumFactorCount: value.MinimumFactorCount,
 		RecoveryAllowed:    false,
-	}
+	}, true
 }
 
 func mapStepUpError(err error) error {

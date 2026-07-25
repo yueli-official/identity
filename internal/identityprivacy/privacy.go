@@ -261,6 +261,25 @@ func (executor *executor) execute(ctx context.Context, instruction privacy.Owner
 						return privacy.OwnerOutcome{}, err
 					}
 				}
+				// Publisher subjects and already-issued proofs remain stable, but
+				// the external GitHub identifier/profile projection is personal
+				// data. Scrub it before deleting Identity; the history row keeps
+				// only a non-resolvable binding ID and lifecycle timestamps.
+				if _, err := tx.ExecContext(ctx, `
+UPDATE github_identity_bindings
+SET status = 'unbound',
+    provider_account_id = 'erased:' || id::text,
+    provider_node_id = '',
+    login_snapshot = 'erased',
+    avatar_url_snapshot = '',
+    unbound_at = COALESCE(unbound_at, now()),
+    erased_at = now(),
+    updated_at = now()
+WHERE identity_id = $1::uuid
+  AND erased_at IS NULL
+`, userID); err != nil {
+					return privacy.OwnerOutcome{}, err
+				}
 				result, err := tx.ExecContext(ctx, `DELETE FROM identities WHERE id=$1::uuid`, userID)
 				if err != nil {
 					return privacy.OwnerOutcome{}, err

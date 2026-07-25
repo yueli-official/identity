@@ -40,6 +40,7 @@ import (
 	"platform/services/identity/internal/cache"
 	"platform/services/identity/internal/controller"
 	"platform/services/identity/internal/dao"
+	"platform/services/identity/internal/githubbinding"
 	"platform/services/identity/internal/guest"
 	"platform/services/identity/internal/identityabuse"
 	"platform/services/identity/internal/identitycap"
@@ -65,6 +66,7 @@ type runtimeRepositories struct {
 	mfa            authentication.MFAStore
 	sessionCache   authentication.SessionCache
 	publisherStore publisher.Store
+	githubStore    githubbinding.Store
 }
 
 type privacyOwnerConfig struct {
@@ -94,6 +96,7 @@ func newRuntimeRepositories(openAPIExport bool) runtimeRepositories {
 			audit:          memory,
 			oidcBackend:    oidc.NewMemBackend(),
 			publisherStore: publisher.NewMemoryStore(),
+			githubStore:    githubbinding.NewMemoryStore(),
 		}
 	}
 
@@ -110,6 +113,7 @@ func newRuntimeRepositories(openAPIExport bool) runtimeRepositories {
 		mfa:            postgres,
 		sessionCache:   redis,
 		publisherStore: postgres,
+		githubStore:    postgres,
 	}
 }
 
@@ -222,11 +226,11 @@ func main() {
 					}
 					return
 				}
-				if result.Ceremonies+result.Transactions+result.PendingTOTP+result.ProofUses > 0 {
+				if result.Ceremonies+result.Transactions+result.PendingTOTP+result.ProofUses+result.BindingAttempts > 0 {
 					g.Log().Infof(
 						maintenanceContext,
-						"identity security retention cleanup: ceremonies=%d transactions=%d pending_totp=%d proof_uses=%d",
-						result.Ceremonies, result.Transactions, result.PendingTOTP, result.ProofUses,
+						"identity security retention cleanup: ceremonies=%d transactions=%d pending_totp=%d proof_uses=%d github_binding_attempts=%d",
+						result.Ceremonies, result.Transactions, result.PendingTOTP, result.ProofUses, result.BindingAttempts,
 					)
 				}
 			}
@@ -422,7 +426,9 @@ func main() {
 	)
 
 	var publisherKeys publisher.KeyProvider
-	var publisherTrust *publisher.VerifiedTrustManifest
+	var publisherManager publisher.ManagedKeyProvider
+	var publisherTrust *publisher.TrustState
+	var publisherRoots []publisher.TrustRoot
 	if openAPIExport {
 		publisherKeys, err = publisher.NewLocalKeyProvider()
 		if err == nil {
@@ -445,7 +451,8 @@ func main() {
 					if verifyErr != nil {
 						err = verifyErr
 					} else {
-						publisherTrust = &verified
+						publisherTrust = publisher.NewTrustState(verified)
+						publisherRoots = []publisher.TrustRoot{root.TrustRoot()}
 					}
 				}
 			}
@@ -453,8 +460,13 @@ func main() {
 	} else {
 		switch mode := g.Cfg().MustGet(ctx, "publisher.mode").String(); mode {
 		case "local-file":
-			publisherKeys, err = publisher.LoadOrCreateLocalKey(
-				g.Cfg().MustGet(ctx, "publisher.keyFile").String(),
+			ring, ringErr := publisher.LoadOrCreateLocalKeyRing(
+				g.Cfg().MustGet(ctx, "publisher.keyRingFile").String(),
+			)
+			publisherKeys, publisherManager, err = ring, ring, ringErr
+		case "secret-pem":
+			publisherKeys, err = publisher.NewSecretPEMKeyProvider(
+				g.Cfg().MustGet(ctx, "publisher.privateKeyPem").String(),
 			)
 		default:
 			err = fmt.Errorf(
@@ -468,8 +480,14 @@ func main() {
 	}
 	if !openAPIExport {
 		activeKeyID, keyErr := publisherKeys.KeyID()
-		if keyErr != nil {
+		if keyErr != nil && !errors.Is(keyErr, publisher.ErrSigningUnavailable) {
 			panic(fmt.Sprintf("identity publisher active key: %v", keyErr))
+		}
+		root, rootErr := publisher.ReadTrustRoot(
+			g.Cfg().MustGet(ctx, "publisher.trustRootFile").String(),
+		)
+		if rootErr != nil {
+			panic(fmt.Sprintf("identity publisher trust root: %v", rootErr))
 		}
 		verified, trustErr := publisher.ReadTrustManifest(
 			g.Cfg().MustGet(ctx, "publisher.trustManifestFile").String(),
@@ -481,7 +499,13 @@ func main() {
 		if trustErr != nil {
 			panic(fmt.Sprintf("identity publisher trust manifest: %v", trustErr))
 		}
-		publisherTrust = &verified
+		if publisherManager != nil {
+			if applyErr := publisherManager.ApplyTrustManifest(ctx, verified); applyErr != nil {
+				panic(fmt.Sprintf("identity publisher key ring reconciliation: %v", applyErr))
+			}
+		}
+		publisherTrust = publisher.NewTrustState(verified)
+		publisherRoots = []publisher.TrustRoot{root}
 	}
 	var publisherConsumerConfigs []publisherConsumerConfig
 	if err := g.Cfg().MustGet(ctx, "publisher.consumers").Scan(&publisherConsumerConfigs); err != nil {
@@ -506,6 +530,64 @@ func main() {
 		panic(fmt.Sprintf("identity publisher module: %v", err))
 	}
 	publisherCtl := controller.NewPublisher(svc, publisherModule, publisherKeys, publisherTrust)
+	var publisherKeyAdmin *publisher.KeyAdministration
+	if publisherManager != nil {
+		publisherKeyAdmin, err = publisher.NewKeyAdministration(
+			publisherManager, publisherTrust, publisherRoots,
+			g.Cfg().MustGet(ctx, "publisher.trustManifestFile").String(),
+		)
+		if err != nil {
+			panic(fmt.Sprintf("identity publisher key administration: %v", err))
+		}
+	}
+	publisherAdminCtl := controller.NewPublisherAdmin(authCtl, svc, publisherKeyAdmin)
+
+	// ── GitHub publisher identity binding ───────────────────────────────────
+	// This is intentionally separate from credentials_oauth. The user token is
+	// used only for authenticated GET /user, revoked best-effort, and never
+	// persisted. A configured provider must also configure revocation webhooks.
+	githubClientID := g.Cfg().MustGet(ctx, "githubBinding.clientId").String()
+	githubClientSecret := g.Cfg().MustGet(ctx, "githubBinding.clientSecret").String()
+	githubRedirectURL := g.Cfg().MustGet(ctx, "githubBinding.redirectUrl").String()
+	githubWebhookSecret := g.Cfg().MustGet(ctx, "githubBinding.webhookSecret").String()
+	var (
+		githubProvider *githubbinding.GitHubApp
+		githubModule   *githubbinding.Module
+	)
+	githubConfigured := githubClientID != "" || githubClientSecret != "" ||
+		githubRedirectURL != "" || githubWebhookSecret != ""
+	if githubConfigured {
+		if githubClientID == "" || githubClientSecret == "" ||
+			githubRedirectURL == "" || githubWebhookSecret == "" {
+			panic("githubBinding clientId, clientSecret, redirectUrl, and webhookSecret must be configured together")
+		}
+		githubProvider, err = githubbinding.NewGitHubApp(
+			githubClientID, githubClientSecret, githubRedirectURL,
+		)
+		if err != nil {
+			panic(fmt.Sprintf("identity GitHub binding provider: %v", err))
+		}
+		githubModule, err = githubbinding.New(githubbinding.Config{
+			Store: repositories.githubStore, Provider: githubProvider,
+			CipherSecret: []byte(globalSecret),
+			AttemptTTL: g.Cfg().MustGet(
+				ctx, "githubBinding.attemptTtl", "10m",
+			).Duration(),
+		})
+		if err != nil {
+			panic(fmt.Sprintf("identity GitHub binding module: %v", err))
+		}
+	}
+	githubCtl := controller.NewGitHubBinding(
+		svc, githubModule, []byte(githubWebhookSecret), "/",
+	)
+	githubSubmissionCtl := controller.NewGitHubSubmission(
+		githubModule, publisherTrust, issuer, svc,
+	)
+	var githubChecker identitycap.HealthChecker
+	if githubProvider != nil {
+		githubChecker = githubProvider
+	}
 
 	// ── Bootstrap admin (RBAC) ───────────────────────────────────────────────
 	// If rbac.bootstrapAdminEmail is set and that identity already exists, grant
@@ -642,6 +724,19 @@ func main() {
 				identitycap.Field("redirect_url", googleRedirectURL, false),
 			},
 		},
+		identitycap.Registration{
+			Key: "github-binding", Adapter: "github-app-user-authorization", Mode: "external",
+			Registered: githubModule != nil, Enabled: githubModule != nil,
+			CapabilityKeys: []string{"identity.github-binding"},
+			Operations:     []string{"authorize", "authorize_submission", "bind", "list", "unlink", "revoke"},
+			Checker:        githubChecker,
+			RequiredConfig: []capability.ConfigField{
+				identitycap.Field("client_id", githubClientID, false),
+				identitycap.Field("client_secret", githubClientSecret, true),
+				identitycap.Field("redirect_url", githubRedirectURL, false),
+				identitycap.Field("webhook_secret", githubWebhookSecret, true),
+			},
+		},
 	)
 	if err != nil {
 		panic(fmt.Sprintf("identity capability registry: %v", err))
@@ -670,6 +765,7 @@ func main() {
 	s := g.Server()
 	s.GetOpenApi().Components.SecuritySchemes = goai.SecuritySchemes{
 		"AdminAuth": {Value: &goai.SecurityScheme{Type: "http", Scheme: "bearer", BearerFormat: "JWT", Description: "Admin session cookie or an Identity access token with platform capability scope."}},
+		"MachineAuth": {Value: &goai.SecurityScheme{Type: "http", Scheme: "bearer", BearerFormat: "JWT", Description: "Identity-issued service access token with the endpoint scope."}},
 		"UserAuth":  {Value: &goai.SecurityScheme{Type: "http", Scheme: "bearer", BearerFormat: "JWT", Description: "Identity user access token."}},
 	}
 	s.Use(ghttpx.TraceRouteMiddleware)
@@ -696,6 +792,9 @@ func main() {
 		grp.Bind(capabilityCtl)
 		grp.Bind(guestCtl)
 		grp.Bind(publisherCtl)
+		grp.Bind(publisherAdminCtl)
+		grp.Bind(githubCtl)
+		grp.Bind(githubSubmissionCtl)
 		if privacyOwner != nil {
 			grp.POST("/api/internal/privacy/owner", privacyhttp.OwnerHandler(privacyOwner, "privacy:owner"))
 		}
@@ -715,11 +814,13 @@ func main() {
 		grp.ALL("/oauth2/end_session", oidcCtl.EndSession) // OIDC RP-initiated logout (MVP)
 	})
 
-	// Google OAuth login: raw redirect handlers — NO envelope middleware.
+	// External OAuth callbacks and GitHub webhook: raw protocol responses.
 	s.Group("/", func(grp *ghttp.RouterGroup) {
 		grp.Middleware(rawRateLimitMiddleware)
 		grp.GET("/api/v1/auth/oauth/google/start", oauthCtl.GoogleStart)
 		grp.GET("/api/v1/auth/oauth/google/callback", oauthCtl.GoogleCallback)
+		grp.GET("/api/v1/account/github-bindings/callback", githubCtl.GitHubCallback)
+		grp.POST("/api/v1/webhooks/github", githubCtl.GitHubWebhook)
 	})
 
 	if handled, err := openapiexport.ExportIfRequested(s); handled {

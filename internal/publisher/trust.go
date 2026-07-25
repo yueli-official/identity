@@ -177,12 +177,32 @@ func LoadTrustManifest(
 	if minimumVersion == 0 || manifest.ManifestVersion < minimumVersion {
 		return VerifiedTrustManifest{}, ErrInvalidTrustManifest
 	}
+	if expectedActiveKeyID == "" {
+		for _, key := range manifest.Keys {
+			if key.Status == KeyStatusActive {
+				return VerifiedTrustManifest{}, ErrInvalidTrustManifest
+			}
+		}
+		return verified, nil
+	}
 	for _, key := range manifest.Keys {
 		if key.KeyID == expectedActiveKeyID && key.Status == KeyStatusActive {
 			return verified, nil
 		}
 	}
 	return VerifiedTrustManifest{}, ErrInvalidTrustManifest
+}
+
+func TrustManifestResource(raw []byte) (string, error) {
+	var manifest TrustManifest
+	if err := decodeStrict(raw, &manifest); err != nil {
+		return "", invalidTrust(err)
+	}
+	canonical, err := canonicalJSON(manifest)
+	if err != nil {
+		return "", invalidTrust(err)
+	}
+	return "publisher:trust-manifest:sha256:" + digestHex(canonical), nil
 }
 
 func trustManifestPayload(manifest TrustManifest) ([]byte, error) {
@@ -230,7 +250,7 @@ func validateTrustManifest(manifest TrustManifest, requireSignature bool) error 
 			active++
 		}
 	}
-	if active != 1 {
+	if active > 1 {
 		return ErrInvalidTrustManifest
 	}
 	return nil

@@ -4,7 +4,7 @@ import "github.com/gogf/gf/v2/frame/g"
 
 type StepUpRequirement struct {
 	FreshWithinSeconds int    `json:"freshWithinSeconds,omitempty" v:"between:0,3600"`
-	MinimumLevel       string `json:"minimumLevel,omitempty" v:"in:|aal1|aal2|aal3"`
+	MinimumLevel       string `json:"minimumLevel,omitempty"`
 	MinimumProfile     string `json:"minimumProfile,omitempty"`
 	UserVerification   bool   `json:"userVerification,omitempty"`
 	PhishingResistant  bool   `json:"phishingResistant,omitempty"`

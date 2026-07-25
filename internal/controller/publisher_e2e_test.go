@@ -22,7 +22,7 @@ import (
 func TestPublisherAttestationHTTPJourney(t *testing.T) {
 	store := repo.NewMemory()
 	service := logic.New(store, logic.DefaultConfig())
-	keys, err := publisher.NewLocalKeyProvider()
+	keys, err := publisher.LoadOrCreateLocalKeyRing(t.TempDir() + "/key-ring.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,6 +45,17 @@ func TestPublisherAttestationHTTPJourney(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	trustState := publisher.NewTrustState(trust)
+	if err := keys.ApplyTrustManifest(context.Background(), trust); err != nil {
+		t.Fatal(err)
+	}
+	keyAdmin, err := publisher.NewKeyAdministration(
+		keys, trustState, []publisher.TrustRoot{root.TrustRoot()},
+		t.TempDir()+"/trust-manifest.json",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	module, err := publisher.New(publisher.Config{
 		Issuer: "https://identity.publisher-http.test",
 		Consumers: []publisher.Consumer{{
@@ -62,10 +73,12 @@ func TestPublisherAttestationHTTPJourney(t *testing.T) {
 	server := g.Server(t.Name())
 	server.SetAddr("127.0.0.1:0")
 	server.SetDumpRouterMap(false)
+	baseController := controller.New(service, false)
 	server.Group("/", func(group *ghttp.RouterGroup) {
 		group.Middleware(ghttpx.Middleware)
-		group.Bind(controller.New(service, false))
-		group.Bind(controller.NewPublisher(service, module, keys, &trust))
+		group.Bind(baseController)
+		group.Bind(controller.NewPublisher(service, module, keys, trustState))
+		group.Bind(controller.NewPublisherAdmin(baseController, service, keyAdmin))
 	})
 	server.Start()
 	defer server.Shutdown()
@@ -100,6 +113,36 @@ func TestPublisherAttestationHTTPJourney(t *testing.T) {
 	postJSON(t, client, base+"/api/v1/auth/login", map[string]any{
 		"email": "publisher@example.test", "password": "Jade river orbits nightly 58!",
 	})
+	forbidden := postJSON(t, client, base+"/api/v1/admin/publisher/keys", map[string]any{})
+	if code := gjson.New(forbidden).Get("code").String(); code != "identity.forbidden" {
+		t.Fatalf("non-admin publisher key prepare code = %q", code)
+	}
+	identity, err := service.GetByEmail(context.Background(), "publisher@example.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.GrantRole(context.Background(), identity.ID, logic.AdminRole); err != nil {
+		t.Fatal(err)
+	}
+	preparedBody := postJSON(t, client, base+"/api/v1/admin/publisher/keys", map[string]any{})
+	if gjson.New(preparedBody).Get("prepared.status").String() != publisher.KeyStatusPreactive {
+		t.Fatalf("prepared publisher key = %s", preparedBody)
+	}
+	prepublished, err := publisher.SignTrustManifest(context.Background(), publisher.TrustManifest{
+		Schema: publisher.TrustManifestSchema, ManifestVersion: 2,
+		Issuer:   "https://identity.publisher-http.test",
+		IssuedAt: time.Now().UTC(), PolicyVersion: "publisher-attestation/v1",
+		Keys: keys.VerificationKeys(),
+	}, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	appliedBody := postJSON(t, client, base+"/api/v1/admin/publisher/trust-manifest", map[string]any{
+		"manifest": prepublished,
+	})
+	if gjson.New(appliedBody).Get("manifestVersion").Uint() != 2 {
+		t.Fatalf("applied publisher manifest = %s", appliedBody)
+	}
 
 	firstBody := postJSON(t, client, base+"/api/v1/account/publisher-attestations", command)
 	first := gjson.New(firstBody)
@@ -119,7 +162,7 @@ func TestPublisherAttestationHTTPJourney(t *testing.T) {
 		t.Fatalf("verification keys = %s", keySet.MustToJsonString())
 	}
 	trustSet := getEnvelope(t, client, base+"/api/v1/publisher/trust-manifest")
-	if trustSet.Get("manifestVersion").Uint() != 1 ||
+	if trustSet.Get("manifestVersion").Uint() != 2 ||
 		trustSet.Get("manifestSignature").String() == "" ||
 		trustSet.Get("snapshotHash").String() == "" ||
 		trustSet.Get("keys.0.status").String() != publisher.KeyStatusActive {

@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -63,6 +64,7 @@ func TestMigrationUpDownUpLifecycle(t *testing.T) {
 	assertTableExists(t, db, "authentication_transactions", true)
 	assertTableExists(t, db, "step_up_proof_uses", true)
 	assertTableExists(t, db, "publisher_attestations", true)
+	assertTableExists(t, db, "github_identity_bindings", true)
 
 	applyMigrationFiles(t, db, down)
 	assertTableExists(t, db, "identities", false)
@@ -70,11 +72,13 @@ func TestMigrationUpDownUpLifecycle(t *testing.T) {
 	assertTableExists(t, db, "authentication_transactions", false)
 	assertTableExists(t, db, "step_up_proof_uses", false)
 	assertTableExists(t, db, "publisher_attestations", false)
+	assertTableExists(t, db, "github_identity_bindings", false)
 
 	applyMigrationFiles(t, db, up)
 	assertTableExists(t, db, "identities", true)
 	assertTableExists(t, db, "step_up_proof_uses", true)
 	assertTableExists(t, db, "publisher_attestations", true)
+	assertTableExists(t, db, "github_identity_bindings", true)
 	assertSecurityRetention(t, db)
 }
 
@@ -98,6 +102,39 @@ VALUES ($1, $2, $3), ($4, $5, $3)
 	if result.ProofUses != 1 {
 		t.Fatalf("deleted proof uses = %d, want 1", result.ProofUses)
 	}
+	identityID := uuid.NewString()
+	if _, err := db.Exec(
+		`INSERT INTO identities(id, email) VALUES ($1, $2)`,
+		identityID, "github-retention@example.test",
+	); err != nil {
+		t.Fatal(err)
+	}
+	oldAttemptID := uuid.NewString()
+	freshAttemptID := uuid.NewString()
+	if _, err := db.Exec(`
+INSERT INTO github_binding_attempts(
+    id, state_digest, identity_id, session_digest, verifier_ciphertext,
+    return_to, expires_at, created_at
+) VALUES
+($1, $2, $3, $4, 'cipher-old', '/', $5, $6),
+($7, $8, $3, $9, 'cipher-fresh', '/', $10, $6)
+`,
+		oldAttemptID, strings.Repeat("a", 64), identityID, strings.Repeat("b", 64),
+		now.Add(-time.Minute), now,
+		freshAttemptID, strings.Repeat("c", 64), strings.Repeat("d", 64),
+		now.Add(time.Minute),
+	); err != nil {
+		t.Fatal(err)
+	}
+	secondResult, err := (identitymaintenance.SecurityRetention{
+		DB: db, Retention: time.Hour, BatchSize: 10, Clock: func() time.Time { return now },
+	}).RunOnce(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if secondResult.BindingAttempts != 1 {
+		t.Fatalf("deleted binding attempts = %d, want 1", secondResult.BindingAttempts)
+	}
 	var remaining int
 	if err := db.QueryRow(
 		`SELECT COUNT(*) FROM step_up_proof_uses WHERE jti IN ($1, $2)`, oldJTI, freshJTI,
@@ -106,6 +143,15 @@ VALUES ($1, $2, $3), ($4, $5, $3)
 	}
 	if remaining != 1 {
 		t.Fatalf("remaining proof uses = %d, want 1", remaining)
+	}
+	if err := db.QueryRow(
+		`SELECT COUNT(*) FROM github_binding_attempts WHERE id IN ($1, $2)`,
+		oldAttemptID, freshAttemptID,
+	).Scan(&remaining); err != nil {
+		t.Fatal(err)
+	}
+	if remaining != 1 {
+		t.Fatalf("remaining binding attempts = %d, want 1", remaining)
 	}
 }
 

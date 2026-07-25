@@ -21,14 +21,14 @@ type PublisherController struct {
 	service *logic.Service
 	module  *publisher.Module
 	keys    publisher.KeyProvider
-	trust   *publisher.VerifiedTrustManifest
+	trust   *publisher.TrustState
 }
 
 func NewPublisher(
 	service *logic.Service,
 	module *publisher.Module,
 	keys publisher.KeyProvider,
-	trust *publisher.VerifiedTrustManifest,
+	trust *publisher.TrustState,
 ) *PublisherController {
 	return &PublisherController{service: service, module: module, keys: keys, trust: trust}
 }
@@ -92,8 +92,9 @@ func (controller *PublisherController) PublisherVerificationKeys(
 	keys := controller.keys.VerificationKeys()
 	manifestVersion := 1
 	if controller.trust != nil {
-		keys = controller.trust.Manifest.Keys
-		manifestVersion = int(controller.trust.Manifest.ManifestVersion)
+		current := controller.trust.Current()
+		keys = current.Manifest.Keys
+		manifestVersion = int(current.Manifest.ManifestVersion)
 	}
 	entries := make([]v1.PublisherVerificationKey, len(keys))
 	for index, key := range keys {
@@ -120,7 +121,8 @@ func (controller *PublisherController) PublisherTrustManifest(
 	if controller.trust == nil {
 		return nil, iderr.PublisherSigningUnavailable()
 	}
-	manifest := controller.trust.Manifest
+	current := controller.trust.Current()
+	manifest := current.Manifest
 	keys := make([]v1.PublisherTrustManifestKey, len(manifest.Keys))
 	for index, key := range manifest.Keys {
 		keys[index] = v1.PublisherTrustManifestKey{
@@ -139,7 +141,7 @@ func (controller *PublisherController) PublisherTrustManifest(
 		Issuer: manifest.Issuer, IssuedAt: manifest.IssuedAt.Format(time.RFC3339Nano),
 		PolicyVersion: manifest.PolicyVersion, RootKeyID: manifest.RootKeyID,
 		Keys: keys, ManifestSignature: manifest.Signature,
-		SnapshotHash: controller.trust.SnapshotHash,
+		SnapshotHash: current.SnapshotHash,
 	}, nil
 }
 
@@ -148,6 +150,27 @@ func optionalPublisherTime(value *time.Time) string {
 		return ""
 	}
 	return value.Format(time.RFC3339Nano)
+}
+
+func publisherTrustKeyResponses(keys []publisher.VerificationKey) []v1.PublisherTrustManifestKey {
+	result := make([]v1.PublisherTrustManifestKey, len(keys))
+	for index := range keys {
+		result[index] = publisherTrustKeyResponse(keys[index])
+	}
+	return result
+}
+
+func publisherTrustKeyResponse(key publisher.VerificationKey) v1.PublisherTrustManifestKey {
+	return v1.PublisherTrustManifestKey{
+		KeyID: key.KeyID, Algorithm: key.Algorithm, Purpose: key.Purpose,
+		Status: key.Status, PublicJWK: key.PublicJWK,
+		ValidFrom:        key.ActivatedAt.Format(time.RFC3339Nano),
+		ValidUntil:       optionalPublisherTime(key.ValidUntil),
+		RetiredAt:        optionalPublisherTime(key.RetiredAt),
+		CompromisedAt:    optionalPublisherTime(key.CompromisedAt),
+		RevokedAt:        optionalPublisherTime(key.RevokedAt),
+		RevocationReason: key.RevocationReason,
+	}
 }
 
 func mapPublisherError(err error) error {
@@ -163,6 +186,14 @@ func mapPublisherError(err error) error {
 		return iderr.PublisherAttestationInvalid()
 	case errors.Is(err, publisher.ErrSigningUnavailable):
 		return iderr.PublisherSigningUnavailable()
+	case errors.Is(err, publisher.ErrRotationPending):
+		return iderr.PublisherRotationPending()
+	case errors.Is(err, publisher.ErrInvalidKeyTransition):
+		return iderr.PublisherKeyTransitionInvalid()
+	case errors.Is(err, publisher.ErrInvalidTrustManifest):
+		return iderr.PublisherTrustManifestInvalid()
+	case errors.Is(err, publisher.ErrUntrustedRoot):
+		return iderr.PublisherRootUntrusted()
 	default:
 		return err
 	}
