@@ -1,3 +1,5 @@
+import { apiErrorMessage } from '../utils/api-errors'
+
 import type {
   AssetStorageBackend,
   AssetStorageBackendDetail,
@@ -101,7 +103,7 @@ export function useAssetStorageBackends(options: UseAssetStorageBackendsOptions)
       storageBackendDetail.value = data.backend
       await fetchStorageBackendEvents(backend.name)
     } catch (error) {
-      toast.add({ title: '加载存储后端失败', description: (error as Error)?.message, color: 'error' })
+      toast.add({ title: '加载存储后端失败', description: apiErrorMessage(error, { fallback: '暂时无法加载存储后端。' }), color: 'error' })
     } finally {
       loadingStorageBackend.value = false
     }
@@ -115,7 +117,7 @@ export function useAssetStorageBackends(options: UseAssetStorageBackendsOptions)
       storageBackendOpen.value = false
       await options.reloadAll()
     } catch (error) {
-      toast.add({ title: '保存存储后端失败', description: (error as Error)?.message, color: 'error' })
+      toast.add({ title: '保存存储后端失败', description: apiErrorMessage(error, { fallback: '暂时无法保存存储后端。' }), color: 'error' })
     } finally {
       savingStorageBackend.value = false
     }
@@ -131,7 +133,7 @@ export function useAssetStorageBackends(options: UseAssetStorageBackendsOptions)
       storageBackendEditingName.value = ''
       await options.reloadAll()
     } catch (error) {
-      toast.add({ title: '删除存储后端失败', description: (error as Error)?.message, color: 'error' })
+      toast.add({ title: '删除存储后端失败', description: apiErrorMessage(error, { fallback: '暂时无法删除存储后端。' }), color: 'error' })
     } finally {
       deletingStorageBackend.value = false
     }
@@ -151,7 +153,7 @@ export function useAssetStorageBackends(options: UseAssetStorageBackendsOptions)
       }
       await Promise.all([reloadStorageBackends(), fetchStorageBackendEvents()])
     } catch (error) {
-      toast.add({ title: '健康检查失败', description: (error as Error)?.message, color: 'error' })
+      toast.add({ title: '健康检查失败', description: apiErrorMessage(error, { fallback: '暂时无法完成健康检查。' }), color: 'error' })
     } finally {
       checkingStorageBackend.value = false
     }
@@ -169,7 +171,7 @@ export function useAssetStorageBackends(options: UseAssetStorageBackendsOptions)
       rotateStorageBackendOpen.value = false
       await Promise.all([reloadStorageBackends(), fetchStorageBackendEvents()])
     } catch (error) {
-      toast.add({ title: '密钥轮换失败', description: (error as Error)?.message, color: 'error' })
+      toast.add({ title: '密钥轮换失败', description: apiErrorMessage(error, { fallback: '暂时无法轮换存储密钥。' }), color: 'error' })
     } finally {
       rotatingStorageBackend.value = false
     }

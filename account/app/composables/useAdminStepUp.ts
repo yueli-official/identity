@@ -1,3 +1,9 @@
+import { identityErrorMessage } from '../utils/api-errors'
+import {
+  AdminStepUpInterruptedError,
+  type AdminStepUpInterruptionReason,
+} from '../utils/admin-step-up-errors'
+
 interface AdminStepUpState {
   open: boolean
   transactionId: string
@@ -74,15 +80,18 @@ export function useAdminStepUp() {
       resolveProof = undefined
       rejectProof = undefined
     } catch (error) {
-      state.value.error = mfaErrorMessage(error)
+      state.value.error = identityErrorMessage(error, {
+        context: 'admin',
+        fallback: '暂时无法完成身份验证。',
+      })
     } finally {
       state.value.loading = false
     }
   }
 
-  function cancel(message = '已取消额外身份验证。') {
+  function cancel(reason: AdminStepUpInterruptionReason = 'cancelled') {
     state.value.open = false
-    rejectProof?.(new Error(message))
+    rejectProof?.(new AdminStepUpInterruptedError(reason))
     resolveProof = undefined
     rejectProof = undefined
   }

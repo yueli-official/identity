@@ -1,5 +1,6 @@
 import type { Ref } from 'vue'
 import { createPlatformNotifier } from '@platform/ui/feedback'
+import { apiErrorMessage } from '../utils/api-errors'
 import type { AssetMaintenanceTask } from '~/types/asset-admin'
 
 type MaintenanceAction = 'pause' | 'resume' | 'cancel'
@@ -72,7 +73,7 @@ export function useAssetMaintenanceTasks(options: UseAssetMaintenanceTasksOption
       pollErrorShown = false
     } catch (error) {
       if (!pollErrorShown) {
-        toast.add({ title: '维护任务状态刷新失败', description: (error as Error)?.message, color: 'warning' })
+        toast.add({ title: '维护任务状态刷新失败', description: apiErrorMessage(error, { fallback: '暂时无法刷新维护任务状态。' }), color: 'warning' })
         pollErrorShown = true
       }
     } finally {
@@ -92,8 +93,8 @@ export function useAssetMaintenanceTasks(options: UseAssetMaintenanceTasksOption
       await call(`/api/v1/admin/assets-proxy/maintenance/tasks/${task.id}/${action}`, { method: 'POST' })
       await fetchMaintenanceTasks()
     } catch (error) {
-      if (silent) selectedRebuildError.value = (error as Error)?.message || '维护任务操作失败'
-      else toast.add({ title: '维护任务操作失败', description: (error as Error)?.message, color: 'error' })
+      if (silent) selectedRebuildError.value = apiErrorMessage(error, { fallback: '暂时无法操作维护任务。' })
+      else toast.add({ title: '维护任务操作失败', description: apiErrorMessage(error, { fallback: '暂时无法操作维护任务。' }), color: 'error' })
     } finally {
       controllingMaintenanceTaskId.value = ''
     }
@@ -123,7 +124,7 @@ export function useAssetMaintenanceTasks(options: UseAssetMaintenanceTasksOption
       options.selectedTaskId.value = response.task.id
       options.clearSelection()
     } catch (error) {
-      selectedRebuildError.value = (error as Error)?.message || '无法创建后台任务，请稍后重试。'
+      selectedRebuildError.value = apiErrorMessage(error, { fallback: '暂时无法创建后台任务。' })
     } finally {
       queueingSelectedRebuild.value = false
     }

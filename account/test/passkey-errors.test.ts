@@ -8,8 +8,19 @@ describe('passkeyErrorMessage', () => {
       .toContain('操作已取消、超时')
   })
 
-  it('preserves an API error message', () => {
-    expect(passkeyErrorMessage({ data: { message: '服务端拒绝了凭据' } }))
-      .toBe('服务端拒绝了凭据')
+  it('translates the current passkey Problem contract', () => {
+    expect(passkeyErrorMessage({
+      data: {
+        failure: {
+          kind: 'remote',
+          status: 400,
+          code: 'identity.passkey_ceremony_invalid',
+          params: {},
+          violations: [],
+          traceId: 'passkey-test',
+          reauth: 'not-attempted',
+        },
+      },
+    })).toContain('请改用其他登录方式')
   })
 })

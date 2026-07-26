@@ -38,6 +38,7 @@ const refreshing = ref(false)
 const probingProvider = ref('')
 const probeError = ref('')
 const probeMessage = ref('')
+const { call } = useApi()
 
 const healthTone: Record<RuntimeHealth, { color: 'neutral' | 'success' | 'warning' | 'error', label: string }> = {
   unknown: { color: 'neutral', label: '未探测' },
@@ -56,11 +57,14 @@ async function probeProvider(provider: string) {
   probeError.value = ''
   probeMessage.value = ''
   try {
-    await $fetch(`/api/platform/services/${serviceKey.value}/providers/${encodeURIComponent(provider)}/health-check`, { method: 'POST' })
+    await call(`/api/platform/services/${serviceKey.value}/providers/${encodeURIComponent(provider)}/health-check`, { method: 'POST' })
     await refresh()
     probeMessage.value = `${provider} 探测完成，状态已刷新`
   } catch (error) {
-    probeError.value = error instanceof Error ? error.message : 'Provider 探测失败'
+    probeError.value = apiErrorMessage(error, {
+      context: 'admin',
+      fallback: '暂时无法完成 Provider 探测。',
+    })
   } finally {
     probingProvider.value = ''
   }

@@ -10,7 +10,7 @@ watch(() => stepUp.state.value.open, (open) => {
 watch(expiry.expired, (expired) => {
   if (!expired || !stepUp.state.value.open) return
   code.value = ''
-  stepUp.cancel('额外身份验证已过期，请重新发起操作。')
+  stepUp.cancel('expired')
 })
 
 function cancel() {

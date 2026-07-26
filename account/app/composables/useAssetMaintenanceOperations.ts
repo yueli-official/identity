@@ -1,5 +1,6 @@
 import type { Ref } from 'vue'
 import { createPlatformNotifier } from '@platform/ui/feedback'
+import { apiErrorMessage } from '../utils/api-errors'
 import type {
   AssetBatchRebuildResult,
   AssetItem,
@@ -61,7 +62,7 @@ export function useAssetMaintenanceOperations(options: UseAssetMaintenanceOperat
       const data = await call<{ generated: number }>(`/api/v1/admin/assets-proxy/library/${asset.id}/derivatives/rebuild`, { method: 'POST' })
       operationFeedback.value = { title: '派生图已重建', description: `生成 ${data.generated ?? 0} 个 Variant`, tone: 'success' }
     } catch (error) {
-      toast.add({ title: '重建派生图失败', description: (error as Error)?.message, color: 'error' })
+      toast.add({ title: '重建派生图失败', description: apiErrorMessage(error, { fallback: '暂时无法重建派生图。' }), color: 'error' })
     } finally {
       rebuildingAssetId.value = ''
     }
@@ -80,7 +81,7 @@ export function useAssetMaintenanceOperations(options: UseAssetMaintenanceOperat
       await options.fetchMaintenanceTasks()
       batchRebuildOpen.value = true
     } catch (error) {
-      toast.add({ title: '批量重建预检失败', description: (error as Error)?.message, color: 'error' })
+      toast.add({ title: '批量重建预检失败', description: apiErrorMessage(error, { fallback: '暂时无法完成批量重建预检。' }), color: 'error' })
     } finally {
       batchRebuilding.value = false
     }
@@ -119,7 +120,7 @@ export function useAssetMaintenanceOperations(options: UseAssetMaintenanceOperat
       batchRebuildPreview.value = null
       await options.fetchMaintenanceTasks()
     } catch (error) {
-      toast.add({ title: '批量重建失败', description: (error as Error)?.message, color: 'error' })
+      toast.add({ title: '批量重建失败', description: apiErrorMessage(error, { fallback: '暂时无法批量重建派生图。' }), color: 'error' })
     } finally {
       batchRebuilding.value = false
     }
@@ -139,7 +140,7 @@ export function useAssetMaintenanceOperations(options: UseAssetMaintenanceOperat
       }
       await options.reloadAll()
     } catch (error) {
-      toast.add({ title: '暂存清理失败', description: (error as Error)?.message, color: 'error' })
+      toast.add({ title: '暂存清理失败', description: apiErrorMessage(error, { fallback: '暂时无法清理暂存文件。' }), color: 'error' })
     } finally {
       sweepingStaging.value = false
     }
@@ -156,7 +157,7 @@ export function useAssetMaintenanceOperations(options: UseAssetMaintenanceOperat
       await options.fetchMaintenanceTasks()
       pruneOpen.value = true
     } catch (error) {
-      toast.add({ title: '无引用素材预检失败', description: (error as Error)?.message, color: 'error' })
+      toast.add({ title: '无引用素材预检失败', description: apiErrorMessage(error, { fallback: '暂时无法完成无引用素材预检。' }), color: 'error' })
     } finally {
       pruningUnreferenced.value = false
     }
@@ -187,7 +188,7 @@ export function useAssetMaintenanceOperations(options: UseAssetMaintenanceOperat
       prunePreview.value = null
       await options.reloadAll()
     } catch (error) {
-      toast.add({ title: '无引用素材清理失败', description: (error as Error)?.message, color: 'error' })
+      toast.add({ title: '无引用素材清理失败', description: apiErrorMessage(error, { fallback: '暂时无法清理无引用素材。' }), color: 'error' })
     } finally {
       pruningUnreferenced.value = false
     }
@@ -213,7 +214,7 @@ export function useAssetMaintenanceOperations(options: UseAssetMaintenanceOperat
       await options.fetchMaintenanceTasks()
       orphanObjectsOpen.value = true
     } catch (error) {
-      toast.add({ title: '孤儿对象预检失败', description: (error as Error)?.message, color: 'error' })
+      toast.add({ title: '孤儿对象预检失败', description: apiErrorMessage(error, { fallback: '暂时无法完成孤儿对象预检。' }), color: 'error' })
     } finally {
       auditingOrphanObjects.value = false
     }
@@ -244,7 +245,7 @@ export function useAssetMaintenanceOperations(options: UseAssetMaintenanceOperat
       orphanObjectsPreview.value = null
       await options.reloadAll()
     } catch (error) {
-      toast.add({ title: '孤儿对象清理失败', description: (error as Error)?.message, color: 'error' })
+      toast.add({ title: '孤儿对象清理失败', description: apiErrorMessage(error, { fallback: '暂时无法清理孤儿对象。' }), color: 'error' })
     } finally {
       auditingOrphanObjects.value = false
     }
@@ -269,7 +270,7 @@ export function useAssetMaintenanceOperations(options: UseAssetMaintenanceOperat
       })
       await options.fetchMaintenanceTasks()
     } catch (error) {
-      toast.add({ title: '存储迁移预检失败', description: (error as Error)?.message, color: 'error' })
+      toast.add({ title: '存储迁移预检失败', description: apiErrorMessage(error, { fallback: '暂时无法完成存储迁移预检。' }), color: 'error' })
     } finally {
       migratingStorage.value = false
     }
@@ -300,7 +301,7 @@ export function useAssetMaintenanceOperations(options: UseAssetMaintenanceOperat
       storageMigrationPreview.value = null
       await options.reloadAll()
     } catch (error) {
-      toast.add({ title: '存储迁移失败', description: (error as Error)?.message, color: 'error' })
+      toast.add({ title: '存储迁移失败', description: apiErrorMessage(error, { fallback: '暂时无法迁移存储对象。' }), color: 'error' })
     } finally {
       migratingStorage.value = false
     }

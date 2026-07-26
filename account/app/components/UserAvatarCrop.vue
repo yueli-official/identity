@@ -173,7 +173,14 @@ async function confirmCrop() {
     emit('update:modelValue', avatarUrl)
     cropModalOpen.value = false
   } catch (err: any) {
-    toast.add({ title: '头像上传失败', description: err?.data?.message || err?.message, color: 'error' })
+    toast.add({
+      title: '头像上传失败',
+      description: identityErrorMessage(err, {
+        context: 'profile',
+        fallback: '暂时无法上传头像。',
+      }),
+      color: 'error',
+    })
   } finally {
     uploading.value = false
   }

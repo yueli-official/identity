@@ -1,5 +1,6 @@
 import type { AssetGrant, AssetGrantForm, AssetItem, CreatedAssetGrant } from '~/types/asset-admin'
 import { createPlatformNotifier } from '@platform/ui/feedback'
+import { apiErrorMessage } from '../utils/api-errors'
 
 interface UseAssetGrantsOptions {
   reloadAll: () => Promise<void>
@@ -45,7 +46,7 @@ export function useAssetGrants(options: UseAssetGrantsOptions) {
       revokeGrantTarget.value = null
       await options.reloadAll()
     } catch (error) {
-      toast.add({ title: '撤销授权失败', description: (error as Error)?.message, color: 'error' })
+      toast.add({ title: '撤销授权失败', description: apiErrorMessage(error, { fallback: '暂时无法撤销该授权。' }), color: 'error' })
     } finally {
       revokingGrant.value = false
     }
@@ -72,7 +73,7 @@ export function useAssetGrants(options: UseAssetGrantsOptions) {
       })
       await fetchGrants()
     } catch (error) {
-      toast.add({ title: '生成交付链接失败', description: (error as Error)?.message, color: 'error' })
+      toast.add({ title: '生成交付链接失败', description: apiErrorMessage(error, { fallback: '暂时无法生成交付链接。' }), color: 'error' })
     } finally {
       creatingGrant.value = false
     }

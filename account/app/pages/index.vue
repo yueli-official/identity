@@ -26,7 +26,14 @@ async function onResendVerification() {
     // feedback-contract: the email is delivered outside the current surface
     toast.add({ title: '验证邮件已发送', description: '请检查邮箱完成验证。(demo 无真实邮件:链接打印在后端日志)', color: 'success', icon: 'i-tabler-mail-check' })
   } catch (err: any) {
-    toast.add({ title: '发送失败', description: err?.data?.message || '请稍后重试。', color: 'error' })
+    toast.add({
+      title: '发送失败',
+      description: identityErrorMessage(err, {
+        context: 'verification',
+        fallback: '暂时无法发送验证邮件。',
+      }),
+      color: 'error',
+    })
   } finally {
     resending.value = false
   }
@@ -83,7 +90,14 @@ async function onSaveProfile(e: FormSubmitEvent<ProfileSchema>) {
     markProfileSaved()
   } catch (err: any) {
     markProfileError()
-    toast.add({ title: '保存失败', description: err?.data?.message || '请重试', color: 'error' })
+    toast.add({
+      title: '保存失败',
+      description: identityErrorMessage(err, {
+        context: 'profile',
+        fallback: '暂时无法保存账户资料。',
+      }),
+      color: 'error',
+    })
   }
 }
 async function onAvatarUpdated(url: string) { avatarUrl.value = url; await refresh() }
@@ -110,7 +124,14 @@ async function onChangePassword(e: FormSubmitEvent<PwSchema>) {
     markPasswordSaved()
   } catch (err: any) {
     markPasswordError()
-    toast.add({ title: '修改失败', description: err?.data?.message || '请检查当前密码', color: 'error' })
+    toast.add({
+      title: '修改失败',
+      description: identityErrorMessage(err, {
+        context: 'password-change',
+        fallback: '暂时无法修改密码。',
+      }),
+      color: 'error',
+    })
   }
 }
 
@@ -131,7 +152,14 @@ async function onSetPassword(e: FormSubmitEvent<SetPwSchema>) {
     markInitialPasswordSaved()
   } catch (err: any) {
     markInitialPasswordError()
-    toast.add({ title: '设置失败', description: err?.data?.message || '请重试', color: 'error' })
+    toast.add({
+      title: '设置失败',
+      description: identityErrorMessage(err, {
+        context: 'password-set',
+        fallback: '暂时无法设置密码。',
+      }),
+      color: 'error',
+    })
   }
 }
 
@@ -155,7 +183,14 @@ async function onRevoke(id: string) {
     await call(`/api/v1/session/${id}`, { method: 'DELETE' })
     await refreshSessions()
   } catch (err: any) {
-    toast.add({ title: '操作失败', description: err?.data?.message || '请重试', color: 'error' })
+    toast.add({
+      title: '无法移除会话',
+      description: identityErrorMessage(err, {
+        context: 'session',
+        fallback: '暂时无法移除该登录会话。',
+      }),
+      color: 'error',
+    })
   } finally {
     revoking.value = ''
   }
@@ -199,15 +234,23 @@ async function onUnbindGoogle() {
     await refreshCreds()
     confirmUnbindOpen.value = false
   } catch (err: any) {
-    toast.add({ title: '解绑失败', description: err?.data?.message || '请重试', color: 'error' })
+    toast.add({
+      title: '解绑失败',
+      description: identityErrorMessage(err, {
+        context: 'credential',
+        fallback: '暂时无法移除该登录方式。',
+      }),
+      color: 'error',
+    })
   } finally {
     unbinding.value = false
   }
 }
 const route = useRoute()
 onMounted(() => {
-  if (route.query.error === 'oauth_bind') {
-    toast.add({ title: 'Google 绑定失败', description: '该 Google 账号可能已绑定到其它账户。', color: 'error' })
+  const oauthBindError = oauthRedirectErrorMessage(route.query.error, 'bind')
+  if (oauthBindError) {
+    toast.add({ title: 'Google 绑定失败', description: oauthBindError, color: 'error' })
   }
 })
 

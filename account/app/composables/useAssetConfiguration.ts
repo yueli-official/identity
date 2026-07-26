@@ -1,5 +1,6 @@
 import type { Ref } from 'vue'
 import { createPlatformNotifier } from '@platform/ui/feedback'
+import { apiErrorMessage } from '../utils/api-errors'
 import type {
   AssetProfile,
   AssetSite,
@@ -145,7 +146,7 @@ export function useAssetConfiguration(options: UseAssetConfigurationOptions) {
       deleteVariantTarget.value = null
       await options.reloadAll()
     } catch (error) {
-      toast.add({ title: '删除 Variant 失败', description: (error as Error)?.message, color: 'error' })
+      toast.add({ title: '删除 Variant 失败', description: apiErrorMessage(error, { fallback: '暂时无法删除该 Variant。' }), color: 'error' })
     } finally {
       deletingVariant.value = false
     }
@@ -164,7 +165,7 @@ export function useAssetConfiguration(options: UseAssetConfigurationOptions) {
       deleteProfileTarget.value = null
       await options.reloadAll()
     } catch (error) {
-      toast.add({ title: '删除 Profile 失败', description: (error as Error)?.message, color: 'error' })
+      toast.add({ title: '删除 Profile 失败', description: apiErrorMessage(error, { fallback: '暂时无法删除该 Profile。' }), color: 'error' })
     } finally {
       deletingProfile.value = false
     }

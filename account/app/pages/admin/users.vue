@@ -14,6 +14,10 @@ import { PageHeader } from '@yueli/ui/dashboard/pattern'
 import { useMinimumLoading } from '@yueli/ui/feedback'
 import { abs } from '@platform/ui/date'
 import { createPlatformNotifier } from '@platform/ui/feedback'
+import {
+  adminStepUpFailureMessage,
+  isAdminStepUpInterruptedError
+} from '../../utils/admin-step-up-errors'
 
 // 站群超级管理员·用户管理。identity 全局用户的全生命周期管理:列表/搜索/筛选/
 // 分页 + 封禁/解封/删除 + 重置密码 + 建用户 + 授/撤 admin 角色。
@@ -178,6 +182,12 @@ async function reloadAll() {
   await Promise.all([reload(), fetchStats()])
 }
 
+function notifyStepUpFailure(error: unknown, title: string, fallback: string) {
+  const description = adminStepUpFailureMessage(error, fallback)
+  if (!description) return
+  toast.add({ title, description, color: 'error' })
+}
+
 // ── Selection ────────────────────────────────────────────────────────────────
 const selectedIds = computed(() => (collection.value.selection.mode === 'keys' ? collection.value.selection.keys : []))
 const selectionCount = computed(() => collection.value.selection.count)
@@ -211,7 +221,7 @@ async function setStatus(u: AdminUser, next: AdminUser['status']) {
     if (workflow.isSelected(u.id)) workflow.toggleKey(u.id)
     await reloadAll()
   } catch (e) {
-    toast.add({ title: '操作失败', description: (e as Error)?.message, color: 'error' })
+    notifyStepUpFailure(e, '操作失败', '暂时无法更新账户状态。')
   } finally {
     busy.value = ''
   }
@@ -264,9 +274,10 @@ async function applyBatch() {
   batchRunning.value = true
   try {
     const results: PromiseSettledResult<unknown>[] = []
+    let interruption: unknown
     for (const id of ids) {
       const next = batchAction.value
-      results.push(await Promise.resolve(adminStepUp.run(
+      const result = await Promise.resolve(adminStepUp.run(
         'identity.admin.status.update',
         adminStepUpResource.status(id, next),
         (proof) => call(`/api/v1/admin/users/${id}/status`, {
@@ -276,7 +287,16 @@ async function applyBatch() {
       )).then(
         (value): PromiseFulfilledResult<unknown> => ({ status: 'fulfilled', value }),
         (reason): PromiseRejectedResult => ({ status: 'rejected', reason }),
-      ))
+      )
+      results.push(result)
+      if (result.status === 'rejected' && isAdminStepUpInterruptedError(result.reason)) {
+        interruption = result.reason
+        break
+      }
+    }
+    if (interruption) {
+      notifyStepUpFailure(interruption, '验证已过期', '暂时无法批量更新账户状态。')
+      return
     }
     const failedIds = ids.filter((_, index) => results[index]?.status === 'rejected')
     batchResult.value = { success: ids.length - failedIds.length, failed: failedIds.length }
@@ -321,7 +341,7 @@ async function toggleAdminRole() {
     u.roles = has ? u.roles.filter((r) => r !== 'admin') : [...u.roles, 'admin']
     await reload()
   } catch (e) {
-    toast.add({ title: '操作失败', description: (e as Error)?.message, color: 'error' })
+    notifyStepUpFailure(e, '操作失败', '暂时无法更新账户角色。')
   } finally {
     togglingRole.value = false
   }
@@ -352,7 +372,7 @@ async function confirmReset() {
     )
     resetTarget.value = null
   } catch (e) {
-    toast.add({ title: '重置失败', description: (e as Error)?.message, color: 'error' })
+    notifyStepUpFailure(e, '重置失败', '暂时无法重置密码。')
   } finally {
     resetting.value = false
   }
@@ -382,7 +402,7 @@ async function confirmDelete() {
     deleteTarget.value = null
     await reloadAll()
   } catch (e) {
-    toast.add({ title: '删除失败', description: (e as Error)?.message, color: 'error' })
+    notifyStepUpFailure(e, '删除失败', '暂时无法删除该账户。')
   } finally {
     deleting.value = false
   }
@@ -428,7 +448,7 @@ async function confirmCreate() {
     page.value = 1
     await reloadAll()
   } catch (e) {
-    toast.add({ title: '创建失败', description: (e as Error)?.message, color: 'error' })
+    createError.value = adminStepUpFailureMessage(e, '暂时无法创建账户。') ?? ''
   } finally {
     creating.value = false
   }
@@ -452,17 +472,17 @@ const statusItems = computed(() => [
 ])
 const activeFilterCount = computed(() => Number(status.value !== defaultQuery.status) + Number(role.value !== ALL))
 const collectionControls = computed<CollectionControl[]>(() => [
-  { kind: 'select', id: 'status', label: '用户状态', value: status.value, options: statusItems.value, icon: 'i-tabler-user-check', class: 'w-36' },
-  { kind: 'select', id: 'role', label: '用户角色', value: role.value, options: roleFilterItems, icon: 'i-tabler-shield', class: 'w-32' },
-  { kind: 'select', id: 'sort', label: '用户排序', value: sort.value, options: sortItems, icon: 'i-tabler-arrows-sort', class: 'w-32' },
-  { kind: 'direction', id: 'direction', label: '排序方向', value: direction.value, ascendingLabel: '切换为倒序', descendingLabel: '切换为正序' }
+  { kind: 'select', id: 'status', label: '用户状态', section: '筛选条件', value: status.value, options: statusItems.value, icon: 'i-tabler-user-check', class: 'w-36' },
+  { kind: 'select', id: 'role', label: '用户角色', section: '筛选条件', value: role.value, options: roleFilterItems, icon: 'i-tabler-shield', class: 'w-32' },
+  { kind: 'select', id: 'sort', label: '排序方式', section: '列表排序', value: sort.value, options: sortItems, icon: 'i-tabler-arrows-sort', class: 'w-32' },
+  { kind: 'direction', id: 'direction', label: '排序方向', section: '列表排序', value: direction.value, ascendingLabel: '升序', descendingLabel: '降序' }
 ])
 const collectionMessages: CollectionPanelMessages = {
   searchPlaceholder: '搜索昵称、用户名或邮箱…',
   searchAction: '搜索',
   filtersAction: '筛选',
   activeFilters: (count) => `筛选（${count}）`,
-  clearFilters: '清除筛选',
+  clearFilters: '重置',
   selectPage: '选择当前页可操作用户',
   selectItem: (label) => `选择用户：${label}`,
   bulkRegion: '用户批量操作',
@@ -520,13 +540,15 @@ const userLabel = (user: AdminUser) => user.displayName || user.email
               <div class="text-xs text-error/80">已封禁</div>
             </div>
           </div>
-          <UButton icon="i-tabler-user-plus" label="新建用户" @click="openCreate" />
+          <UButton icon="i-tabler-user-plus" label="新建用户" size="sm" @click="openCreate" />
         </div>
       </template>
     </PageHeader>
 
     <CollectionPanel
       v-model:search="searchInput"
+      filter-panel-title="筛选与排序"
+      filter-panel-description="选择后立即应用。"
       :items="users"
       :item-key="userKey"
       :item-label="userLabel"
@@ -587,7 +609,7 @@ const userLabel = (user: AdminUser) => user.displayName || user.email
       </template>
 
       <template #item="{ item: u }">
-        <div class="grid min-w-0 grid-cols-1 items-center gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:gap-3">
           <div class="flex min-w-0 items-center gap-3">
             <UAvatar :src="u.avatarUrl || undefined" :text="initialOf(u)" size="md" class="hidden shrink-0 sm:flex" />
             <div class="min-w-0 flex-1">
@@ -603,13 +625,22 @@ const userLabel = (user: AdminUser) => user.displayName || user.email
               </div>
             </div>
           </div>
-          <div class="flex w-full shrink-0 items-center justify-between gap-2 sm:w-40 sm:justify-end">
-            <div class="flex flex-wrap items-center gap-1">
+          <div class="flex shrink-0 items-center justify-end gap-1 sm:w-40 sm:gap-2">
+            <div class="hidden flex-wrap items-center gap-1 min-[390px]:flex">
               <UBadge :label="statusBadge[u.status].label" :color="statusBadge[u.status].color" variant="subtle" size="sm" />
               <UBadge v-if="u.roles.includes('admin')" label="管理员" color="warning" variant="soft" size="sm" class="hidden lg:inline-flex" />
             </div>
             <UDropdownMenu :items="rowActions(u)">
-              <UButton color="neutral" variant="ghost" icon="i-tabler-dots-vertical" square size="xs" :loading="busy === u.id" :aria-label="`管理 ${u.displayName || u.email}`" />
+              <UButton
+                color="neutral"
+                variant="ghost"
+                icon="i-tabler-dots-vertical"
+                square
+                size="xs"
+                class="min-h-11 min-w-11 touch-manipulation sm:min-h-0 sm:min-w-0"
+                :loading="busy === u.id"
+                :aria-label="`管理 ${u.displayName || u.email}`"
+              />
             </UDropdownMenu>
           </div>
         </div>

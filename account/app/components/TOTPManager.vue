@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { createPlatformNotifier } from '@platform/ui/feedback'
 import type { TOTPEnrollment, TOTPEntry } from '~/composables/useMFA'
-import { mfaErrorMessage } from '~/composables/useMFA'
 
 const props = defineProps<{ recovery?: boolean }>()
 const emit = defineEmits<{ recovered: [] }>()
@@ -57,7 +56,7 @@ async function startEnrollment() {
     qrDataUrl.value = qr.dataUrl
     modalOpen.value = true
   } catch (error) {
-    toast.add({ title: '无法开始设置', description: mfaErrorMessage(error), color: 'error' })
+    toast.add({ title: '无法开始设置', description: identityErrorMessage(error, { context: 'mfa' }), color: 'error' })
   } finally {
     starting.value = false
   }
@@ -72,7 +71,7 @@ async function confirmEnrollment() {
     stage.value = 'recovery'
     await refresh()
   } catch (error) {
-    toast.add({ title: '验证码未通过', description: mfaErrorMessage(error), color: 'error' })
+    toast.add({ title: '验证码未通过', description: identityErrorMessage(error, { context: 'mfa' }), color: 'error' })
   } finally {
     confirming.value = false
   }
@@ -127,7 +126,7 @@ async function confirmRemove() {
     await refresh()
     removeOpen.value = false
   } catch (error) {
-    toast.add({ title: '无法移除身份验证器', description: mfaErrorMessage(error), color: 'error' })
+    toast.add({ title: '无法移除身份验证器', description: identityErrorMessage(error, { context: 'mfa' }), color: 'error' })
   } finally {
     removing.value = false
   }
@@ -209,7 +208,7 @@ function formatDate(value?: string) {
 
   <UModal
     v-model:open="modalOpen"
-    :dismissible="stage !== 'recovery'"
+    :dismissible="false"
     title="设置身份验证器"
     :description="stage === 'verify' ? '扫描二维码并输入动态验证码。' : '保存一次性恢复代码。'"
   >

@@ -12,10 +12,7 @@ const error = ref('')
 const loading = ref(false)
 
 const oauthError = computed(() => {
-  const e = route.query.error
-  if (!e) return ''
-  if (e === 'oauth_unavailable') return 'Google 登录在该环境未配置,请用邮箱注册。'
-  return '第三方登录失败,请重试或改用邮箱注册。'
+  return oauthRedirectErrorMessage(route.query.error, 'register')
 })
 
 const returnTo = computed(() => String(route.query.return_to ?? '/'))
@@ -39,7 +36,10 @@ async function onSubmit(e: FormSubmitEvent<Schema>) {
     // dev proxy → identity, not Nuxt's client router (which has no such page).
     await navigateTo(safeReturnTo(route.query.return_to as string), { external: true })
   } catch (err: any) {
-    error.value = err?.data?.message || '注册失败,请重试'
+    error.value = identityErrorMessage(err, {
+      context: 'register',
+      fallback: '暂时无法创建账户。',
+    })
   } finally {
     loading.value = false
   }

@@ -159,8 +159,8 @@ const controls = computed<CollectionControl[]>(() => [
     id: "direction",
     label: "排序方向",
     value: direction.value,
-    ascendingLabel: "切换为倒序",
-    descendingLabel: "切换为正序",
+    ascendingLabel: "升序",
+    descendingLabel: "降序",
   },
 ]);
 const messages: CollectionPanelMessages = {

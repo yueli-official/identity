@@ -1,5 +1,6 @@
 import type { AssetItem, AssetReference, AssetSecurityDetail } from '~/types/asset-admin'
 import { createPlatformNotifier } from '@platform/ui/feedback'
+import { apiErrorMessage } from '../utils/api-errors'
 
 interface UseAssetLibraryActionsOptions {
   reloadAll: () => Promise<void>
@@ -47,7 +48,7 @@ export function useAssetLibraryActions(options: UseAssetLibraryActionsOptions) {
       deleteAssetTarget.value = null
       await options.reloadAll()
     } catch (error) {
-      toast.add({ title: '删除素材失败', description: (error as Error)?.message, color: 'error' })
+      toast.add({ title: '删除素材失败', description: apiErrorMessage(error, { fallback: '暂时无法删除该素材。' }), color: 'error' })
     } finally {
       deletingAsset.value = false
     }
@@ -63,7 +64,7 @@ export function useAssetLibraryActions(options: UseAssetLibraryActionsOptions) {
       })
       references.value = data.items ?? []
     } catch (error) {
-      toast.add({ title: '加载引用失败', description: (error as Error)?.message, color: 'error' })
+      toast.add({ title: '加载引用失败', description: apiErrorMessage(error, { fallback: '暂时无法加载素材引用。' }), color: 'error' })
     } finally {
       loadingReferences.value = false
     }
@@ -79,7 +80,7 @@ export function useAssetLibraryActions(options: UseAssetLibraryActionsOptions) {
       securityDetail.value = data.security
       securityAsset.value = data.security.asset
     } catch (error) {
-      toast.add({ title: '加载安全详情失败', description: (error as Error)?.message, color: 'error' })
+      toast.add({ title: '加载安全详情失败', description: apiErrorMessage(error, { fallback: '暂时无法加载安全详情。' }), color: 'error' })
     } finally {
       loadingSecurity.value = false
     }
@@ -100,7 +101,7 @@ export function useAssetLibraryActions(options: UseAssetLibraryActionsOptions) {
       toast.add({ title: '已重新进入安全处理队列', color: 'success' })
       await Promise.all([loadSecurity(securityAsset.value), options.reloadAll()])
     } catch (error) {
-      toast.add({ title: '重新处理失败', description: (error as Error)?.message, color: 'error' })
+      toast.add({ title: '重新处理失败', description: apiErrorMessage(error, { fallback: '暂时无法重新处理该素材。' }), color: 'error' })
     } finally {
       retryingSecurity.value = false
     }
@@ -132,7 +133,7 @@ export function useAssetLibraryActions(options: UseAssetLibraryActionsOptions) {
       securityRejectTarget.value = null
       await options.reloadAll()
     } catch (error) {
-      toast.add({ title: '拒绝素材失败', description: (error as Error)?.message, color: 'error' })
+      toast.add({ title: '拒绝素材失败', description: apiErrorMessage(error, { fallback: '暂时无法拒绝该素材。' }), color: 'error' })
     } finally {
       rejectingSecurity.value = false
     }

@@ -12,6 +12,7 @@
     "@nuxt/ui": "catalog:",
     "@platform/ui": "workspace:*",
     "@platform/manage": "workspace:*",
+    "@yueli/http-runtime": "workspace:*",
     "@yueli/ui": "workspace:*",
     "nuxt": "catalog:",
     "qrcode": "catalog:",

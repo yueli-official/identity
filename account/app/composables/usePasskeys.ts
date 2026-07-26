@@ -1,3 +1,5 @@
+import { identityErrorMessage } from "../utils/api-errors";
+
 export interface PasskeyEntry {
   id: string;
   label: string;
@@ -41,12 +43,10 @@ export function passkeyErrorMessage(error: unknown): string {
     if (error.name === "SecurityError")
       return "当前域名未被允许使用通行密钥，请联系管理员检查 WebAuthn 配置。";
   }
-  const candidate = error as any;
-  return (
-    candidate?.data?.message ||
-    candidate?.statusMessage ||
-    "通行密钥操作失败，请重试。"
-  );
+  return identityErrorMessage(error, {
+    context: "passkey",
+    fallback: "暂时无法完成通行密钥操作。",
+  });
 }
 
 export function usePasskeys() {

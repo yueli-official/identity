@@ -29,7 +29,10 @@ async function onSubmit(e: FormSubmitEvent<Schema>) {
     done.value = true
     await navigateTo('/login')
   } catch (err: any) {
-    error.value = err?.data?.message || '链接无效或已过期,请重新申请。'
+    error.value = identityErrorMessage(err, {
+      context: 'password-reset',
+      fallback: '暂时无法重置密码。',
+    })
   } finally {
     loading.value = false
   }

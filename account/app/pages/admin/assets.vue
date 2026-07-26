@@ -594,7 +594,7 @@ async function reloadAll(includeAssets = true) {
   } catch (e) {
     toast.add({
       title: '资源后台加载失败',
-      description: (e as Error)?.message,
+      description: apiErrorMessage(e, { fallback: '暂时无法加载资源后台。' }),
       color: 'error',
     })
   } finally {

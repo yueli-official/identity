@@ -181,7 +181,14 @@ async function confirmCrop() {
     emit('update:modelValue', coverUrl)
     cropModalOpen.value = false
   } catch (err: any) {
-    toast.add({ title: '封面上传失败', description: err?.data?.message || err?.message, color: 'error' })
+    toast.add({
+      title: '封面上传失败',
+      description: identityErrorMessage(err, {
+        context: 'profile',
+        fallback: '暂时无法上传封面。',
+      }),
+      color: 'error',
+    })
   } finally {
     uploading.value = false
   }

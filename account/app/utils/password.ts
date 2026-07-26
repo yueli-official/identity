@@ -1,8 +1,8 @@
 import * as z from 'zod'
 
-export const PASSWORD_MIN_LENGTH = 15
+export const PASSWORD_MIN_LENGTH = 8
 export const PASSWORD_MAX_LENGTH = 128
-export const PASSWORD_HINT = '至少 15 个字符，建议使用密码管理器生成或保存'
+export const PASSWORD_HINT = '8–128 个字符；常见或泄露密码不可用，建议使用密码管理器'
 
 export function passwordLength(value: string): number {
   return [...value.normalize('NFC')].length

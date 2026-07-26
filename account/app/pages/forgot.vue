@@ -7,6 +7,7 @@ definePageMeta({ layout: 'auth' })
 const { call } = useApi()
 const loading = ref(false)
 const submitted = ref(false)
+const error = ref('')
 
 const schema = z.object({
   email: z.email('邮箱格式不正确')
@@ -16,14 +17,20 @@ const state = reactive<Partial<Schema>>({ email: '' })
 
 async function onSubmit(e: FormSubmitEvent<Schema>) {
   loading.value = true
+  error.value = ''
   try {
     await call('/api/v1/auth/password/forgot', { method: 'POST', body: e.data })
-  } catch {
-    // Swallow errors: the confirmation is intentionally identical regardless of
-    // whether the email exists, to avoid account enumeration.
+    submitted.value = true
+  } catch (cause) {
+    // Identity already makes existing and unknown emails indistinguishable.
+    // Transport, admission, and throttle failures remain safe to disclose
+    // because none of them reveal whether this particular email exists.
+    error.value = identityErrorMessage(cause, {
+      context: 'password-reset',
+      fallback: '暂时无法提交密码重置请求。',
+    })
   } finally {
     loading.value = false
-    submitted.value = true
   }
 }
 </script>
@@ -48,6 +55,7 @@ async function onSubmit(e: FormSubmitEvent<Schema>) {
         <UFormField name="email" label="邮箱">
           <UInput v-model="state.email" type="email" autocomplete="email" placeholder="you@example.com" class="w-full" />
         </UFormField>
+        <UAlert v-if="error" color="error" variant="soft" :description="error" />
         <UButton type="submit" label="发送重置链接" block :loading="loading" />
       </UForm>
 

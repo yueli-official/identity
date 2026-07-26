@@ -19,6 +19,11 @@ const mfaCode = ref('')
 const mfaLoading = ref(false)
 const useRecoveryCode = ref(false)
 const mfaExpiry = useExpiryCountdown(mfaExpiresAt)
+const recoveryCode = computed(() => parseRecoveryCode(mfaCode.value))
+const recoveryCodeInputError = computed(() => {
+  if (!useRecoveryCode.value || !mfaCode.value || recoveryCode.value) return undefined
+  return '请输入一枚恢复代码，不要粘贴整组代码。'
+})
 
 watch(mfaExpiry.expired, (expired) => {
   if (!expired || !mfaTransaction.value) return
@@ -36,10 +41,7 @@ onMounted(() => {
 // Surface an error handed back via the query string (e.g. an OAuth redirect that
 // failed) so the "Sign in with Google" button never silently appears dead.
 const oauthError = computed(() => {
-  const e = route.query.error
-  if (!e) return ''
-  if (e === 'oauth_unavailable') return 'Google 登录在该环境未配置,请用邮箱登录。'
-  return '第三方登录失败,请重试或改用邮箱登录。'
+  return oauthRedirectErrorMessage(route.query.error, 'login')
 })
 
 const returnTo = computed(() => String(route.query.return_to ?? '/'))
@@ -73,7 +75,10 @@ async function onSubmit(e: FormSubmitEvent<Schema>) {
     // is no /oauth2/authorize page in this app).
     await navigateTo(safeReturnTo(route.query.return_to as string), { external: true })
   } catch (err: any) {
-    error.value = err?.data?.message || '登录失败,请重试'
+    error.value = identityErrorMessage(err, {
+      context: 'login',
+      fallback: '暂时无法登录。',
+    })
   } finally {
     loading.value = false
   }
@@ -81,13 +86,16 @@ async function onSubmit(e: FormSubmitEvent<Schema>) {
 
 async function onMFASubmit() {
   if (!useRecoveryCode.value && !/^\d{6}$/.test(mfaCode.value)) return
-  if (useRecoveryCode.value && mfaCode.value.trim().length < 16) return
+  if (useRecoveryCode.value && !recoveryCode.value) return
   error.value = ''
   mfaLoading.value = true
   try {
     await call(useRecoveryCode.value ? '/api/v1/auth/mfa/recovery' : '/api/v1/auth/mfa/totp', {
       method: 'POST',
-      body: { transactionId: mfaTransaction.value, code: mfaCode.value },
+      body: {
+        transactionId: mfaTransaction.value,
+        code: useRecoveryCode.value ? recoveryCode.value : mfaCode.value,
+      },
     })
     if (useRecoveryCode.value) {
       await navigateTo('/recovery')
@@ -96,7 +104,10 @@ async function onMFASubmit() {
     await refresh()
     await navigateTo(safeReturnTo(route.query.return_to as string), { external: true })
   } catch (err) {
-    error.value = mfaErrorMessage(err)
+    error.value = identityErrorMessage(err, {
+      context: 'mfa',
+      fallback: '暂时无法完成双重验证。',
+    })
   } finally {
     mfaLoading.value = false
   }
@@ -174,13 +185,19 @@ function cancelPasskeyLogin() {
           >
             验证将在 {{ mfaExpiry.label.value }} 后过期
           </p>
-          <UFormField :label="useRecoveryCode ? '恢复代码' : '动态验证码'">
+          <UFormField
+            :label="useRecoveryCode ? '恢复代码' : '动态验证码'"
+            :error="recoveryCodeInputError"
+          >
             <UInput
               v-model="mfaCode"
               :inputmode="useRecoveryCode ? 'text' : 'numeric'"
               :autocomplete="useRecoveryCode ? 'off' : 'one-time-code'"
-              :maxlength="useRecoveryCode ? 32 : 6"
+              :maxlength="useRecoveryCode ? 128 : 6"
               :pattern="useRecoveryCode ? undefined : '[0-9]{6}'"
+              :placeholder="useRecoveryCode ? 'XXXX-XXXX-XXXX-XXXX' : undefined"
+              :autocapitalize="useRecoveryCode ? 'characters' : undefined"
+              :spellcheck="useRecoveryCode ? false : undefined"
               autofocus
               class="w-full"
             />
@@ -191,7 +208,7 @@ function cancelPasskeyLogin() {
             label="验证并登录"
             block
             size="lg"
-            :disabled="useRecoveryCode ? mfaCode.trim().length < 16 : !/^\d{6}$/.test(mfaCode)"
+            :disabled="useRecoveryCode ? !recoveryCode : !/^\d{6}$/.test(mfaCode)"
             :loading="mfaLoading"
           />
           <UButton

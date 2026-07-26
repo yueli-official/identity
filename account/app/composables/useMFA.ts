@@ -14,18 +14,15 @@ export interface TOTPEnrollment {
   expiresAt: string
 }
 
-export function mfaErrorMessage(error: unknown): string {
-  const candidate = error as any
-  const code = candidate?.data?.code ?? candidate?.data?.data?.code
-  if (code === 'identity.totp_code_invalid') return '验证码无效、已过期或已经使用，请等待新验证码后重试。'
-  if (code === 'identity.totp_enrollment_invalid') return '设置过程已过期，请重新开始。'
-  if (code === 'identity.step_up_required') return '这项安全操作需要重新验证身份。'
-  if (code === 'identity.recovery_code_invalid') return '恢复代码无效或已经使用。'
-  if (code === 'identity.mfa_transaction_invalid') return '登录验证已过期，请重新登录。'
-  return candidate?.data?.message
-    ?? candidate?.data?.data?.message
-    ?? candidate?.statusMessage
-    ?? '身份验证器操作失败，请重试。'
+const recoveryCodePattern = /^[A-Z2-7]{16}$/
+const recoveryCodeSeparators = /[\s\-\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g
+
+export function parseRecoveryCode(value: string): string | undefined {
+  const canonical = value
+    .normalize('NFKC')
+    .toUpperCase()
+    .replace(recoveryCodeSeparators, '')
+  return recoveryCodePattern.test(canonical) ? canonical : undefined
 }
 
 export function useMFA() {
