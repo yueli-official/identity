@@ -111,9 +111,15 @@ func (r *Redis) DeleteSessionsByIdentity(ctx context.Context, identityID string)
 	return err
 }
 
-func (r *Redis) Locked(ctx context.Context, key string) (bool, error) {
-	n, err := r.c.Exists(ctx, "lock:"+key)
-	return n > 0, err
+func (r *Redis) RetryAfter(ctx context.Context, key string) (time.Duration, bool, error) {
+	remainingMilliseconds, err := r.c.PTTL(ctx, "lock:"+key)
+	if err != nil {
+		return 0, false, err
+	}
+	if remainingMilliseconds <= 0 {
+		return 0, false, nil
+	}
+	return time.Duration(remainingMilliseconds) * time.Millisecond, true, nil
 }
 
 func (r *Redis) RecordFailure(ctx context.Context, key string, window, lockDur time.Duration, max int) error {

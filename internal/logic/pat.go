@@ -33,11 +33,11 @@ func (s *Service) CreatePAT(ctx context.Context, identityID, name string, scopes
 		return "", repo.PATRow{}, iderr.PATScopesRequired()
 	}
 	if len(scopes) > 50 {
-		return "", repo.PATRow{}, iderr.PATScopeInvalid()
+		return "", repo.PATRow{}, iderr.PATScopesTooMany(50)
 	}
-	for _, sc := range scopes {
+	for index, sc := range scopes {
 		if sc == "" || strings.ContainsAny(sc, " \t\r\n") {
-			return "", repo.PATRow{}, iderr.PATScopeInvalid()
+			return "", repo.PATRow{}, iderr.PATScopeInvalid(index)
 		}
 	}
 

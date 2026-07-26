@@ -63,23 +63,23 @@ func (c *AvatarController) upload(ctx context.Context, kind string, file *ghttp.
 		return "", err
 	}
 	if file == nil {
-		return "", iderr.InvalidProfile("no file uploaded")
+		return "", iderr.InvalidProfile(iderr.ProfileReasonFileRequired)
 	}
 	if file.Size > maxImageBytes {
-		return "", iderr.InvalidProfile("image too large")
+		return "", iderr.InvalidProfile(iderr.ProfileReasonImageTooLarge)
 	}
 	mime := file.Header.Get("Content-Type")
 	if !strings.HasPrefix(mime, "image/") {
-		return "", iderr.InvalidProfile("not an image")
+		return "", iderr.InvalidProfile(iderr.ProfileReasonUnsupportedImage)
 	}
 	f, err := file.Open()
 	if err != nil {
-		return "", iderr.InvalidProfile("cannot read upload")
+		return "", iderr.InvalidProfile(iderr.ProfileReasonUploadUnreadable)
 	}
 	defer f.Close()
 	data, err := io.ReadAll(f)
 	if err != nil {
-		return "", iderr.InvalidProfile("cannot read upload")
+		return "", iderr.InvalidProfile(iderr.ProfileReasonUploadUnreadable)
 	}
 
 	// Old asset behind this image (if any) — deleted after the replacement lands

@@ -64,7 +64,7 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (LoginOutput, error)
 		case abuse.DispositionChallenge:
 			return LoginOutput{}, iderr.ChallengeRequired(attemptID)
 		default:
-			return LoginOutput{}, iderr.AccountLocked()
+			return LoginOutput{}, iderr.AccountLockedUntil(admission.RetryAt)
 		}
 	}
 

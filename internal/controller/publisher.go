@@ -181,9 +181,10 @@ func mapPublisherError(err error) error {
 		return iderr.PublisherConsumerDisabled()
 	case errors.Is(err, publisher.ErrIdempotencyConflict):
 		return iderr.PublisherIdempotencyConflict()
-	case errors.Is(err, publisher.ErrInvalidCommand),
-		errors.Is(err, publisher.ErrInvalidAttestation):
-		return iderr.PublisherAttestationInvalid()
+	case errors.Is(err, publisher.ErrInvalidCommand):
+		return iderr.PublisherAttestationInvalid(iderr.PublisherAttestationReasonCommand)
+	case errors.Is(err, publisher.ErrInvalidAttestation):
+		return iderr.PublisherAttestationInvalid(iderr.PublisherAttestationReasonAttestation)
 	case errors.Is(err, publisher.ErrSigningUnavailable):
 		return iderr.PublisherSigningUnavailable()
 	case errors.Is(err, publisher.ErrRotationPending):

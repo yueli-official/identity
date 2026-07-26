@@ -199,7 +199,7 @@ type GuestSessionStore interface {
 // VerificationThrottle protects email-verification and password-reset delivery.
 // Password-login admission is handled by Foundation Abuse instead.
 type VerificationThrottle interface {
-	Locked(ctx context.Context, key string) (bool, error)
+	RetryAfter(ctx context.Context, key string) (time.Duration, bool, error)
 	RecordFailure(ctx context.Context, key string, window, lockDur time.Duration, max int) error
 	Reset(ctx context.Context, key string) error
 }

@@ -30,7 +30,7 @@ func (s *Service) AdmitPublisherAttestation(
 		return iderr.AbuseUnavailable()
 	}
 	if admission.Disposition != abuse.DispositionAllow {
-		return iderr.AccountLocked()
+		return iderr.AccountLockedUntil(admission.RetryAt)
 	}
 	return nil
 }

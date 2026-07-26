@@ -70,6 +70,13 @@ func TestUpdateProfile_EmptyDisplayNameRejected(t *testing.T) {
 	if codeOf(t, err) != iderr.CodeInvalidProfile {
 		t.Fatalf("want CodeInvalidProfile, got %v", err)
 	}
+	var coded *errs.Coded
+	if !errors.As(err, &coded) {
+		t.Fatalf("want coded error, got %v", err)
+	}
+	if coded.Params["reason"] != string(iderr.ProfileReasonDisplayNameRequired) {
+		t.Fatalf("reason = %#v, want %q", coded.Params["reason"], iderr.ProfileReasonDisplayNameRequired)
+	}
 }
 
 func TestChangePassword_SuccessKeepsCurrentRevokesOthers(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"platform/services/identity/internal/actor"
+	"platform/services/identity/internal/iderr"
 )
 
 // DefaultRole is granted to every identity at creation time (password register
@@ -37,6 +38,9 @@ func (s *Service) GrantRole(ctx context.Context, identityID, slug string) error 
 }
 
 func (s *Service) RevokeRole(ctx context.Context, identityID, slug string) error {
+	if slug == AdminRole && identityID == actor.From(ctx).IdentityID {
+		return iderr.SelfAdminTarget()
+	}
 	if err := s.store.RevokeRole(ctx, identityID, slug); err != nil {
 		return err
 	}

@@ -5,6 +5,7 @@ package iderr
 
 import (
 	"net/http"
+	"time"
 
 	"platform/gokit/errs"
 )
@@ -30,8 +31,9 @@ var (
 	CodeResetThrottled      = errs.Register("identity.reset_throttled", http.StatusTooManyRequests)
 	CodeVerifyThrottled     = errs.Register("identity.verify_throttled", http.StatusTooManyRequests)
 
-	CodeForbidden   = errs.Register("identity.forbidden", http.StatusForbidden)
-	CodeUnknownRole = errs.Register("identity.unknown_role", http.StatusBadRequest)
+	CodeForbidden                = errs.Register("identity.forbidden", http.StatusForbidden)
+	CodeSelfAdminActionForbidden = errs.Register("identity.self_admin_action_forbidden", http.StatusForbidden)
+	CodeUnknownRole              = errs.Register("identity.unknown_role", http.StatusBadRequest)
 
 	CodeInvalidProfile  = errs.Register("identity.invalid_profile", http.StatusBadRequest)
 	CodeSessionNotFound = errs.Register("identity.session_not_found", http.StatusNotFound)
@@ -97,6 +99,13 @@ func AccountDisabled() *errs.Coded {
 
 func AccountLocked() *errs.Coded {
 	return errs.New(CodeAccountLocked, "too many attempts, try again later", nil)
+}
+
+func AccountLockedUntil(retryAt time.Time) *errs.Coded {
+	if retryAt.IsZero() {
+		return AccountLocked()
+	}
+	return errs.New(CodeAccountLocked, "too many attempts, try again later", retryAtParams(retryAt))
 }
 
 func ChallengeRequired(attemptID string) *errs.Coded {
@@ -224,8 +233,17 @@ func PublisherConsumerDisabled() *errs.Coded {
 	return errs.New(CodePublisherConsumerDisabled, "publisher consumer is disabled", nil)
 }
 
-func PublisherAttestationInvalid() *errs.Coded {
-	return errs.New(CodePublisherAttestationInvalid, "publisher attestation request is invalid", nil)
+type PublisherAttestationInvalidReason string
+
+const (
+	PublisherAttestationReasonCommand     PublisherAttestationInvalidReason = "command_invalid"
+	PublisherAttestationReasonAttestation PublisherAttestationInvalidReason = "attestation_invalid"
+)
+
+func PublisherAttestationInvalid(reason PublisherAttestationInvalidReason) *errs.Coded {
+	return errs.New(CodePublisherAttestationInvalid, "publisher attestation request is invalid", map[string]any{
+		"reason": string(reason),
+	})
 }
 
 func PublisherIdempotencyConflict() *errs.Coded {
@@ -308,9 +326,27 @@ func ResetThrottled() *errs.Coded {
 	return errs.New(CodeResetThrottled, "too many reset requests, try again later", nil)
 }
 
+func ResetThrottledUntil(retryAt time.Time) *errs.Coded {
+	if retryAt.IsZero() {
+		return ResetThrottled()
+	}
+	return errs.New(CodeResetThrottled, "too many reset requests, try again later", retryAtParams(retryAt))
+}
+
 // VerifyThrottled: too many email-verification requests for this account/IP.
 func VerifyThrottled() *errs.Coded {
 	return errs.New(CodeVerifyThrottled, "too many verification requests, try again later", nil)
+}
+
+func VerifyThrottledUntil(retryAt time.Time) *errs.Coded {
+	if retryAt.IsZero() {
+		return VerifyThrottled()
+	}
+	return errs.New(CodeVerifyThrottled, "too many verification requests, try again later", retryAtParams(retryAt))
+}
+
+func retryAtParams(retryAt time.Time) map[string]any {
+	return map[string]any{"retryAt": retryAt.UTC().Format(time.RFC3339Nano)}
 }
 
 // Forbidden: the caller is authenticated but lacks the required privilege
@@ -334,7 +370,7 @@ func InvalidStatus(status string) *errs.Coded {
 // SelfAdminTarget: an admin attempted a destructive action (ban / delete /
 // demote) against their own account. Refused to prevent self-lockout. 403.
 func SelfAdminTarget() *errs.Coded {
-	return errs.New(CodeForbidden, "cannot perform this action on your own account", nil)
+	return errs.New(CodeSelfAdminActionForbidden, "cannot perform this action on your own account", nil)
 }
 
 // UnknownRole: the requested role slug is not in the fixed catalog (migration
@@ -344,10 +380,23 @@ func UnknownRole(slug string) *errs.Coded {
 	return errs.New(CodeUnknownRole, "unknown role slug", map[string]any{"role": slug})
 }
 
-// InvalidProfile: a submitted profile field failed validation (e.g. empty
-// display name).
-func InvalidProfile(reason string) *errs.Coded {
-	return errs.New(CodeInvalidProfile, "invalid profile", map[string]any{"reason": reason})
+// InvalidProfileReason is a stable machine-readable reason carried in
+// identity.invalid_profile.params.reason. Keep these values backward-compatible:
+// Account uses them to choose field-specific copy without inspecting prose.
+type InvalidProfileReason string
+
+const (
+	ProfileReasonDisplayNameRequired InvalidProfileReason = "display_name_required"
+	ProfileReasonFileRequired        InvalidProfileReason = "file_required"
+	ProfileReasonImageTooLarge       InvalidProfileReason = "image_too_large"
+	ProfileReasonUnsupportedImage    InvalidProfileReason = "unsupported_image"
+	ProfileReasonUploadUnreadable    InvalidProfileReason = "upload_unreadable"
+)
+
+// InvalidProfile reports which profile validation rule failed through a stable
+// enum rather than an implementation-detail message.
+func InvalidProfile(reason InvalidProfileReason) *errs.Coded {
+	return errs.New(CodeInvalidProfile, "invalid profile", map[string]any{"reason": string(reason)})
 }
 
 // SessionNotFound: the target session does not exist OR is not owned by the
@@ -397,8 +446,18 @@ func PATScopesRequired() *errs.Coded {
 	return errs.New(CodePATScopesRequired, "at least one scope required", nil)
 }
 
-func PATScopeInvalid() *errs.Coded {
-	return errs.New(CodePATScopeInvalid, "scope is invalid", nil)
+func PATScopeInvalid(index int) *errs.Coded {
+	return errs.New(CodePATScopeInvalid, "scope is invalid", map[string]any{
+		"reason": "invalid_scope",
+		"index":  index,
+	})
+}
+
+func PATScopesTooMany(max int) *errs.Coded {
+	return errs.New(CodePATScopeInvalid, "too many scopes", map[string]any{
+		"reason": "too_many_scopes",
+		"max":    max,
+	})
 }
 
 func PATLimitReached(max int) *errs.Coded {

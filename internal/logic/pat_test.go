@@ -165,6 +165,10 @@ func TestCreatePAT_ScopeWithSpace(t *testing.T) {
 	if patCodeOfErr(err) != iderr.CodePATScopeInvalid {
 		t.Errorf("scope with space: want PATScopeInvalid, got %v", err)
 	}
+	var coded *errs.Coded
+	if !errors.As(err, &coded) || coded.Params["reason"] != "invalid_scope" || coded.Params["index"] != 0 {
+		t.Errorf("scope params: %#v", coded)
+	}
 }
 
 func TestCreatePAT_TooManyScopes(t *testing.T) {
@@ -177,6 +181,10 @@ func TestCreatePAT_TooManyScopes(t *testing.T) {
 	_, _, err := svc.CreatePAT(context.Background(), "id-1", "tok", scopes, 0)
 	if patCodeOfErr(err) != iderr.CodePATScopeInvalid {
 		t.Errorf(">50 scopes: want PATScopeInvalid, got %v", err)
+	}
+	var coded *errs.Coded
+	if !errors.As(err, &coded) || coded.Params["reason"] != "too_many_scopes" || coded.Params["max"] != 50 {
+		t.Errorf("scope count params: %#v", coded)
 	}
 }
 

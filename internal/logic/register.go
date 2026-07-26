@@ -52,7 +52,7 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (model.Identit
 		case abuse.DispositionChallenge:
 			return model.Identity{}, iderr.ChallengeRequired(attemptID)
 		default:
-			return model.Identity{}, iderr.AccountLocked()
+			return model.Identity{}, iderr.AccountLockedUntil(admission.RetryAt)
 		}
 	}
 	if err := ValidateEmail(email); err != nil {

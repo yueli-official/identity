@@ -28,7 +28,7 @@ func (s *Service) AdmitPasskeyCeremony(
 		return iderr.AbuseUnavailable()
 	}
 	if admission.Disposition != abuse.DispositionAllow || admission.Replay {
-		return iderr.AccountLocked()
+		return iderr.AccountLockedUntil(admission.RetryAt)
 	}
 	return nil
 }

@@ -326,6 +326,16 @@ func TestTOTPLoginCreatesAAL2SessionAndConsumesTransaction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if _, err := module.FinishTOTPAction(context.Background(), FinishTOTPActionRequest{
+		TransactionID: stepUp.TransactionID,
+		Session: Session{
+			ID: "session-existing", IdentityID: "identity-1",
+			Authentication: baseContext,
+		},
+		Code: "not-a-totp-code",
+	}); !errors.Is(err, ErrTOTPCodeInvalid) {
+		t.Fatalf("invalid step-up code error = %v", err)
+	}
 	proof, err := module.FinishTOTPAction(context.Background(), FinishTOTPActionRequest{
 		TransactionID: stepUp.TransactionID,
 		Session: Session{
@@ -350,6 +360,75 @@ func TestTOTPLoginCreatesAAL2SessionAndConsumesTransaction(t *testing.T) {
 		Code: stepUpCode,
 	}); !errors.Is(err, ErrAuthenticationTransactionInvalid) {
 		t.Fatalf("step-up replay error = %v", err)
+	}
+}
+
+func TestStepUpRejectsExpiredTransactionBeforeConsumingProof(t *testing.T) {
+	passkeys := newPasskeyTestStore()
+	module, err := NewModule(
+		passkeys, passkeys, &passkeyTestVerifier{store: passkeys},
+		ModuleConfig{SessionTTL: time.Hour, TransactionTTL: 5 * time.Minute},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	totpVerifier, _ := NewTOTPVerifier("Yueli Account")
+	box, _ := NewSecretBox([]byte("test-master-secret-at-least-thirty-two-bytes"))
+	recovery, _ := NewRecoveryCodeCodec([]byte("test-master-secret-at-least-thirty-two-bytes"))
+	store := &mfaTestStore{}
+	if err := module.ConfigureMFA(store, totpVerifier, box, recovery); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 7, 26, 12, 0, 0, 0, time.UTC)
+	module.now = func() time.Time { return now }
+	seed, err := totpVerifier.Generate("user@example.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	authenticatorID := "totp-1"
+	ciphertext, err := box.Seal(
+		[]byte(seed.Secret), totpAdditionalData("identity-1", authenticatorID, 1),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.authenticator = TOTPAuthenticator{
+		ID: authenticatorID, IdentityID: "identity-1", Status: "active",
+		SecretCiphertext: ciphertext, KeyVersion: 1,
+	}
+	baseContext := Password("primary-event", now.Add(-time.Minute))
+	begin, err := module.BeginStepUp(context.Background(), BeginStepUpRequest{
+		IdentityID: "identity-1", SessionID: "session-1",
+		Audience: "identity-api", Action: "identity.admin.status.update",
+		Resource: "identity:user-1:status:disabled",
+		Requirement: Requirement{
+			FreshWithin: 5 * time.Minute, MinimumLevel: LevelAAL2,
+			MinimumProfile: ProfileMultiFactor, MinimumFactorCount: 2,
+		},
+		Context: baseContext,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	now = begin.ExpiresAt
+	code, err := totp.GenerateCode(seed.Secret, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = module.FinishTOTPAction(context.Background(), FinishTOTPActionRequest{
+		TransactionID: begin.TransactionID,
+		Session: Session{
+			ID: "session-1", IdentityID: "identity-1", Authentication: baseContext,
+		},
+		Code: code,
+	})
+
+	if !errors.Is(err, ErrAuthenticationTransactionInvalid) {
+		t.Fatalf("expired step-up error = %v", err)
+	}
+	if store.transaction.ConsumedAt != nil {
+		t.Fatal("expired step-up transaction was consumed")
 	}
 }
 

@@ -392,11 +392,19 @@ func (m *Memory) DeleteSessionsByIdentity(_ context.Context, identityID string) 
 	return nil
 }
 
-func (m *Memory) Locked(_ context.Context, key string) (bool, error) {
+func (m *Memory) RetryAfter(_ context.Context, key string) (time.Duration, bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	until, ok := m.lockUntil[key]
-	return ok && m.now().Before(until), nil
+	if !ok {
+		return 0, false, nil
+	}
+	remaining := until.Sub(m.now())
+	if remaining <= 0 {
+		delete(m.lockUntil, key)
+		return 0, false, nil
+	}
+	return remaining, true, nil
 }
 
 func (m *Memory) RecordFailure(_ context.Context, key string, _, lockDur time.Duration, max int) error {

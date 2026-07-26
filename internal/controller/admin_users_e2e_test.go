@@ -117,7 +117,7 @@ func TestAdminUserManagement(t *testing.T) {
 			path := "/api/v1/admin/users/" + adminID + "/status"
 			body, status := do(http.MethodPut, path, `{"status":"disabled"}`, adminHdr)
 			t.Assert(status, 403)
-			t.Assert(gjson.New(body).Get("code").String(), "identity.forbidden")
+			t.Assert(gjson.New(body).Get("code").String(), "identity.self_admin_action_forbidden")
 		}
 
 		// 6. Invalid status value → 400.

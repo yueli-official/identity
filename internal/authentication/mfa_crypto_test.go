@@ -102,3 +102,21 @@ func TestRecoveryCodesAreHighEntropyOneTimeLookupMaterial(t *testing.T) {
 		}
 	}
 }
+
+func TestRecoveryCodeDigestNormalizesMobileInputSeparators(t *testing.T) {
+	codec, err := NewRecoveryCodeCodec([]byte("test-master-secret-at-least-thirty-two-bytes"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const displayed = "ABCD-EFGH-JKLM-NPQR"
+	want := codec.Digest(displayed)
+	for _, input := range []string{
+		"abcd efgh jklm npqr",
+		"ＡＢＣＤ－ＥＦＧＨ－ＪＫＬＭ－ＮＰＱＲ",
+		"ABCD\u00a0EFGH\u2011JKLM\u2013NPQR",
+	} {
+		if got := codec.Digest(input); !hmac.Equal(got, want) {
+			t.Fatalf("Digest(%q) did not match displayed recovery code", input)
+		}
+	}
+}

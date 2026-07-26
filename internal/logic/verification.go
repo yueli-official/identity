@@ -33,11 +33,11 @@ func hashToken(token string) string {
 // RequestEmailVerification issues a verify-email link to the identity's email.
 func (s *Service) RequestEmailVerification(ctx context.Context, identityID, ip string) error {
 	acctKey, ipKey := "emailverify:id:"+identityID, "emailverify:ip:"+ip
-	if locked, _ := s.store.Locked(ctx, acctKey); locked {
-		return iderr.VerifyThrottled()
+	if retryAfter, locked, _ := s.store.RetryAfter(ctx, acctKey); locked {
+		return iderr.VerifyThrottledUntil(s.now().Add(retryAfter))
 	}
-	if locked, _ := s.store.Locked(ctx, ipKey); locked {
-		return iderr.VerifyThrottled()
+	if retryAfter, locked, _ := s.store.RetryAfter(ctx, ipKey); locked {
+		return iderr.VerifyThrottledUntil(s.now().Add(retryAfter))
 	}
 	id, err := s.store.GetByID(ctx, identityID)
 	if err != nil {
@@ -97,11 +97,11 @@ func (s *Service) VerifyEmail(ctx context.Context, token string) error {
 func (s *Service) RequestPasswordReset(ctx context.Context, email, ip string) error {
 	email = CanonicalizeEmail(email)
 	acctKey, ipKey := "pwreset:acct:"+email, "pwreset:ip:"+ip
-	if locked, _ := s.store.Locked(ctx, acctKey); locked {
-		return iderr.ResetThrottled()
+	if retryAfter, locked, _ := s.store.RetryAfter(ctx, acctKey); locked {
+		return iderr.ResetThrottledUntil(s.now().Add(retryAfter))
 	}
-	if locked, _ := s.store.Locked(ctx, ipKey); locked {
-		return iderr.ResetThrottled()
+	if retryAfter, locked, _ := s.store.RetryAfter(ctx, ipKey); locked {
+		return iderr.ResetThrottledUntil(s.now().Add(retryAfter))
 	}
 	_ = s.store.RecordFailure(ctx, acctKey, s.cfg.VerifyResetWindow, s.cfg.VerifyResetLockFor, s.cfg.ResetMaxReq)
 	_ = s.store.RecordFailure(ctx, ipKey, s.cfg.VerifyResetWindow, s.cfg.VerifyResetLockFor, s.cfg.ResetMaxReq)

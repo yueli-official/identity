@@ -31,7 +31,7 @@ func (s *Service) UpdateProfile(ctx context.Context, identityID string, in Profi
 	in.Bio = strings.TrimSpace(in.Bio)
 	in.Locale = strings.TrimSpace(in.Locale)
 	if in.DisplayName == "" {
-		return model.Profile{}, iderr.InvalidProfile("display name required")
+		return model.Profile{}, iderr.InvalidProfile(iderr.ProfileReasonDisplayNameRequired)
 	}
 	links := make([]model.SocialLink, 0, len(in.SocialLinks))
 	for _, l := range in.SocialLinks {

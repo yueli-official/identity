@@ -2,10 +2,14 @@ package logic_test
 
 import (
 	"context"
+	"errors"
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
+	"platform/gokit/errs"
+	"platform/services/identity/internal/iderr"
 	"platform/services/identity/internal/logic"
 	"platform/services/identity/internal/repo"
 )
@@ -109,5 +113,30 @@ func TestPasswordReset_UnknownEmail_NoLeak(t *testing.T) {
 	}
 	if cm.resetLink != "" {
 		t.Fatal("must not send mail for unknown email")
+	}
+}
+
+func TestPasswordReset_ThrottleCarriesRetryAt(t *testing.T) {
+	m := repo.NewMemory()
+	cfg := logic.DefaultConfig()
+	cfg.ResetMaxReq = 1
+	cfg.VerifyResetLockFor = time.Hour
+	s := logic.New(m, cfg)
+	ctx := context.Background()
+
+	if err := s.RequestPasswordReset(ctx, "nobody@example.com", "1.1.1.1"); err != nil {
+		t.Fatal(err)
+	}
+	err := s.RequestPasswordReset(ctx, "nobody@example.com", "1.1.1.1")
+	var coded *errs.Coded
+	if !errors.As(err, &coded) || coded.Code != iderr.CodeResetThrottled {
+		t.Fatalf("want reset throttled coded error, got %v", err)
+	}
+	retryAt, err := time.Parse(time.RFC3339Nano, coded.Params["retryAt"].(string))
+	if err != nil {
+		t.Fatalf("retryAt = %#v: %v", coded.Params["retryAt"], err)
+	}
+	if time.Until(retryAt) < 59*time.Minute {
+		t.Fatalf("retryAt too soon: %s", retryAt)
 	}
 }

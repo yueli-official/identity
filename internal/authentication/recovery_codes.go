@@ -8,8 +8,10 @@ import (
 	"errors"
 	"io"
 	"strings"
+	"unicode"
 
 	"golang.org/x/crypto/hkdf"
+	"golang.org/x/text/unicode/norm"
 )
 
 const (
@@ -58,7 +60,12 @@ func (codec *RecoveryCodeCodec) Generate() ([]string, [][]byte, error) {
 }
 
 func (codec *RecoveryCodeCodec) Digest(code string) []byte {
-	canonical := strings.ToUpper(strings.NewReplacer("-", "", " ", "").Replace(code))
+	canonical := strings.Map(func(value rune) rune {
+		if unicode.IsSpace(value) || unicode.Is(unicode.Pd, value) || value == '\u2212' {
+			return -1
+		}
+		return unicode.ToUpper(value)
+	}, norm.NFKC.String(code))
 	mac := hmac.New(sha256.New, codec.key)
 	_, _ = mac.Write([]byte(canonical))
 	return mac.Sum(nil)

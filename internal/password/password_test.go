@@ -34,6 +34,20 @@ func TestPolicyUsesNFCUnicodeCodePointsAndContext(t *testing.T) {
 	}
 }
 
+func TestDefaultPolicyUsesEightToOneHundredTwentyEightCharacterBoundary(t *testing.T) {
+	manager := password.New(password.DefaultConfig())
+	if _, err := manager.Validate(
+		context.Background(), "z7K!4qP", password.Context{},
+	); password.ParseReason(err) != password.ReasonTooShort {
+		t.Fatalf("seven-character password error = %v", err)
+	}
+	if _, err := manager.Validate(
+		context.Background(), "z7K!4qPx", password.Context{},
+	); err != nil {
+		t.Fatalf("eight-character password error = %v", err)
+	}
+}
+
 func TestArgon2idRoundTripAndMalformedHashBounds(t *testing.T) {
 	manager := password.New(password.DefaultConfig())
 	encoded, err := manager.Hash("Café horse battery")

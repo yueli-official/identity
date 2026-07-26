@@ -25,7 +25,7 @@ func (s *Service) AdmitMFAVerification(
 		return abuse.Receipt{}, iderr.AbuseUnavailable()
 	}
 	if admission.Disposition != abuse.DispositionAllow || admission.Replay {
-		return abuse.Receipt{}, iderr.AccountLocked()
+		return abuse.Receipt{}, iderr.AccountLockedUntil(admission.RetryAt)
 	}
 	return admission.Receipt, nil
 }
