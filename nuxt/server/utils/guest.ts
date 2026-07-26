@@ -1,11 +1,5 @@
 import type { H3Event } from "h3";
 
-interface Envelope<T> {
-  code: string;
-  message: string;
-  data?: T;
-}
-
 interface GuestSessionCreated {
   subjectId: string;
   sessionToken: string;
@@ -49,32 +43,18 @@ async function identityRequest<T>(
   body: Record<string, unknown>,
   headers: Record<string, string> = {},
 ): Promise<T> {
-  const response = await $fetch<Envelope<T>>(url, {
+  return await $fetch<T>(url, {
     method: "POST",
     body,
     headers,
   });
-  if (response.code !== "ok" || !response.data) {
-    throw createError({
-      statusCode: 502,
-      statusMessage:
-        response.message || "Identity guest session request failed",
-    });
-  }
-  return response.data;
 }
 
 async function claimResource(target: GuestClaimTarget, claimToken: string) {
-  const response = await $fetch<Envelope<{ claimed: number }>>(
+  await $fetch<{ claimed: number }>(
     `${target.base.replace(/\/$/, "")}${target.path}`,
     { method: "POST", headers: { authorization: `Bearer ${claimToken}` } },
   );
-  if (response.code !== "ok") {
-    throw createError({
-      statusCode: 502,
-      statusMessage: response.message || "Guest resource claim failed",
-    });
-  }
 }
 
 function cookieName(secure: boolean) {
@@ -86,10 +66,12 @@ function isInvalidGuestSession(error: unknown): boolean {
   const failure = error as {
     data?: { code?: unknown };
     response?: { _data?: { code?: unknown } };
+    failure?: { code?: unknown };
   };
   return (
     failure.data?.code === "identity.guest_session_invalid" ||
-    failure.response?._data?.code === "identity.guest_session_invalid"
+    failure.response?._data?.code === "identity.guest_session_invalid" ||
+    failure.failure?.code === "identity.guest_session_invalid"
   );
 }
 

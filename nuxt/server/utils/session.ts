@@ -5,13 +5,27 @@ interface SessionOptions {
   clearOnRefreshFailure?: boolean
 }
 
-export async function sessionForEvent(event: H3Event, options: SessionOptions = {}): Promise<Session | null> {
+function refreshFailureCode(error: unknown): string {
+  if (!error || typeof error !== 'object') return ''
+  const value = error as {
+    data?: { error?: unknown; code?: unknown }
+    failure?: { code?: unknown }
+  }
+  const candidate = value.data?.error || value.data?.code || value.failure?.code
+  return typeof candidate === 'string' ? candidate : ''
+}
+
+export async function sessionForEvent(event: H3Event, _options: SessionOptions = {}): Promise<Session | null> {
   const cfg = oidcConfig(event)
   const session = unseal<Session>(getCookie(event, SESSION_COOKIE), cfg.sealSecret)
   if (!session) return null
 
-  if (!session.refresh || Date.now() <= session.exp - 30_000) {
+  if (Date.now() <= session.exp - 30_000) {
     return session
+  }
+  if (!session.refresh) {
+    deleteCookie(event, SESSION_COOKIE, { path: '/' })
+    return null
   }
 
   try {
@@ -24,12 +38,12 @@ export async function sessionForEvent(event: H3Event, options: SessionOptions = 
       maxAge: 60 * 60 * 24 * 7
     })
     return next
-  } catch {
-    if (options.clearOnRefreshFailure) {
+  } catch (error) {
+    if (refreshFailureCode(error) === 'invalid_grant') {
       deleteCookie(event, SESSION_COOKIE, { path: '/' })
       return null
     }
-    return session
+    throw error
   }
 }
 

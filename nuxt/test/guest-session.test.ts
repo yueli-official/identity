@@ -28,23 +28,27 @@ describe("guestSessionAuthHeaders", () => {
     const fetch = vi
       .fn()
       .mockRejectedValueOnce(
-        Object.assign(new Error("expired"), {
-          statusCode: 401,
-          data: { code: "identity.guest_session_invalid" },
+        Object.assign(new Error("identity.guest_session_invalid"), {
+          failure: {
+            kind: "remote",
+            status: 401,
+            code: "identity.guest_session_invalid",
+            params: {},
+            violations: [],
+            traceId: "guest-expired",
+            reauth: "not-attempted",
+          },
         }),
       )
       .mockResolvedValueOnce({
-        code: "ok",
-        data: {
-          subjectId: "guest-2",
-          sessionToken: "replacement-session",
-          effectiveTtlSeconds: 30 * 24 * 60 * 60,
-          expiresAt: "2026-08-16T00:00:00Z",
-        },
+        subjectId: "guest-2",
+        sessionToken: "replacement-session",
+        effectiveTtlSeconds: 30 * 24 * 60 * 60,
+        expiresAt: "2026-08-16T00:00:00Z",
       })
       .mockResolvedValueOnce({
-        code: "ok",
-        data: { accessToken: "replacement-access", expiresInSeconds: 600 },
+        accessToken: "replacement-access",
+        expiresInSeconds: 600,
       });
     vi.stubGlobal("$fetch", fetch);
 

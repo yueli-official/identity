@@ -18,7 +18,8 @@ export function useAuth() {
       const res = await $fetch<{ user: AuthUser | null }>('/auth/session', { headers })
       user.value = res.user
     } catch {
-      user.value = null
+      // A transient Identity/BFF failure is not a logout. Keep the last
+      // confirmed display state; a later refresh can renew the session.
     }
     return user.value
   }
