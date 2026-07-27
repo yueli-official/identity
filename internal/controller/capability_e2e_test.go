@@ -15,7 +15,7 @@ import (
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/gogf/gf/v2/test/gtest"
 
-	"platform/gokit/capability"
+	"github.com/yueli-official/foundation/go/capability"
 	"platform/gokit/ghttpx"
 	"platform/services/identity/internal/controller"
 	"platform/services/identity/internal/identitycap"

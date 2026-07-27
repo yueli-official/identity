@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	foundationauth "github.com/yueli-official/foundation/go/auth"
-	"platform/gokit/capability"
+	"github.com/yueli-official/foundation/go/capability"
 	"platform/gokit/errs"
 	v1 "platform/services/identity/api/v1"
 	"platform/services/identity/internal/identitycap"

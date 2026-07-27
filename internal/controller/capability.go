@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	foundationauth "github.com/yueli-official/foundation/go/auth"
-	"platform/gokit/capability"
+	"github.com/yueli-official/foundation/go/capability"
 	"platform/gokit/ghttpx"
 	v1 "platform/services/identity/api/v1"
 	"platform/services/identity/internal/actor"

@@ -21,17 +21,14 @@ import (
 	foundationabuse "github.com/yueli-official/foundation/go/abuse"
 	"github.com/yueli-official/foundation/go/abuse/turnstile"
 	foundationauth "github.com/yueli-official/foundation/go/auth"
+	"github.com/yueli-official/foundation/go/capability"
 	"github.com/yueli-official/foundation/go/privacy"
 	privacyadapter "github.com/yueli-official/foundation/go/privacy/httpadapter"
 	"github.com/yueli-official/foundation/go/work"
 	workpostgres "github.com/yueli-official/foundation/go/work/postgres"
 	"github.com/yueli-official/notification/client"
 	"platform/gokit/authhttp"
-	"platform/gokit/capability"
 	"platform/gokit/ghttpx"
-	"platform/gokit/healthcheck"
-	"platform/gokit/observability"
-	"platform/gokit/openapiexport"
 	"platform/gokit/privacycatalog"
 	"platform/gokit/privacyhttp"
 	"platform/gokit/stepup"
@@ -53,6 +50,7 @@ import (
 	"platform/services/identity/internal/oidc"
 	"platform/services/identity/internal/publisher"
 	"platform/services/identity/internal/repo"
+	identityruntime "platform/services/identity/internal/runtime"
 )
 
 type runtimeRepositories struct {
@@ -120,13 +118,13 @@ func newRuntimeRepositories(openAPIExport bool) runtimeRepositories {
 func main() {
 	ctx := gctx.New()
 	var err error
-	openAPIExport := os.Getenv(openapiexport.OutputEnv) != ""
+	openAPIExport := identityruntime.OpenAPIRequested()
 	if !openAPIExport {
-		shutdown, err := observability.StartFromEnvironment(ctx, "identity-api")
+		shutdown, err := identityruntime.StartTelemetry(ctx, "identity-api")
 		if err != nil {
 			panic(err)
 		}
-		defer observability.ShutdownWithTimeout(shutdown)
+		defer identityruntime.ShutdownTelemetry(shutdown)
 	}
 
 	// ── Config ──────────────────────────────────────────────────────────────
@@ -699,7 +697,7 @@ func main() {
 			CapabilityKeys: coreKeys, Operations: []string{"admin", "authenticate", "authorize", "issue", "profile", "verify"},
 			RequiredConfig: []capability.ConfigField{identitycap.Field("issuer", issuer, false), identitycap.Field("global_secret", globalSecret, true)},
 			Checker: identitycap.HealthCheckFunc(func(ctx context.Context) error {
-				return errors.Join(healthcheck.Database(ctx), healthcheck.Redis(ctx))
+				return errors.Join(identityruntime.DatabaseReadiness(ctx), identityruntime.RedisReadiness(ctx))
 			}),
 		},
 		identitycap.Registration{
@@ -764,9 +762,9 @@ func main() {
 	// ── Routing ─────────────────────────────────────────────────────────────
 	s := g.Server()
 	s.GetOpenApi().Components.SecuritySchemes = goai.SecuritySchemes{
-		"AdminAuth": {Value: &goai.SecurityScheme{Type: "http", Scheme: "bearer", BearerFormat: "JWT", Description: "Admin session cookie or an Identity access token with platform capability scope."}},
+		"AdminAuth":   {Value: &goai.SecurityScheme{Type: "http", Scheme: "bearer", BearerFormat: "JWT", Description: "Admin session cookie or an Identity access token with platform capability scope."}},
 		"MachineAuth": {Value: &goai.SecurityScheme{Type: "http", Scheme: "bearer", BearerFormat: "JWT", Description: "Identity-issued service access token with the endpoint scope."}},
-		"UserAuth":  {Value: &goai.SecurityScheme{Type: "http", Scheme: "bearer", BearerFormat: "JWT", Description: "Identity user access token."}},
+		"UserAuth":    {Value: &goai.SecurityScheme{Type: "http", Scheme: "bearer", BearerFormat: "JWT", Description: "Identity user access token."}},
 	}
 	s.Use(ghttpx.TraceRouteMiddleware)
 
@@ -782,9 +780,9 @@ func main() {
 	s.Group("/", func(grp *ghttp.RouterGroup) {
 		grp.Middleware(apiMiddleware, authhttp.Optional(identityVerifier))
 		grp.GET("/healthz", controller.Healthz)
-		grp.GET("/readyz", healthcheck.Handler(map[string]healthcheck.Check{
-			"database": healthcheck.Database,
-			"redis":    healthcheck.Redis,
+		grp.GET("/readyz", identityruntime.ReadinessHandler(map[string]identityruntime.ReadinessCheck{
+			"database": identityruntime.DatabaseReadiness,
+			"redis":    identityruntime.RedisReadiness,
 		}))
 		grp.Bind(authCtl)
 		grp.Bind(stepUpCtl)
@@ -823,7 +821,7 @@ func main() {
 		grp.POST("/api/v1/webhooks/github", githubCtl.GitHubWebhook)
 	})
 
-	if handled, err := openapiexport.ExportIfRequested(s); handled {
+	if handled, err := identityruntime.ExportOpenAPIIfRequested(s); handled {
 		if err != nil {
 			panic(err)
 		}

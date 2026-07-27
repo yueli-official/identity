@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"platform/gokit/capability"
+	"github.com/yueli-official/foundation/go/capability"
 )
 
 type HealthChecker interface {

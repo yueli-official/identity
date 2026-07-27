@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"platform/gokit/observability"
+	identityruntime "platform/services/identity/internal/runtime"
 )
 
 const githubAPIVersion = "2026-03-10"
@@ -51,7 +51,7 @@ func newGitHubAppWithEndpoints(
 		clientID: clientID, clientSecret: clientSecret, redirectURL: redirectURL,
 		authorizeURL: authorizeURL, tokenURL: tokenURL, userURL: userURL,
 		revokeURL: revokeURL,
-		client:    observability.HTTPClient(&http.Client{Timeout: 10 * time.Second}),
+		client:    identityruntime.TelemetryHTTPClient(&http.Client{Timeout: 10 * time.Second}),
 	}, nil
 }
 
