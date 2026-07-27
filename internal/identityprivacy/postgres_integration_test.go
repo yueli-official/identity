@@ -13,7 +13,7 @@ import (
 	"github.com/yueli-official/foundation/go/privacy"
 	"github.com/yueli-official/foundation/go/work"
 
-	"platform/gokit/privacycatalog"
+	identitycatalog "platform/services/identity/internal/identityprivacy/catalog"
 )
 
 func TestCoordinatorFinalizesIdentityAfterRemoteOwnersAndKeepsStatusCapability(t *testing.T) {
@@ -82,11 +82,11 @@ INSERT INTO github_identity_bindings(
 `); err != nil {
 		t.Fatal(err)
 	}
-	blogOwner := privacycatalog.Blog()
+	blogOwner := identitycatalog.Blog()
 	catalog := privacy.MustCompile(Definition(blogOwner))
 	remote := map[privacy.OwnerKey]privacy.OwnerHost{}
 	for _, owner := range catalog.Owners() {
-		if owner.Ref.Key == privacycatalog.IdentityOwner {
+		if owner.Ref.Key == identitycatalog.IdentityOwner {
 			continue
 		}
 		definition := owner

@@ -16,20 +16,20 @@ import (
 	"github.com/yueli-official/foundation/go/privacy"
 	"github.com/yueli-official/foundation/go/work"
 
-	"platform/gokit/privacycatalog"
+	identitycatalog "platform/services/identity/internal/identityprivacy/catalog"
 )
 
 func Definition(configuredOwners ...privacy.OwnerDefinition) privacy.Definition {
-	owner := privacycatalog.Identity()
+	owner := identitycatalog.Identity()
 	return privacy.Definition{
 		Version: privacy.DefinitionVersion, Consumer: "platform.identity",
-		SubjectKinds:   privacycatalog.SubjectKinds(),
-		DataCategories: privacycatalog.Categories(),
-		RetentionRules: privacycatalog.RetentionRules(),
+		SubjectKinds:   identitycatalog.SubjectKinds(),
+		DataCategories: identitycatalog.Categories(),
+		RetentionRules: identitycatalog.RetentionRules(),
 		Limits:         privacy.Limits{MaxAliases: 64},
 		Owner:          &owner,
 		Coordination: &privacy.CoordinationDefinition{
-			Owners: privacycatalog.Owners(configuredOwners...), RightsPolicies: privacycatalog.RightsPolicies(),
+			Owners: identitycatalog.Owners(configuredOwners...), RightsPolicies: identitycatalog.RightsPolicies(),
 		},
 	}
 }
@@ -63,7 +63,7 @@ func NewPostgres(ctx context.Context, options Options) (*Service, error) {
 		return nil, err
 	}
 	router := privacy.OwnerRouterFunc(func(_ context.Context, owner privacy.OwnerKey) (privacy.OwnerHost, error) {
-		if owner == privacycatalog.IdentityOwner {
+		if owner == identitycatalog.IdentityOwner {
 			return host, nil
 		}
 		if remote := options.Remote[owner]; remote != nil {
@@ -93,18 +93,18 @@ func (service *Service) OpenErasure(
 	statusToken string, requestedAt time.Time, verification privacy.VerificationEvidence,
 ) (privacy.RightsRequestView, error) {
 	current := privacy.SubjectRef{
-		Owner: privacycatalog.IdentityOwner, Kind: privacycatalog.UserSubject, Value: userID,
+		Owner: identitycatalog.IdentityOwner, Kind: identitycatalog.UserSubject, Value: userID,
 	}
 	aliases := make([]privacy.SubjectRef, 0, len(service.owners)*2)
 	for _, owner := range service.owners {
-		if owner.Ref.Key == privacycatalog.IdentityOwner {
+		if owner.Ref.Key == identitycatalog.IdentityOwner {
 			continue
 		}
 		for _, kind := range owner.SubjectKinds {
 			switch kind {
-			case privacycatalog.UserSubject:
+			case identitycatalog.UserSubject:
 				aliases = append(aliases, privacy.SubjectRef{Owner: owner.Ref.Key, Kind: kind, Value: userID})
-			case privacycatalog.SubscriberSubject:
+			case identitycatalog.SubscriberSubject:
 				aliases = append(aliases, privacy.SubjectRef{Owner: owner.Ref.Key, Kind: kind, Value: email})
 			}
 		}
@@ -249,7 +249,7 @@ func (executor *executor) execute(ctx context.Context, instruction privacy.Owner
 	results := make([]privacy.DatasetOutcome, 0, len(instruction.Command.Datasets))
 	for _, dataset := range instruction.Command.Datasets {
 		switch dataset {
-		case privacycatalog.IdentityAccountDataset:
+		case identitycatalog.IdentityAccountDataset:
 			var count int64
 			for _, userID := range userIDs {
 				// Fosite token rows intentionally have no FK to identities.
@@ -294,7 +294,7 @@ WHERE identity_id = $1::uuid
 			results = append(results, privacy.DatasetOutcome{
 				Dataset: dataset, Disposition: disposition, Count: count,
 			})
-		case privacycatalog.IdentityAuditDataset:
+		case identitycatalog.IdentityAuditDataset:
 			var count int64
 			for _, userID := range userIDs {
 				var current int64
@@ -330,8 +330,8 @@ func identitySubjects(subjects privacy.SubjectContext) []string {
 	}
 	result := make([]string, 0, len(all))
 	for _, subject := range all {
-		if subject.Owner == privacycatalog.IdentityOwner &&
-			subject.Kind == privacycatalog.UserSubject && strings.TrimSpace(subject.Value) != "" {
+		if subject.Owner == identitycatalog.IdentityOwner &&
+			subject.Kind == identitycatalog.UserSubject && strings.TrimSpace(subject.Value) != "" {
 			result = append(result, subject.Value)
 		}
 	}

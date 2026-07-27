@@ -28,8 +28,6 @@ import (
 	workpostgres "github.com/yueli-official/foundation/go/work/postgres"
 	"github.com/yueli-official/notification/client"
 	"platform/gokit/ghttpx"
-	"platform/gokit/privacycatalog"
-	"platform/gokit/privacyhttp"
 	"platform/services/identity/internal/assetclient"
 	"platform/services/identity/internal/authentication"
 	"platform/services/identity/internal/cache"
@@ -41,6 +39,7 @@ import (
 	"platform/services/identity/internal/identitycap"
 	"platform/services/identity/internal/identitymaintenance"
 	"platform/services/identity/internal/identityprivacy"
+	identitycatalog "platform/services/identity/internal/identityprivacy/catalog"
 	"platform/services/identity/internal/identitysecurity"
 	"platform/services/identity/internal/logic"
 	"platform/services/identity/internal/mailer"
@@ -335,19 +334,19 @@ func main() {
 			seenOwners[owner] = struct{}{}
 			switch configured.Kind {
 			case "blog":
-				configuredOwners = append(configuredOwners, privacycatalog.BlogFor(owner))
+				configuredOwners = append(configuredOwners, identitycatalog.BlogFor(owner))
 			case "notification":
-				if owner != privacycatalog.NotificationOwner {
-					panic(fmt.Sprintf("identity privacy notification owner key must be %q", privacycatalog.NotificationOwner))
+				if owner != identitycatalog.NotificationOwner {
+					panic(fmt.Sprintf("identity privacy notification owner key must be %q", identitycatalog.NotificationOwner))
 				}
-				configuredOwners = append(configuredOwners, privacycatalog.Notification())
+				configuredOwners = append(configuredOwners, identitycatalog.Notification())
 			default:
 				panic(fmt.Sprintf("identity privacy owner %q has unsupported kind %q", owner, configured.Kind))
 			}
 			if configured.URL == "" {
 				continue
 			}
-			tokenSource := &privacyhttp.ClientCredentialsTokenSource{
+			tokenSource := &privacyadapter.ClientCredentialsTokenSource{
 				TokenURL: g.Cfg().MustGet(ctx, "privacy.tokenUrl").String(),
 				ClientID: configured.ClientID, ClientSecret: configured.ClientSecret,
 				Scope: "privacy:owner",
@@ -793,7 +792,7 @@ func main() {
 		grp.Bind(githubCtl)
 		grp.Bind(githubSubmissionCtl)
 		if privacyOwner != nil {
-			grp.POST("/api/internal/privacy/owner", privacyhttp.OwnerHandler(privacyOwner, "privacy:owner"))
+			grp.POST("/api/internal/privacy/owner", identityruntime.PrivacyOwnerHandler(privacyOwner, "privacy:owner"))
 		}
 		grp.ALL("/api/v1/admin/assets-proxy/*", assetAdminProxy.Forward)
 		grp.ALL("/api/v1/admin/platform-proxy/*", platformCapabilityProxy.Forward)

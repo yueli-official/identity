@@ -5,6 +5,7 @@
 - `health.go`：组合 PostgreSQL/Redis readiness 与 Foundation health runner；
 - `auth.go`：组合 Foundation JWKS source 与 token verifier；
 - `openapi.go`：处理显式 OpenAPI 导出；
+- `privacy.go`：组合 Foundation Owner transport 与 Identity scope/error policy；
 - `telemetry.go`：读取 Identity 运行环境并组装 Foundation telemetry provider 与 HTTP client。
 
 这些薄适配留在 Identity 仓，避免服务依赖 Platform `gokit`，也避免把 Identity 的环境变量和进程策略反向塞进
