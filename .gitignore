@@ -1,0 +1,5 @@
+.doctor/
+.data/
+manifest/config/config.yaml
+account/node_modules/
+account/pnpm-debug.log*

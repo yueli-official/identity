@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Verify module
+        env:
+          GOWORK: "off"
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+      - name: Test
+        env:
+          GOWORK: "off"
+        run: go test ./...
+      - name: Check error catalog
+        env:
+          GOWORK: "off"
+        run: go run ./cmd/errorcatalog --check
+      - name: Build
+        env:
+          GOWORK: "off"
+        run: go build ./cmd/identity ./cmd/publishertrust ./cmd/errorcatalog
+
+  account:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: account
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.2
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+          cache-dependency-path: account/pnpm-lock.yaml
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Test
+        run: pnpm test
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Build
+        run: pnpm build
+
+  container:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: identity
+            file: Dockerfile
+            context: .
+          - name: account
+            file: account/Dockerfile
+            context: account
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build --file ${{ matrix.file }} --tag ${{ matrix.name }}:ci ${{ matrix.context }}

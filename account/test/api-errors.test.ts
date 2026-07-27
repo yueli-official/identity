@@ -31,7 +31,7 @@ function remoteFailure(
 describe('Account API error presentation', () => {
   it('covers every registered Identity error code', () => {
     const catalog = JSON.parse(readFileSync(
-      new URL('../../../contracts/errors/catalog.json', import.meta.url),
+      new URL('../../contracts/errors/catalog.json', import.meta.url),
       'utf8',
     )) as { errors: Array<{ code: string }> }
     const identityCodes = catalog.errors

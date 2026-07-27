@@ -1,6 +1,7 @@
 package iderr_test
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -33,6 +34,27 @@ func TestCodesDeclareExpectedStatus(t *testing.T) {
 		if got := descriptor.Kind().Status(); got != want {
 			t.Errorf("Status(%q) = %d, want %d", code, got, want)
 		}
+	}
+}
+
+func TestCatalogContainsEveryDescriptorInStableOrder(t *testing.T) {
+	catalog := iderr.Catalog()
+	if len(catalog) != 72 {
+		t.Fatalf("catalog length = %d, want 72", len(catalog))
+	}
+	codes := make([]string, 0, len(catalog))
+	for _, entry := range catalog {
+		descriptor, ok := iderr.DescriptorForCode(entry.Code)
+		if !ok {
+			t.Fatalf("catalog code %q is missing a descriptor", entry.Code)
+		}
+		if got := descriptor.Kind().Status(); got != entry.Status {
+			t.Fatalf("catalog status %q = %d, want %d", entry.Code, entry.Status, got)
+		}
+		codes = append(codes, entry.Code)
+	}
+	if !slices.IsSorted(codes) {
+		t.Fatalf("catalog is not sorted: %#v", codes)
 	}
 }
 

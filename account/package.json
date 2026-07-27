@@ -8,10 +8,11 @@
     "pnpm": "10.28.x"
   },
   "scripts": {
+    "postinstall": "nuxt prepare",
     "dev": "nuxt dev",
     "build": "nuxt build",
     "typecheck": "nuxt typecheck",
-    "test": "vitest run"
+    "test": "nuxt prepare && vitest run"
   },
   "dependencies": {
     "@nuxt/ui": "4.9.0",
@@ -26,6 +27,8 @@
   "devDependencies": {
     "@iconify-json/tabler": "1.2.35",
     "@types/qrcode": "1.5.6",
-    "vitest": "4.1.10"
+    "typescript": "6.0.3",
+    "vitest": "4.1.10",
+    "vue-tsc": "3.3.7"
   }
 }

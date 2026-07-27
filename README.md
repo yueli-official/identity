@@ -1,7 +1,7 @@
 # 身份服务
 
 - 生命周期：活跃的平台服务
-- 权威来源：Catalog `platformServices.identity`、迁移和生成的 OpenAPI
+- 权威来源：本仓源码、版本化迁移、`doctor.yaml` 和生成的 OpenAPI
 - 消费者：Account、全部产品 BFF/API、Asset 及其他平台服务
 - 验证：进入本目录并设置 `GOWORK=off` 后执行 `go test ./...`
 
@@ -13,9 +13,7 @@ Identity 是站群唯一身份提供方，负责账户、凭据、公开资料�
 - Redis 是会话热缓存，也是限流与锁定依赖；Redis miss 时可从 PostgreSQL 恢复有效 Identity 会话。
 - `ory/fosite` 提供 OAuth2/OIDC 协议状态机。公共客户端使用授权码与 PKCE S256；短期访问令牌为 RS256 JWT，消费者通过 JWKS 本地验证。
 - 刷新令牌持久化并轮换；单会话退出、全部退出和 RP 发起退出会撤销对应刷新令牌范围。
-- Account 是 Catalog 声明的每环境唯一配套界面，不是第二个身份权威。
-
-长期实现契约见 `flightdeck/knowledge/auth/identity-oidc-provider-boundary.md` 与 `flightdeck/knowledge/auth/login-session-durability.md`。
+- Account 是本仓唯一配套界面，不是第二个身份权威。
 
 ## 接口面
 
@@ -42,6 +40,8 @@ Identity 是站群唯一身份提供方，负责账户、凭据、公开资料�
 - `/healthz`、`/readyz`、`/api.json`、`/swagger`：运维与接口发现。
 
 字段级接口真值以生成的 OpenAPI 为准。
+Account 使用的错误码目录位于 `contracts/errors/catalog.json`，由
+`go run ./cmd/errorcatalog` 生成；CI 使用 `go run ./cmd/errorcatalog --check` 拒绝目录漂移。
 
 ## 目录地图
 
@@ -62,17 +62,22 @@ Identity 是站群唯一身份提供方，负责账户、凭据、公开资料�
 
 ## 开发
 
-正常开发使用 Catalog 生命周期，它会一致地 provision OIDC 客户端和共享本地账户（`test@example.com` / `Yueli local development 2026`）：
+仓库自治清单位于 `doctor.yaml`。安装统筹仓库提供的 Doctor CLI 后，在本仓执行：
 
-```powershell
-pnpm platformctl dev up --file catalog/overlays/local.yaml --root . docs-main
-pnpm platformctl dev status --root .
+```text
+doctor check
+doctor test
+doctor up --detach
+doctor status --check
+doctor logs identity
+doctor down
 ```
 
-隔离开发时，把 `manifest/config/config.example.yaml` 复制为忽略的 `config.yaml`。必须提供 PostgreSQL、Redis 和至少 32 字节且稳定的 `GF_OIDC_GLOBALSECRET`；`oidc.issuer` 必须等于外部可访问的 Identity origin。
+`check` 不启动进程或修改数据库；缺少运行配置、数据库 URL 或可选 Asset/Notification 地址时会明确给出警告。
+`up` 要求先把 `manifest/config/config.example.yaml` 复制为忽略的 `config.yaml`。必须提供 PostgreSQL、Redis
+和至少 32 字节且稳定的 `GF_OIDC_GLOBALSECRET`；`oidc.issuer` 必须等于外部可访问的 Identity origin。
 
 ```powershell
-Set-Location services/identity
 $env:GOWORK = "off"
 go run ./cmd/publishertrust `
   -issuer http://localhost:8081 `
@@ -82,6 +87,10 @@ go run ./cmd/publishertrust `
   -manifest .data/publisher/trust-manifest.json
 go run ./cmd/identity
 go test ./...
+pnpm --dir account install --frozen-lockfile
+pnpm --dir account test
+pnpm --dir account typecheck
+pnpm --dir account build
 ```
 
 `publishertrust` 是离线运维命令。Identity runtime 只配置 leaf signing key、root 公钥和已签 manifest；
@@ -114,11 +123,10 @@ Publisher subject、已签证明和 Registry 已保存的历史 submission manif
 
 DAO 集成测试使用 `TEST_PG_LINK` 和 `TEST_REDIS_ADDR`；完整迁移 lifecycle 使用
 `IDENTITY_MIGRATION_PG_*` 创建并删除隔离临时库。不要把整套历史 integration suite 指向长期
-Identity 数据库。生产 wiring 绝不能把 PG 会话/OIDC store 替换为内存实现。现代认证的长期契约见
-`flightdeck/knowledge/auth/identity-authentication-system.md`。
+Identity 数据库。生产 wiring 绝不能把 PG 会话/OIDC store 替换为内存实现。
 
-Privacy 的远程 Owner URL 与 confidential OAuth client 在 `privacy.*` 配置，并由部署 Catalog 的
-`privacy:owner` service client 自动生成。每个独立站点使用 `site.<slug>` Owner key；协调器只冻结当前部署
+Privacy 的远程 Owner URL 与 confidential OAuth client 在 `privacy.*` 配置，并由部署组合提供
+`privacy:owner` service client。每个独立站点使用 `site.<slug>` Owner key；协调器只冻结当前部署
 实际存在的 Owner，不假设所有产品或 Notification 永远同部署。Identity 只保存请求、任务和最小回执；
 Blog 与 Notification 仍直接拥有数据。Identity Owner 被声明为 finalizer，只有其他 Owner 全部终态后才
 删除账号。独立 `identity:privacy` Work 实例会持续恢复 Owner 不可用或响应丢失的请求。

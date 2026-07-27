@@ -1,0 +1,63 @@
+apiVersion: doctor.yueli.dev/v1
+kind: Repository
+metadata:
+  name: identity
+  class: foundation-service
+
+toolchains:
+  - { name: go, version: 1.25.12 }
+  - { name: node, version: 24.18.0 }
+  - { name: pnpm, version: 10.28.2 }
+
+dependencies:
+  - name: asset
+    capability: asset.api
+    version: ">=1.0"
+    urlEnv: GF_ASSET_BASEURL
+    optional: true
+  - name: notification
+    capability: notification.email
+    version: ">=1.0"
+    urlEnv: GF_NOTIFICATION_BASEURL
+    optional: true
+
+configuration:
+  - name: runtime
+    path: manifest/config/config.yaml
+    example: manifest/config/config.example.yaml
+
+migrations:
+  - name: identity-db
+    engine: postgres
+    directory: manifest/sql/migrations
+    databaseUrlEnv: IDENTITY_DATABASE_URL
+
+tasks:
+  - name: backend-unit
+    phase: test
+    command: [go, test, ./...]
+  - name: account-unit
+    phase: test
+    cwd: account
+    command: [pnpm, test]
+  - name: account-typecheck
+    phase: test
+    cwd: account
+    command: [pnpm, typecheck]
+  - name: account-build
+    phase: test
+    cwd: account
+    command: [pnpm, build]
+
+processes:
+  - name: identity
+    command: [go, run, ./cmd/identity]
+    health:
+      url: http://127.0.0.1:8081/readyz
+      timeout: 3m
+  - name: account
+    cwd: account
+    command: [pnpm, dev, --host, 0.0.0.0]
+    health:
+      url: http://127.0.0.1:3000/
+      timeout: 3m

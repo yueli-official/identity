@@ -6,6 +6,7 @@ package iderr
 import (
 	"fmt"
 	"net/http"
+	"sort"
 
 	"github.com/yueli-official/foundation/go/problem"
 )
@@ -178,6 +179,27 @@ func descriptor(code string, status int) problem.Descriptor {
 func DescriptorForCode(code string) (problem.Descriptor, bool) {
 	value, ok := descriptors[code]
 	return value, ok
+}
+
+// CatalogEntry 是供 Account 与契约工具消费的稳定机器可读投影。
+type CatalogEntry struct {
+	Code   string `json:"code"`
+	Status int    `json:"status"`
+}
+
+// Catalog 返回按错误码排序的 Identity 公共错误合同副本。
+func Catalog() []CatalogEntry {
+	result := make([]CatalogEntry, 0, len(descriptors))
+	for code, value := range descriptors {
+		result = append(result, CatalogEntry{
+			Code:   code,
+			Status: value.Kind().Status(),
+		})
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Code < result[j].Code
+	})
+	return result
 }
 
 // Resolve exposes the immutable public mapping for service logic and tests

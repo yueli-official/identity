@@ -1,0 +1,293 @@
+{
+  "schemaVersion": "identity.yueli.dev/error-catalog/v1",
+  "errors": [
+    {
+      "code": "identity.abuse_attempt_replayed",
+      "status": 409
+    },
+    {
+      "code": "identity.abuse_unavailable",
+      "status": 503
+    },
+    {
+      "code": "identity.account_disabled",
+      "status": 403
+    },
+    {
+      "code": "identity.account_locked",
+      "status": 429
+    },
+    {
+      "code": "identity.capability_audit_unavailable",
+      "status": 500
+    },
+    {
+      "code": "identity.capability_not_found",
+      "status": 404
+    },
+    {
+      "code": "identity.capability_probe_rate_limited",
+      "status": 429
+    },
+    {
+      "code": "identity.challenge_required",
+      "status": 403
+    },
+    {
+      "code": "identity.credential_conflict",
+      "status": 409
+    },
+    {
+      "code": "identity.credential_not_found",
+      "status": 404
+    },
+    {
+      "code": "identity.email_taken",
+      "status": 409
+    },
+    {
+      "code": "identity.forbidden",
+      "status": 403
+    },
+    {
+      "code": "identity.github_binding_attempt_invalid",
+      "status": 400
+    },
+    {
+      "code": "identity.github_binding_conflict",
+      "status": 409
+    },
+    {
+      "code": "identity.github_binding_not_found",
+      "status": 404
+    },
+    {
+      "code": "identity.github_binding_unavailable",
+      "status": 503
+    },
+    {
+      "code": "identity.github_provider_failed",
+      "status": 502
+    },
+    {
+      "code": "identity.github_submission_invalid",
+      "status": 400
+    },
+    {
+      "code": "identity.github_submission_unauthorized",
+      "status": 403
+    },
+    {
+      "code": "identity.guest_audience_invalid",
+      "status": 403
+    },
+    {
+      "code": "identity.guest_claim_conflict",
+      "status": 409
+    },
+    {
+      "code": "identity.guest_request_invalid",
+      "status": 400
+    },
+    {
+      "code": "identity.guest_session_invalid",
+      "status": 401
+    },
+    {
+      "code": "identity.invalid_credentials",
+      "status": 401
+    },
+    {
+      "code": "identity.invalid_email",
+      "status": 400
+    },
+    {
+      "code": "identity.invalid_profile",
+      "status": 400
+    },
+    {
+      "code": "identity.invalid_status",
+      "status": 400
+    },
+    {
+      "code": "identity.last_credential",
+      "status": 409
+    },
+    {
+      "code": "identity.mfa_transaction_invalid",
+      "status": 400
+    },
+    {
+      "code": "identity.mfa_unavailable",
+      "status": 503
+    },
+    {
+      "code": "identity.not_authenticated",
+      "status": 401
+    },
+    {
+      "code": "identity.not_found",
+      "status": 404
+    },
+    {
+      "code": "identity.oauth_email_conflict",
+      "status": 409
+    },
+    {
+      "code": "identity.oauth_failed",
+      "status": 401
+    },
+    {
+      "code": "identity.oauth_no_email",
+      "status": 400
+    },
+    {
+      "code": "identity.passkey_ceremony_invalid",
+      "status": 400
+    },
+    {
+      "code": "identity.passkey_exists",
+      "status": 409
+    },
+    {
+      "code": "identity.passkey_unavailable",
+      "status": 503
+    },
+    {
+      "code": "identity.password_already_set",
+      "status": 409
+    },
+    {
+      "code": "identity.pat_expired",
+      "status": 401
+    },
+    {
+      "code": "identity.pat_invalid",
+      "status": 401
+    },
+    {
+      "code": "identity.pat_limit_reached",
+      "status": 409
+    },
+    {
+      "code": "identity.pat_name_required",
+      "status": 400
+    },
+    {
+      "code": "identity.pat_not_found",
+      "status": 404
+    },
+    {
+      "code": "identity.pat_scope_invalid",
+      "status": 400
+    },
+    {
+      "code": "identity.pat_scopes_required",
+      "status": 400
+    },
+    {
+      "code": "identity.provider_not_found",
+      "status": 404
+    },
+    {
+      "code": "identity.publisher_attestation_invalid",
+      "status": 400
+    },
+    {
+      "code": "identity.publisher_consumer_disabled",
+      "status": 409
+    },
+    {
+      "code": "identity.publisher_consumer_not_found",
+      "status": 404
+    },
+    {
+      "code": "identity.publisher_idempotency_conflict",
+      "status": 409
+    },
+    {
+      "code": "identity.publisher_key_transition_invalid",
+      "status": 409
+    },
+    {
+      "code": "identity.publisher_root_untrusted",
+      "status": 400
+    },
+    {
+      "code": "identity.publisher_rotation_pending",
+      "status": 409
+    },
+    {
+      "code": "identity.publisher_signing_unavailable",
+      "status": 503
+    },
+    {
+      "code": "identity.publisher_trust_manifest_invalid",
+      "status": 400
+    },
+    {
+      "code": "identity.recovery_code_invalid",
+      "status": 401
+    },
+    {
+      "code": "identity.reset_throttled",
+      "status": 429
+    },
+    {
+      "code": "identity.self_admin_action_forbidden",
+      "status": 403
+    },
+    {
+      "code": "identity.session_not_found",
+      "status": 404
+    },
+    {
+      "code": "identity.step_up_method_unavailable",
+      "status": 409
+    },
+    {
+      "code": "identity.step_up_proof_invalid",
+      "status": 401
+    },
+    {
+      "code": "identity.step_up_proof_replayed",
+      "status": 409
+    },
+    {
+      "code": "identity.step_up_request_invalid",
+      "status": 400
+    },
+    {
+      "code": "identity.step_up_required",
+      "status": 428
+    },
+    {
+      "code": "identity.totp_code_invalid",
+      "status": 401
+    },
+    {
+      "code": "identity.totp_enrollment_invalid",
+      "status": 400
+    },
+    {
+      "code": "identity.totp_not_found",
+      "status": 404
+    },
+    {
+      "code": "identity.unknown_role",
+      "status": 400
+    },
+    {
+      "code": "identity.verification_invalid",
+      "status": 400
+    },
+    {
+      "code": "identity.verify_throttled",
+      "status": 429
+    },
+    {
+      "code": "identity.weak_password",
+      "status": 400
+    }
+  ]
+}
