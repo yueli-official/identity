@@ -17,12 +17,12 @@ import (
 	"github.com/google/uuid"
 
 	"platform/gokit/ghttpx"
-	"platform/gokit/stepup"
 	"platform/services/identity/internal/authentication"
 	"platform/services/identity/internal/controller"
 	"platform/services/identity/internal/logic"
 	"platform/services/identity/internal/oidc"
 	"platform/services/identity/internal/repo"
+	"platform/services/identity/stepup"
 )
 
 func TestAdminMutationRequiresActionBoundOneTimeProof(t *testing.T) {

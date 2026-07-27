@@ -31,7 +31,6 @@ import (
 	"platform/gokit/ghttpx"
 	"platform/gokit/privacycatalog"
 	"platform/gokit/privacyhttp"
-	"platform/gokit/stepup"
 	"platform/services/identity/internal/assetclient"
 	"platform/services/identity/internal/authentication"
 	"platform/services/identity/internal/cache"
@@ -51,6 +50,7 @@ import (
 	"platform/services/identity/internal/publisher"
 	"platform/services/identity/internal/repo"
 	identityruntime "platform/services/identity/internal/runtime"
+	"platform/services/identity/stepup"
 )
 
 type runtimeRepositories struct {

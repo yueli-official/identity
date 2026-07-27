@@ -8,8 +8,8 @@ import (
 
 	"github.com/gogf/gf/v2/net/ghttp"
 
-	"platform/gokit/stepup"
 	"platform/services/identity/internal/iderr"
+	"platform/services/identity/stepup"
 )
 
 const stepUpProofHeader = "X-Step-Up-Proof"
