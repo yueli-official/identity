@@ -10,7 +10,7 @@ import (
 
 	foundationauth "github.com/yueli-official/foundation/go/auth"
 	"github.com/yueli-official/foundation/go/capability"
-	"platform/gokit/ghttpx"
+	"github.com/yueli-official/foundation/go/goframe/ratelimit"
 	v1 "platform/services/identity/api/v1"
 	"platform/services/identity/internal/actor"
 	"platform/services/identity/internal/identitycap"
@@ -24,7 +24,7 @@ type Capability struct {
 	registry      *identitycap.Registry
 	audit         repo.AuditRepo
 	service       capability.ServiceMetadata
-	healthLimiter *ghttpx.RateLimiter
+	healthLimiter *ratelimit.Limiter
 }
 
 type capabilityActor struct {
@@ -34,7 +34,10 @@ type capabilityActor struct {
 }
 
 func NewCapability(auth *Controller, registry *identitycap.Registry, audit repo.AuditRepo, service capability.ServiceMetadata) *Capability {
-	return &Capability{auth: auth, registry: registry, audit: audit, service: service, healthLimiter: ghttpx.NewRateLimiter(5, time.Minute)}
+	return &Capability{
+		auth: auth, registry: registry, audit: audit, service: service,
+		healthLimiter: ratelimit.MustNew(ratelimit.Policy{Limit: 5, Window: time.Minute}),
+	}
 }
 
 func (controller *Capability) Capabilities(ctx context.Context, _ *v1.AdminCapabilitiesReq) (*v1.AdminCapabilitiesRes, error) {

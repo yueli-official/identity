@@ -1,236 +1,156 @@
-// Package iderr registers identity-service error codes into the gokit registry
-// and provides typed constructors. (TS catalog/codegen lands with Plan 2-UI;
-// the Go registry is the single source of truth for now.)
 package iderr
 
 import (
-	"net/http"
 	"time"
-
-	"platform/gokit/errs"
 )
 
-var (
-	CodeEmailTaken         = errs.Register("identity.email_taken", http.StatusConflict)
-	CodeInvalidCredentials = errs.Register("identity.invalid_credentials", http.StatusUnauthorized)
-	CodeAccountDisabled    = errs.Register("identity.account_disabled", http.StatusForbidden)
-	CodeAccountLocked      = errs.Register("identity.account_locked", http.StatusTooManyRequests)
-	CodeWeakPassword       = errs.Register("identity.weak_password", http.StatusBadRequest)
-	CodeInvalidEmail       = errs.Register("identity.invalid_email", http.StatusBadRequest)
-	CodeNotAuthenticated   = errs.Register("identity.not_authenticated", http.StatusUnauthorized)
-	CodeStepUpRequired     = errs.Register("identity.step_up_required", http.StatusPreconditionRequired)
-	CodeChallengeRequired  = errs.Register("identity.challenge_required", http.StatusForbidden)
-	CodeAbuseUnavailable   = errs.Register("identity.abuse_unavailable", http.StatusServiceUnavailable)
-	CodeAbuseReplay        = errs.Register("identity.abuse_attempt_replayed", http.StatusConflict)
-
-	CodeOAuthEmailConflict = errs.Register("identity.oauth_email_conflict", http.StatusConflict)
-	CodeOAuthNoEmail       = errs.Register("identity.oauth_no_email", http.StatusBadRequest)
-	CodeOAuthFailed        = errs.Register("identity.oauth_failed", http.StatusUnauthorized)
-
-	CodeVerificationInvalid = errs.Register("identity.verification_invalid", http.StatusBadRequest)
-	CodeResetThrottled      = errs.Register("identity.reset_throttled", http.StatusTooManyRequests)
-	CodeVerifyThrottled     = errs.Register("identity.verify_throttled", http.StatusTooManyRequests)
-
-	CodeForbidden                = errs.Register("identity.forbidden", http.StatusForbidden)
-	CodeSelfAdminActionForbidden = errs.Register("identity.self_admin_action_forbidden", http.StatusForbidden)
-	CodeUnknownRole              = errs.Register("identity.unknown_role", http.StatusBadRequest)
-
-	CodeInvalidProfile  = errs.Register("identity.invalid_profile", http.StatusBadRequest)
-	CodeSessionNotFound = errs.Register("identity.session_not_found", http.StatusNotFound)
-
-	CodeCredentialConflict = errs.Register("identity.credential_conflict", http.StatusConflict)
-	CodeCredentialNotFound = errs.Register("identity.credential_not_found", http.StatusNotFound)
-	CodeLastCredential     = errs.Register("identity.last_credential", http.StatusConflict)
-	CodePasswordAlreadySet = errs.Register("identity.password_already_set", http.StatusConflict)
-
-	CodeIdentityNotFound             = errs.Register("identity.not_found", http.StatusNotFound)
-	CodeInvalidStatus                = errs.Register("identity.invalid_status", http.StatusBadRequest)
-	CodeCapabilityNotFound           = errs.Register("identity.capability_not_found", http.StatusNotFound)
-	CodeProviderNotFound             = errs.Register("identity.provider_not_found", http.StatusNotFound)
-	CodeCapabilityProbeRateLimit     = errs.Register("identity.capability_probe_rate_limited", http.StatusTooManyRequests)
-	CodeCapabilityAudit              = errs.Register("identity.capability_audit_unavailable", http.StatusInternalServerError)
-	CodeInvalidGuestRequest          = errs.Register("identity.guest_request_invalid", http.StatusBadRequest)
-	CodeInvalidGuestSession          = errs.Register("identity.guest_session_invalid", http.StatusUnauthorized)
-	CodeInvalidGuestAudience         = errs.Register("identity.guest_audience_invalid", http.StatusForbidden)
-	CodeGuestClaimConflict           = errs.Register("identity.guest_claim_conflict", http.StatusConflict)
-	CodePasskeyUnavailable           = errs.Register("identity.passkey_unavailable", http.StatusServiceUnavailable)
-	CodePasskeyCeremonyInvalid       = errs.Register("identity.passkey_ceremony_invalid", http.StatusBadRequest)
-	CodePasskeyExists                = errs.Register("identity.passkey_exists", http.StatusConflict)
-	CodeMFAUnavailable               = errs.Register("identity.mfa_unavailable", http.StatusServiceUnavailable)
-	CodeTOTPEnrollmentInvalid        = errs.Register("identity.totp_enrollment_invalid", http.StatusBadRequest)
-	CodeTOTPCodeInvalid              = errs.Register("identity.totp_code_invalid", http.StatusUnauthorized)
-	CodeTOTPNotFound                 = errs.Register("identity.totp_not_found", http.StatusNotFound)
-	CodeMFATransactionInvalid        = errs.Register("identity.mfa_transaction_invalid", http.StatusBadRequest)
-	CodeRecoveryCodeInvalid          = errs.Register("identity.recovery_code_invalid", http.StatusUnauthorized)
-	CodeStepUpRequestInvalid         = errs.Register("identity.step_up_request_invalid", http.StatusBadRequest)
-	CodeStepUpMethodUnavailable      = errs.Register("identity.step_up_method_unavailable", http.StatusConflict)
-	CodeStepUpProofInvalid           = errs.Register("identity.step_up_proof_invalid", http.StatusUnauthorized)
-	CodeStepUpProofReplayed          = errs.Register("identity.step_up_proof_replayed", http.StatusConflict)
-	CodePublisherConsumerNotFound    = errs.Register("identity.publisher_consumer_not_found", http.StatusNotFound)
-	CodePublisherConsumerDisabled    = errs.Register("identity.publisher_consumer_disabled", http.StatusConflict)
-	CodePublisherAttestationInvalid  = errs.Register("identity.publisher_attestation_invalid", http.StatusBadRequest)
-	CodePublisherIdempotencyConflict = errs.Register("identity.publisher_idempotency_conflict", http.StatusConflict)
-	CodePublisherSigningUnavailable  = errs.Register("identity.publisher_signing_unavailable", http.StatusServiceUnavailable)
-	CodePublisherRotationPending     = errs.Register("identity.publisher_rotation_pending", http.StatusConflict)
-	CodePublisherKeyTransition       = errs.Register("identity.publisher_key_transition_invalid", http.StatusConflict)
-	CodePublisherTrustInvalid        = errs.Register("identity.publisher_trust_manifest_invalid", http.StatusBadRequest)
-	CodePublisherRootUntrusted       = errs.Register("identity.publisher_root_untrusted", http.StatusBadRequest)
-	CodeGitHubBindingUnavailable     = errs.Register("identity.github_binding_unavailable", http.StatusServiceUnavailable)
-	CodeGitHubBindingAttemptInvalid  = errs.Register("identity.github_binding_attempt_invalid", http.StatusBadRequest)
-	CodeGitHubBindingConflict        = errs.Register("identity.github_binding_conflict", http.StatusConflict)
-	CodeGitHubBindingNotFound        = errs.Register("identity.github_binding_not_found", http.StatusNotFound)
-	CodeGitHubProviderFailed         = errs.Register("identity.github_provider_failed", http.StatusBadGateway)
-	CodeGitHubSubmissionInvalid      = errs.Register("identity.github_submission_invalid", http.StatusBadRequest)
-	CodeGitHubSubmissionUnauthorized = errs.Register("identity.github_submission_unauthorized", http.StatusForbidden)
-)
-
-func EmailTaken(email string) *errs.Coded {
-	return errs.New(CodeEmailTaken, "email already registered", map[string]any{"email": email})
+func EmailTaken(email string) error {
+	return mapped(CodeEmailTaken, map[string]any{"email": email})
 }
 
 // InvalidCredentials is intentionally generic (no enumeration of which field).
-func InvalidCredentials() *errs.Coded {
-	return errs.New(CodeInvalidCredentials, "invalid email or password", nil)
+func InvalidCredentials() error {
+	return mapped(CodeInvalidCredentials, nil)
 }
 
-func AccountDisabled() *errs.Coded {
-	return errs.New(CodeAccountDisabled, "account disabled", nil)
+func AccountDisabled() error {
+	return mapped(CodeAccountDisabled, nil)
 }
 
-func AccountLocked() *errs.Coded {
-	return errs.New(CodeAccountLocked, "too many attempts, try again later", nil)
+func AccountLocked() error {
+	return mapped(CodeAccountLocked, nil)
 }
 
-func AccountLockedUntil(retryAt time.Time) *errs.Coded {
+func AccountLockedUntil(retryAt time.Time) error {
 	if retryAt.IsZero() {
 		return AccountLocked()
 	}
-	return errs.New(CodeAccountLocked, "too many attempts, try again later", retryAtParams(retryAt))
+	return mapped(CodeAccountLocked, retryAtParams(retryAt))
 }
 
-func ChallengeRequired(attemptID string) *errs.Coded {
-	return errs.New(CodeChallengeRequired, "additional verification required", map[string]any{
+func ChallengeRequired(attemptID string) error {
+	return mapped(CodeChallengeRequired, map[string]any{
 		"attemptId": attemptID,
 		"challenge": "turnstile",
 	})
 }
 
-func AbuseUnavailable() *errs.Coded {
-	return errs.New(CodeAbuseUnavailable, "request admission is temporarily unavailable", nil)
+func AbuseUnavailable() error {
+	return mapped(CodeAbuseUnavailable, nil)
 }
 
-func AbuseAttemptReplayed() *errs.Coded {
-	return errs.New(CodeAbuseReplay, "request attempt was already admitted", nil)
+func AbuseAttemptReplayed() error {
+	return mapped(CodeAbuseReplay, nil)
 }
 
-func WeakPassword(reason string) *errs.Coded {
-	return errs.New(CodeWeakPassword, "password too weak", map[string]any{"reason": reason})
+func WeakPassword(reason string) error {
+	return mapped(CodeWeakPassword, map[string]any{"reason": reason})
 }
 
-func InvalidEmail(email string) *errs.Coded {
-	return errs.New(CodeInvalidEmail, "invalid email format", map[string]any{"email": email})
+func InvalidEmail(email string) error {
+	return mapped(CodeInvalidEmail, map[string]any{"email": email})
 }
 
-func NotAuthenticated() *errs.Coded {
-	return errs.New(CodeNotAuthenticated, "not authenticated", nil)
+func NotAuthenticated() error {
+	return mapped(CodeNotAuthenticated, nil)
 }
 
-func StepUpRequired(missing []string) *errs.Coded {
-	return errs.New(CodeStepUpRequired, "additional authentication required", map[string]any{
+func StepUpRequired(missing []string) error {
+	return mapped(CodeStepUpRequired, map[string]any{
 		"missing": missing,
 	})
 }
 
-func CapabilityNotFound(key string) *errs.Coded {
-	return errs.New(CodeCapabilityNotFound, "identity capability not found", map[string]any{"key": key})
+func CapabilityNotFound(key string) error {
+	return mapped(CodeCapabilityNotFound, map[string]any{"key": key})
 }
 
-func ProviderNotFound(key string) *errs.Coded {
-	return errs.New(CodeProviderNotFound, "identity provider not found", map[string]any{"key": key})
+func ProviderNotFound(key string) error {
+	return mapped(CodeProviderNotFound, map[string]any{"key": key})
 }
 
-func CapabilityProbeRateLimited(key string) *errs.Coded {
-	return errs.New(CodeCapabilityProbeRateLimit, "identity provider health check rate limited", map[string]any{"key": key})
+func CapabilityProbeRateLimited(key string) error {
+	return mapped(CodeCapabilityProbeRateLimit, map[string]any{"key": key})
 }
 
-func CapabilityAuditUnavailable() *errs.Coded {
-	return errs.New(CodeCapabilityAudit, "identity capability audit is unavailable", nil)
+func CapabilityAuditUnavailable() error {
+	return mapped(CodeCapabilityAudit, nil)
 }
 
-func InvalidGuestRequest() *errs.Coded {
-	return errs.New(CodeInvalidGuestRequest, "invalid guest session request", nil)
+func InvalidGuestRequest() error {
+	return mapped(CodeInvalidGuestRequest, nil)
 }
 
-func InvalidGuestSession() *errs.Coded {
-	return errs.New(CodeInvalidGuestSession, "guest session is invalid or expired", nil)
+func InvalidGuestSession() error {
+	return mapped(CodeInvalidGuestSession, nil)
 }
 
-func InvalidGuestAudience() *errs.Coded {
-	return errs.New(CodeInvalidGuestAudience, "guest token audience is not allowed", nil)
+func InvalidGuestAudience() error {
+	return mapped(CodeInvalidGuestAudience, nil)
 }
 
-func GuestClaimConflict() *errs.Coded {
-	return errs.New(CodeGuestClaimConflict, "guest session is already claimed", nil)
+func GuestClaimConflict() error {
+	return mapped(CodeGuestClaimConflict, nil)
 }
 
-func PasskeyUnavailable() *errs.Coded {
-	return errs.New(CodePasskeyUnavailable, "passkey authentication is unavailable", nil)
+func PasskeyUnavailable() error {
+	return mapped(CodePasskeyUnavailable, nil)
 }
 
-func PasskeyCeremonyInvalid() *errs.Coded {
-	return errs.New(CodePasskeyCeremonyInvalid, "passkey ceremony is invalid, expired, or used", nil)
+func PasskeyCeremonyInvalid() error {
+	return mapped(CodePasskeyCeremonyInvalid, nil)
 }
 
-func PasskeyExists() *errs.Coded {
-	return errs.New(CodePasskeyExists, "passkey is already registered", nil)
+func PasskeyExists() error {
+	return mapped(CodePasskeyExists, nil)
 }
 
-func MFAUnavailable() *errs.Coded {
-	return errs.New(CodeMFAUnavailable, "multi-factor authentication is unavailable", nil)
+func MFAUnavailable() error {
+	return mapped(CodeMFAUnavailable, nil)
 }
 
-func TOTPEnrollmentInvalid() *errs.Coded {
-	return errs.New(CodeTOTPEnrollmentInvalid, "TOTP enrollment is invalid or expired", nil)
+func TOTPEnrollmentInvalid() error {
+	return mapped(CodeTOTPEnrollmentInvalid, nil)
 }
 
-func TOTPCodeInvalid() *errs.Coded {
-	return errs.New(CodeTOTPCodeInvalid, "TOTP code is invalid or already used", nil)
+func TOTPCodeInvalid() error {
+	return mapped(CodeTOTPCodeInvalid, nil)
 }
 
-func TOTPNotFound() *errs.Coded {
-	return errs.New(CodeTOTPNotFound, "TOTP authenticator not found", nil)
+func TOTPNotFound() error {
+	return mapped(CodeTOTPNotFound, nil)
 }
 
-func MFATransactionInvalid() *errs.Coded {
-	return errs.New(CodeMFATransactionInvalid, "MFA transaction is invalid or expired", nil)
+func MFATransactionInvalid() error {
+	return mapped(CodeMFATransactionInvalid, nil)
 }
 
-func RecoveryCodeInvalid() *errs.Coded {
-	return errs.New(CodeRecoveryCodeInvalid, "recovery code is invalid or already used", nil)
+func RecoveryCodeInvalid() error {
+	return mapped(CodeRecoveryCodeInvalid, nil)
 }
 
-func StepUpRequestInvalid() *errs.Coded {
-	return errs.New(CodeStepUpRequestInvalid, "step-up request is invalid", nil)
+func StepUpRequestInvalid() error {
+	return mapped(CodeStepUpRequestInvalid, nil)
 }
 
-func StepUpMethodUnavailable() *errs.Coded {
-	return errs.New(CodeStepUpMethodUnavailable, "no enrolled method can satisfy this step-up requirement", nil)
+func StepUpMethodUnavailable() error {
+	return mapped(CodeStepUpMethodUnavailable, nil)
 }
 
-func StepUpProofInvalid() *errs.Coded {
-	return errs.New(CodeStepUpProofInvalid, "step-up proof is invalid or does not match this action", nil)
+func StepUpProofInvalid() error {
+	return mapped(CodeStepUpProofInvalid, nil)
 }
 
-func StepUpProofReplayed() *errs.Coded {
-	return errs.New(CodeStepUpProofReplayed, "step-up proof was already used", nil)
+func StepUpProofReplayed() error {
+	return mapped(CodeStepUpProofReplayed, nil)
 }
 
-func PublisherConsumerNotFound() *errs.Coded {
-	return errs.New(CodePublisherConsumerNotFound, "publisher consumer not found", nil)
+func PublisherConsumerNotFound() error {
+	return mapped(CodePublisherConsumerNotFound, nil)
 }
 
-func PublisherConsumerDisabled() *errs.Coded {
-	return errs.New(CodePublisherConsumerDisabled, "publisher consumer is disabled", nil)
+func PublisherConsumerDisabled() error {
+	return mapped(CodePublisherConsumerDisabled, nil)
 }
 
 type PublisherAttestationInvalidReason string
@@ -240,109 +160,109 @@ const (
 	PublisherAttestationReasonAttestation PublisherAttestationInvalidReason = "attestation_invalid"
 )
 
-func PublisherAttestationInvalid(reason PublisherAttestationInvalidReason) *errs.Coded {
-	return errs.New(CodePublisherAttestationInvalid, "publisher attestation request is invalid", map[string]any{
+func PublisherAttestationInvalid(reason PublisherAttestationInvalidReason) error {
+	return mapped(CodePublisherAttestationInvalid, map[string]any{
 		"reason": string(reason),
 	})
 }
 
-func PublisherIdempotencyConflict() *errs.Coded {
-	return errs.New(CodePublisherIdempotencyConflict, "publisher idempotency key conflicts with another request", nil)
+func PublisherIdempotencyConflict() error {
+	return mapped(CodePublisherIdempotencyConflict, nil)
 }
 
-func PublisherSigningUnavailable() *errs.Coded {
-	return errs.New(CodePublisherSigningUnavailable, "publisher signing is temporarily unavailable", nil)
+func PublisherSigningUnavailable() error {
+	return mapped(CodePublisherSigningUnavailable, nil)
 }
 
-func PublisherRotationPending() *errs.Coded {
-	return errs.New(CodePublisherRotationPending, "a publisher key rotation is already pending", nil)
+func PublisherRotationPending() error {
+	return mapped(CodePublisherRotationPending, nil)
 }
 
-func PublisherKeyTransitionInvalid() *errs.Coded {
-	return errs.New(CodePublisherKeyTransition, "publisher key transition is invalid", nil)
+func PublisherKeyTransitionInvalid() error {
+	return mapped(CodePublisherKeyTransition, nil)
 }
 
-func PublisherTrustManifestInvalid() *errs.Coded {
-	return errs.New(CodePublisherTrustInvalid, "publisher trust manifest is invalid", nil)
+func PublisherTrustManifestInvalid() error {
+	return mapped(CodePublisherTrustInvalid, nil)
 }
 
-func PublisherRootUntrusted() *errs.Coded {
-	return errs.New(CodePublisherRootUntrusted, "publisher trust root is not trusted", nil)
+func PublisherRootUntrusted() error {
+	return mapped(CodePublisherRootUntrusted, nil)
 }
 
-func GitHubBindingUnavailable() *errs.Coded {
-	return errs.New(CodeGitHubBindingUnavailable, "GitHub binding is unavailable", nil)
+func GitHubBindingUnavailable() error {
+	return mapped(CodeGitHubBindingUnavailable, nil)
 }
 
-func GitHubBindingAttemptInvalid() *errs.Coded {
-	return errs.New(CodeGitHubBindingAttemptInvalid, "GitHub binding attempt is invalid, expired, or used", nil)
+func GitHubBindingAttemptInvalid() error {
+	return mapped(CodeGitHubBindingAttemptInvalid, nil)
 }
 
-func GitHubBindingConflict() *errs.Coded {
-	return errs.New(CodeGitHubBindingConflict, "GitHub account is already bound to another identity", nil)
+func GitHubBindingConflict() error {
+	return mapped(CodeGitHubBindingConflict, nil)
 }
 
-func GitHubBindingNotFound() *errs.Coded {
-	return errs.New(CodeGitHubBindingNotFound, "GitHub binding not found", nil)
+func GitHubBindingNotFound() error {
+	return mapped(CodeGitHubBindingNotFound, nil)
 }
 
-func GitHubProviderFailed() *errs.Coded {
-	return errs.New(CodeGitHubProviderFailed, "GitHub account verification failed", nil)
+func GitHubProviderFailed() error {
+	return mapped(CodeGitHubProviderFailed, nil)
 }
 
-func GitHubSubmissionInvalid() *errs.Coded {
-	return errs.New(CodeGitHubSubmissionInvalid, "GitHub submission manifest is invalid", nil)
+func GitHubSubmissionInvalid() error {
+	return mapped(CodeGitHubSubmissionInvalid, nil)
 }
 
-func GitHubSubmissionUnauthorized() *errs.Coded {
-	return errs.New(CodeGitHubSubmissionUnauthorized, "GitHub identity is not authorized for this publisher", nil)
+func GitHubSubmissionUnauthorized() error {
+	return mapped(CodeGitHubSubmissionUnauthorized, nil)
 }
 
 // OAuthEmailConflict: the provider's (unverified) email collides with an
 // existing local account, so we refuse to auto-link.
-func OAuthEmailConflict(email string) *errs.Coded {
-	return errs.New(CodeOAuthEmailConflict, "email already registered to another account", map[string]any{"email": email})
+func OAuthEmailConflict(email string) error {
+	return mapped(CodeOAuthEmailConflict, map[string]any{"email": email})
 }
 
 // OAuthNoEmail: the provider returned no email, so we can neither link nor register.
-func OAuthNoEmail() *errs.Coded {
-	return errs.New(CodeOAuthNoEmail, "oauth provider returned no email", nil)
+func OAuthNoEmail() error {
+	return mapped(CodeOAuthNoEmail, nil)
 }
 
 // OAuthFailed is a generic provider/exchange failure for any non-redirect caller
 // that needs a coded error (the redirect endpoints surface errors via query string).
-func OAuthFailed() *errs.Coded {
-	return errs.New(CodeOAuthFailed, "oauth login failed", nil)
+func OAuthFailed() error {
+	return mapped(CodeOAuthFailed, nil)
 }
 
 // VerificationInvalid: a verify/reset token is missing, expired, already used, or
 // scoped to a different purpose (intentionally generic — no detail leak).
-func VerificationInvalid() *errs.Coded {
-	return errs.New(CodeVerificationInvalid, "verification token invalid, expired, or used", nil)
+func VerificationInvalid() error {
+	return mapped(CodeVerificationInvalid, nil)
 }
 
 // ResetThrottled: too many password-reset requests for this account/IP.
-func ResetThrottled() *errs.Coded {
-	return errs.New(CodeResetThrottled, "too many reset requests, try again later", nil)
+func ResetThrottled() error {
+	return mapped(CodeResetThrottled, nil)
 }
 
-func ResetThrottledUntil(retryAt time.Time) *errs.Coded {
+func ResetThrottledUntil(retryAt time.Time) error {
 	if retryAt.IsZero() {
 		return ResetThrottled()
 	}
-	return errs.New(CodeResetThrottled, "too many reset requests, try again later", retryAtParams(retryAt))
+	return mapped(CodeResetThrottled, retryAtParams(retryAt))
 }
 
 // VerifyThrottled: too many email-verification requests for this account/IP.
-func VerifyThrottled() *errs.Coded {
-	return errs.New(CodeVerifyThrottled, "too many verification requests, try again later", nil)
+func VerifyThrottled() error {
+	return mapped(CodeVerifyThrottled, nil)
 }
 
-func VerifyThrottledUntil(retryAt time.Time) *errs.Coded {
+func VerifyThrottledUntil(retryAt time.Time) error {
 	if retryAt.IsZero() {
 		return VerifyThrottled()
 	}
-	return errs.New(CodeVerifyThrottled, "too many verification requests, try again later", retryAtParams(retryAt))
+	return mapped(CodeVerifyThrottled, retryAtParams(retryAt))
 }
 
 func retryAtParams(retryAt time.Time) map[string]any {
@@ -351,33 +271,33 @@ func retryAtParams(retryAt time.Time) map[string]any {
 
 // Forbidden: the caller is authenticated but lacks the required privilege
 // (e.g. a non-admin hitting an admin-only endpoint).
-func Forbidden() *errs.Coded {
-	return errs.New(CodeForbidden, "insufficient privileges", nil)
+func Forbidden() error {
+	return mapped(CodeForbidden, nil)
 }
 
 // IdentityNotFound: the target identity does not exist (admin operations on a
 // user id that matches no row). 404.
-func IdentityNotFound() *errs.Coded {
-	return errs.New(CodeIdentityNotFound, "user not found", nil)
+func IdentityNotFound() error {
+	return mapped(CodeIdentityNotFound, nil)
 }
 
 // InvalidStatus: an admin status change requested a value outside the lifecycle
 // set {active, disabled, deleted}. 400.
-func InvalidStatus(status string) *errs.Coded {
-	return errs.New(CodeInvalidStatus, "invalid status", map[string]any{"status": status})
+func InvalidStatus(status string) error {
+	return mapped(CodeInvalidStatus, map[string]any{"status": status})
 }
 
 // SelfAdminTarget: an admin attempted a destructive action (ban / delete /
 // demote) against their own account. Refused to prevent self-lockout. 403.
-func SelfAdminTarget() *errs.Coded {
-	return errs.New(CodeSelfAdminActionForbidden, "cannot perform this action on your own account", nil)
+func SelfAdminTarget() error {
+	return mapped(CodeSelfAdminActionForbidden, nil)
 }
 
 // UnknownRole: the requested role slug is not in the fixed catalog (migration
 // 0006 seeds {user, admin}). A client error, not a server fault — so it maps to
 // 400 rather than leaking through the envelope as a generic 500.
-func UnknownRole(slug string) *errs.Coded {
-	return errs.New(CodeUnknownRole, "unknown role slug", map[string]any{"role": slug})
+func UnknownRole(slug string) error {
+	return mapped(CodeUnknownRole, map[string]any{"role": slug})
 }
 
 // InvalidProfileReason is a stable machine-readable reason carried in
@@ -395,84 +315,74 @@ const (
 
 // InvalidProfile reports which profile validation rule failed through a stable
 // enum rather than an implementation-detail message.
-func InvalidProfile(reason InvalidProfileReason) *errs.Coded {
-	return errs.New(CodeInvalidProfile, "invalid profile", map[string]any{"reason": string(reason)})
+func InvalidProfile(reason InvalidProfileReason) error {
+	return mapped(CodeInvalidProfile, map[string]any{"reason": string(reason)})
 }
 
 // SessionNotFound: the target session does not exist OR is not owned by the
 // caller (intentionally merged — don't reveal another account's sessions).
-func SessionNotFound() *errs.Coded {
-	return errs.New(CodeSessionNotFound, "session not found", nil)
+func SessionNotFound() error {
+	return mapped(CodeSessionNotFound, nil)
 }
 
 // CredentialConflict: the external account is already linked to a different identity.
-func CredentialConflict(provider string) *errs.Coded {
-	return errs.New(CodeCredentialConflict, "this account is already linked to another identity", map[string]any{"provider": provider})
+func CredentialConflict(provider string) error {
+	return mapped(CodeCredentialConflict, map[string]any{"provider": provider})
 }
 
 // CredentialNotFound: the caller has no such credential to unbind.
-func CredentialNotFound() *errs.Coded {
-	return errs.New(CodeCredentialNotFound, "credential not found", nil)
+func CredentialNotFound() error {
+	return mapped(CodeCredentialNotFound, nil)
 }
 
 // LastCredential: refusing to remove the only remaining login credential.
-func LastCredential() *errs.Coded {
-	return errs.New(CodeLastCredential, "cannot remove the last login credential", nil)
+func LastCredential() error {
+	return mapped(CodeLastCredential, nil)
 }
 
 // PasswordAlreadySet: SetPassword is for accounts WITHOUT a password (e.g.
 // OAuth-only). An account that already has one must use ChangePassword.
-func PasswordAlreadySet() *errs.Coded {
-	return errs.New(CodePasswordAlreadySet, "password already set; use change password", nil)
+func PasswordAlreadySet() error {
+	return mapped(CodePasswordAlreadySet, nil)
 }
 
 // ── Personal Access Token (PAT) codes ───────────────────────────────────────
 
-var (
-	CodePATNameRequired   = errs.Register("identity.pat_name_required", http.StatusBadRequest)
-	CodePATScopesRequired = errs.Register("identity.pat_scopes_required", http.StatusBadRequest)
-	CodePATScopeInvalid   = errs.Register("identity.pat_scope_invalid", http.StatusBadRequest)
-	CodePATLimitReached   = errs.Register("identity.pat_limit_reached", http.StatusConflict)
-	CodePATNotFound       = errs.Register("identity.pat_not_found", http.StatusNotFound)
-	CodePATInvalid        = errs.Register("identity.pat_invalid", http.StatusUnauthorized)
-	CodePATExpired        = errs.Register("identity.pat_expired", http.StatusUnauthorized)
-)
-
-func PATNameRequired() *errs.Coded {
-	return errs.New(CodePATNameRequired, "token name required", nil)
+func PATNameRequired() error {
+	return mapped(CodePATNameRequired, nil)
 }
 
-func PATScopesRequired() *errs.Coded {
-	return errs.New(CodePATScopesRequired, "at least one scope required", nil)
+func PATScopesRequired() error {
+	return mapped(CodePATScopesRequired, nil)
 }
 
-func PATScopeInvalid(index int) *errs.Coded {
-	return errs.New(CodePATScopeInvalid, "scope is invalid", map[string]any{
+func PATScopeInvalid(index int) error {
+	return mapped(CodePATScopeInvalid, map[string]any{
 		"reason": "invalid_scope",
 		"index":  index,
 	})
 }
 
-func PATScopesTooMany(max int) *errs.Coded {
-	return errs.New(CodePATScopeInvalid, "too many scopes", map[string]any{
+func PATScopesTooMany(max int) error {
+	return mapped(CodePATScopeInvalid, map[string]any{
 		"reason": "too_many_scopes",
 		"max":    max,
 	})
 }
 
-func PATLimitReached(max int) *errs.Coded {
-	return errs.New(CodePATLimitReached, "personal access token limit reached", map[string]any{"max": max})
+func PATLimitReached(max int) error {
+	return mapped(CodePATLimitReached, map[string]any{"max": max})
 }
 
-func PATNotFound() *errs.Coded {
-	return errs.New(CodePATNotFound, "token not found", nil)
+func PATNotFound() error {
+	return mapped(CodePATNotFound, nil)
 }
 
 // PATInvalid is intentionally generic (no enumeration of why the token is bad).
-func PATInvalid() *errs.Coded {
-	return errs.New(CodePATInvalid, "invalid token", nil)
+func PATInvalid() error {
+	return mapped(CodePATInvalid, nil)
 }
 
-func PATExpired() *errs.Coded {
-	return errs.New(CodePATExpired, "token has expired", nil)
+func PATExpired() error {
+	return mapped(CodePATExpired, nil)
 }

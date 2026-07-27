@@ -14,11 +14,11 @@ import (
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/gogf/gf/v2/test/gtest"
 
-	"platform/gokit/ghttpx"
 	"platform/services/identity/internal/controller"
 	"platform/services/identity/internal/iderr"
 	"platform/services/identity/internal/logic"
 	"platform/services/identity/internal/repo"
+	identityruntime "platform/services/identity/internal/runtime"
 )
 
 // TestAdminUserManagement is a hermetic e2e test for the admin user-management
@@ -34,7 +34,7 @@ func TestAdminUserManagement(t *testing.T) {
 
 		s := g.Server(t.Name())
 		s.SetAddr("127.0.0.1:0")
-		s.Use(ghttpx.Middleware)
+		s.Use(identityruntime.APIMiddleware)
 		s.Group("/", func(grp *ghttp.RouterGroup) {
 			grp.Bind(ctl)
 		})

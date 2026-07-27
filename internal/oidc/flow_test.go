@@ -132,7 +132,7 @@ func setupE2E(t *testing.T, clientID string) *e2eEnv {
 		[]byte("0123456789abcdef0123456789abcdef"),
 	)
 
-	// 5. Start GoFrame server on the pre-chosen port (NO ghttpx.Middleware), with
+	// 5. Start GoFrame server on the pre-chosen port (NO identityruntime.APIMiddleware), with
 	//    the full OIDC route set.
 	s := g.Server(t.Name())
 	s.SetAddr(fmt.Sprintf("127.0.0.1:%d", port)) // loopback-only: avoids the Windows Firewall prompt
@@ -466,7 +466,7 @@ func TestOIDCFlow(t *testing.T) {
 	)
 
 	// -----------------------------------------------------------------------
-	// 5. Start GoFrame server on the pre-chosen port (NO ghttpx.Middleware)
+	// 5. Start GoFrame server on the pre-chosen port (NO identityruntime.APIMiddleware)
 	// -----------------------------------------------------------------------
 	s := g.Server(t.Name())
 	s.SetAddr(fmt.Sprintf("127.0.0.1:%d", port)) // loopback-only: avoids the Windows Firewall prompt

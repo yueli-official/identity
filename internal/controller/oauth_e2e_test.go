@@ -14,11 +14,11 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 
-	"platform/gokit/ghttpx"
 	"platform/services/identity/internal/controller"
 	"platform/services/identity/internal/logic"
 	"platform/services/identity/internal/oauthlogin"
 	"platform/services/identity/internal/repo"
+	identityruntime "platform/services/identity/internal/runtime"
 )
 
 // fakeProvider is a test-local oauthlogin.Provider that returns canned profile
@@ -89,7 +89,7 @@ func TestE2E_GoogleLogin(t *testing.T) {
 	s.SetDumpRouterMap(false)
 	// Business API: gokit envelope middleware for /session/me.
 	s.Group("/", func(grp *ghttp.RouterGroup) {
-		grp.Middleware(ghttpx.Middleware)
+		grp.Middleware(identityruntime.APIMiddleware)
 		grp.Bind(authCtl)
 	})
 	// OAuth raw redirect handlers: NO envelope middleware (mirrors main.go).

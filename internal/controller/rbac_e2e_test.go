@@ -22,12 +22,12 @@ import (
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/gogf/gf/v2/test/gtest"
 
-	"platform/gokit/ghttpx"
 	"platform/services/identity/internal/controller"
 	"platform/services/identity/internal/logic"
 	"platform/services/identity/internal/model"
 	"platform/services/identity/internal/oidc"
 	"platform/services/identity/internal/repo"
+	identityruntime "platform/services/identity/internal/runtime"
 )
 
 // TestE2E_RBAC is the integration witness that ties the admin role
@@ -117,7 +117,7 @@ func TestE2E_RBAC(t *testing.T) {
 		s.SetAddr(fmt.Sprintf("127.0.0.1:%d", port)) // loopback-only: avoids the Windows Firewall prompt
 		s.SetDumpRouterMap(false)
 		s.Group("/", func(grp *ghttp.RouterGroup) {
-			grp.Middleware(ghttpx.Middleware)
+			grp.Middleware(identityruntime.APIMiddleware)
 			grp.Bind(bizCtl)
 		})
 		// OIDC handlers: NO envelope middleware (fosite writes raw RFC responses).

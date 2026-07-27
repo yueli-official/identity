@@ -17,11 +17,11 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 
-	"platform/gokit/ghttpx"
 	"platform/services/identity/internal/controller"
 	"platform/services/identity/internal/githubbinding"
 	"platform/services/identity/internal/logic"
 	"platform/services/identity/internal/repo"
+	identityruntime "platform/services/identity/internal/runtime"
 )
 
 type githubBindingProvider struct {
@@ -71,7 +71,7 @@ func TestGitHubBindingHTTPJourneyAndRevocationWebhook(t *testing.T) {
 	server.SetAddr("127.0.0.1:0")
 	server.SetDumpRouterMap(false)
 	server.Group("/", func(group *ghttp.RouterGroup) {
-		group.Middleware(ghttpx.Middleware)
+		group.Middleware(identityruntime.APIMiddleware)
 		group.Bind(baseController)
 		group.Bind(githubController)
 	})

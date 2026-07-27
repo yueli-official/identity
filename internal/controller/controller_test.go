@@ -13,10 +13,10 @@ import (
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/gogf/gf/v2/test/gtest"
 
-	"platform/gokit/ghttpx"
 	"platform/services/identity/internal/controller"
 	"platform/services/identity/internal/logic"
 	"platform/services/identity/internal/repo"
+	identityruntime "platform/services/identity/internal/runtime"
 )
 
 // TestAuthFlow is a hermetic end-to-end test covering register → login → me →
@@ -33,7 +33,7 @@ func TestAuthFlow(t *testing.T) {
 		// --- start server ---
 		s := g.Server(t.Name())
 		s.SetAddr("127.0.0.1:0") // loopback-only: avoids the Windows Firewall prompt
-		s.Use(ghttpx.Middleware)
+		s.Use(identityruntime.APIMiddleware)
 		s.Group("/", func(grp *ghttp.RouterGroup) {
 			grp.Bind(ctl)
 		})

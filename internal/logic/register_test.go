@@ -2,10 +2,8 @@ package logic_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 
-	"platform/gokit/errs"
 	"platform/services/identity/internal/iderr"
 	"platform/services/identity/internal/logic"
 	"platform/services/identity/internal/repo"
@@ -13,11 +11,10 @@ import (
 
 func newSvc() *logic.Service { return logic.New(repo.NewMemory(), logic.DefaultConfig()) }
 
-// codeOfErr returns the *errs.Coded code, or "" if not a Coded error.
+// codeOfErr returns the public Problem code, or "" for an unmapped error.
 func codeOfErr(err error) string {
-	var c *errs.Coded
-	if errors.As(err, &c) {
-		return c.Code
+	if value, ok := iderr.Resolve(err); ok {
+		return value.Code
 	}
 	return ""
 }

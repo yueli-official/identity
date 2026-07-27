@@ -16,11 +16,11 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 
-	"platform/gokit/ghttpx"
 	"platform/services/identity/internal/controller"
 	"platform/services/identity/internal/logic"
 	"platform/services/identity/internal/mailer"
 	"platform/services/identity/internal/repo"
+	identityruntime "platform/services/identity/internal/runtime"
 )
 
 // capMailer is a test-local mailer.Mailer that records the last verify / reset
@@ -81,7 +81,7 @@ func TestE2E_Email(t *testing.T) {
 	s.SetAddr("127.0.0.1:0") // loopback-only: avoids the Windows Firewall prompt
 	s.SetDumpRouterMap(false)
 	s.Group("/", func(grp *ghttp.RouterGroup) {
-		grp.Middleware(ghttpx.Middleware)
+		grp.Middleware(identityruntime.APIMiddleware)
 		grp.Bind(authCtl)
 	})
 	s.Start()

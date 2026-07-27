@@ -4,6 +4,7 @@
 
 - `health.go`：组合 PostgreSQL/Redis readiness 与 Foundation health runner；
 - `auth.go`：组合 Foundation JWKS source 与 token verifier；
+- `http.go`：组合 Foundation Problem/GoFrame 中间件、进程级限流配置与 OIDC 原始响应限流；
 - `openapi.go`：处理显式 OpenAPI 导出；
 - `privacy.go`：组合 Foundation Owner transport 与 Identity scope/error policy；
 - `telemetry.go`：读取 Identity 运行环境并组装 Foundation telemetry provider 与 HTTP client。

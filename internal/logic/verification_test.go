@@ -2,13 +2,11 @@ package logic_test
 
 import (
 	"context"
-	"errors"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
 
-	"platform/gokit/errs"
 	"platform/services/identity/internal/iderr"
 	"platform/services/identity/internal/logic"
 	"platform/services/identity/internal/repo"
@@ -128,8 +126,8 @@ func TestPasswordReset_ThrottleCarriesRetryAt(t *testing.T) {
 		t.Fatal(err)
 	}
 	err := s.RequestPasswordReset(ctx, "nobody@example.com", "1.1.1.1")
-	var coded *errs.Coded
-	if !errors.As(err, &coded) || coded.Code != iderr.CodeResetThrottled {
+	coded, ok := iderr.Resolve(err)
+	if !ok || coded.Code != iderr.CodeResetThrottled {
 		t.Fatalf("want reset throttled coded error, got %v", err)
 	}
 	retryAt, err := time.Parse(time.RFC3339Nano, coded.Params["retryAt"].(string))

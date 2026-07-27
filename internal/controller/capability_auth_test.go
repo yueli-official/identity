@@ -2,12 +2,10 @@ package controller
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	foundationauth "github.com/yueli-official/foundation/go/auth"
 	"github.com/yueli-official/foundation/go/capability"
-	"platform/gokit/errs"
 	v1 "platform/services/identity/api/v1"
 	"platform/services/identity/internal/identitycap"
 	"platform/services/identity/internal/iderr"
@@ -34,8 +32,8 @@ func TestCapabilityMachineAuthorizationSeparatesReadAndProbeScopes(t *testing.T)
 	if _, err := controller.authorize(readCtx, "platform:capabilities:probe"); err == nil {
 		t.Fatal("read token must not probe")
 	} else {
-		var coded *errs.Coded
-		if !errors.As(err, &coded) || coded.Code != iderr.CodeForbidden {
+		coded, ok := iderr.Resolve(err)
+		if !ok || coded.Code != iderr.CodeForbidden {
 			t.Fatalf("read token probe error = %v", err)
 		}
 	}

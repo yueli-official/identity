@@ -12,11 +12,11 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 
-	"platform/gokit/ghttpx"
 	"platform/services/identity/internal/controller"
 	"platform/services/identity/internal/logic"
 	"platform/services/identity/internal/publisher"
 	"platform/services/identity/internal/repo"
+	identityruntime "platform/services/identity/internal/runtime"
 )
 
 func TestPublisherAttestationHTTPJourney(t *testing.T) {
@@ -75,7 +75,7 @@ func TestPublisherAttestationHTTPJourney(t *testing.T) {
 	server.SetDumpRouterMap(false)
 	baseController := controller.New(service, false)
 	server.Group("/", func(group *ghttp.RouterGroup) {
-		group.Middleware(ghttpx.Middleware)
+		group.Middleware(identityruntime.APIMiddleware)
 		group.Bind(baseController)
 		group.Bind(controller.NewPublisher(service, module, keys, trustState))
 		group.Bind(controller.NewPublisherAdmin(baseController, service, keyAdmin))

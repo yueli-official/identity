@@ -2,10 +2,8 @@ package logic_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 
-	"platform/gokit/errs"
 	"platform/services/identity/internal/iderr"
 	"platform/services/identity/internal/logic"
 	"platform/services/identity/internal/repo"
@@ -33,11 +31,11 @@ func setupAccount(t *testing.T) (*repo.Memory, *logic.Service, string, string) {
 
 func codeOf(t *testing.T, err error) string {
 	t.Helper()
-	var c *errs.Coded
-	if !errors.As(err, &c) {
-		t.Fatalf("want a coded error, got %v", err)
+	value, ok := iderr.Resolve(err)
+	if !ok {
+		t.Fatalf("want a public Problem error, got %v", err)
 	}
-	return c.Code
+	return value.Code
 }
 
 func TestUpdateProfile_Success(t *testing.T) {
@@ -70,9 +68,9 @@ func TestUpdateProfile_EmptyDisplayNameRejected(t *testing.T) {
 	if codeOf(t, err) != iderr.CodeInvalidProfile {
 		t.Fatalf("want CodeInvalidProfile, got %v", err)
 	}
-	var coded *errs.Coded
-	if !errors.As(err, &coded) {
-		t.Fatalf("want coded error, got %v", err)
+	coded, ok := iderr.Resolve(err)
+	if !ok {
+		t.Fatalf("want public Problem error, got %v", err)
 	}
 	if coded.Params["reason"] != string(iderr.ProfileReasonDisplayNameRequired) {
 		t.Fatalf("reason = %#v, want %q", coded.Params["reason"], iderr.ProfileReasonDisplayNameRequired)

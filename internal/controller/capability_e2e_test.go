@@ -16,11 +16,11 @@ import (
 	"github.com/gogf/gf/v2/test/gtest"
 
 	"github.com/yueli-official/foundation/go/capability"
-	"platform/gokit/ghttpx"
 	"platform/services/identity/internal/controller"
 	"platform/services/identity/internal/identitycap"
 	"platform/services/identity/internal/logic"
 	"platform/services/identity/internal/repo"
+	identityruntime "platform/services/identity/internal/runtime"
 )
 
 type capabilityAuditStore struct {
@@ -52,7 +52,7 @@ func TestCapabilityEndpointsRequireAdminAndAuditProbes(t *testing.T) {
 
 		s := g.Server(t.Name())
 		s.SetAddr("127.0.0.1:0")
-		s.Use(controller.ActorMiddleware, ghttpx.Middleware)
+		s.Use(controller.ActorMiddleware, identityruntime.APIMiddleware)
 		s.Group("/", func(group *ghttp.RouterGroup) {
 			group.Bind(auth)
 			group.Bind(capCtl)

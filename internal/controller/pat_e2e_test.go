@@ -32,10 +32,10 @@ import (
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/gogf/gf/v2/test/gtest"
 
-	"platform/gokit/ghttpx"
 	"platform/services/identity/internal/controller"
 	"platform/services/identity/internal/logic"
 	"platform/services/identity/internal/repo"
+	identityruntime "platform/services/identity/internal/runtime"
 )
 
 func TestE2E_PAT(t *testing.T) {
@@ -53,7 +53,7 @@ func TestE2E_PAT(t *testing.T) {
 		s.SetDumpRouterMap(false)
 		s.Use(controller.ActorMiddleware)
 		s.Group("/", func(grp *ghttp.RouterGroup) {
-			grp.Middleware(ghttpx.Middleware)
+			grp.Middleware(identityruntime.APIMiddleware)
 			grp.Bind(ctl)
 		})
 		s.Start()

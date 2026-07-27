@@ -22,12 +22,12 @@ import (
 	"github.com/yueli-official/foundation/go/abuse/turnstile"
 	foundationauth "github.com/yueli-official/foundation/go/auth"
 	"github.com/yueli-official/foundation/go/capability"
+	goframeapi "github.com/yueli-official/foundation/go/goframe/api"
 	"github.com/yueli-official/foundation/go/privacy"
 	privacyadapter "github.com/yueli-official/foundation/go/privacy/httpadapter"
 	"github.com/yueli-official/foundation/go/work"
 	workpostgres "github.com/yueli-official/foundation/go/work/postgres"
 	"github.com/yueli-official/notification/client"
-	"platform/gokit/ghttpx"
 	"platform/services/identity/internal/assetclient"
 	"platform/services/identity/internal/authentication"
 	"platform/services/identity/internal/cache"
@@ -764,19 +764,19 @@ func main() {
 		"MachineAuth": {Value: &goai.SecurityScheme{Type: "http", Scheme: "bearer", BearerFormat: "JWT", Description: "Identity-issued service access token with the endpoint scope."}},
 		"UserAuth":    {Value: &goai.SecurityScheme{Type: "http", Scheme: "bearer", BearerFormat: "JWT", Description: "Identity user access token."}},
 	}
-	s.Use(ghttpx.TraceRouteMiddleware)
+	s.Use(goframeapi.TraceRoute)
 
 	// Actor middleware runs globally (before all handlers) so that every
 	// request — business API, OIDC endpoints, and OAuth login callbacks —
 	// has IP / User-Agent / X-Request-Id available via actor.From(ctx).
 	s.Use(controller.ActorMiddleware)
-	rateLimiter := ghttpx.MustRateLimiterFromEnvironment()
-	apiMiddleware := ghttpx.NewMiddleware(rateLimiter, ghttpx.ForwardedClientIPKey)
-	rawRateLimitMiddleware := ghttpx.NewRawRateLimitMiddleware(rateLimiter, ghttpx.ForwardedClientIPKey)
+	rateLimiter := identityruntime.MustRateLimiterFromEnvironment()
+	apiMiddleware := identityruntime.MustAPIMiddleware(rateLimiter)
+	rawRateLimitMiddleware := identityruntime.NewRawRateLimitMiddleware(rateLimiter, goframeapi.ForwardedClientIPKey)
 
 	// Business API: raw-success/Problem middleware applied to this group only.
 	s.Group("/", func(grp *ghttp.RouterGroup) {
-		grp.Middleware(apiMiddleware, identityruntime.OptionalAuth(identityVerifier))
+		grp.Middleware(apiMiddleware.Handle, identityruntime.OptionalAuth(identityVerifier))
 		grp.GET("/healthz", controller.Healthz)
 		grp.GET("/readyz", identityruntime.ReadinessHandler(map[string]identityruntime.ReadinessCheck{
 			"database": identityruntime.DatabaseReadiness,

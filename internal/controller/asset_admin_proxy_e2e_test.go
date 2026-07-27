@@ -16,7 +16,6 @@ import (
 	coreauth "github.com/yueli-official/foundation/go/auth"
 	"github.com/yueli-official/foundation/go/problem"
 
-	"platform/gokit/ghttpx"
 	"platform/services/identity/internal/controller"
 	"platform/services/identity/internal/logic"
 	"platform/services/identity/internal/oidc"
@@ -105,7 +104,7 @@ func TestAssetAdminProxyAcceptsVerifiedAdminBearerAndAdminCookie(t *testing.T) {
 	server.SetAddr("127.0.0.1:0")
 	server.SetDumpRouterMap(false)
 	server.Group("/", func(group *ghttp.RouterGroup) {
-		group.Middleware(ghttpx.Middleware, identityruntime.OptionalAuth(verifier))
+		group.Middleware(identityruntime.APIMiddleware, identityruntime.OptionalAuth(verifier))
 		group.ALL("/api/v1/admin/assets-proxy/*", proxy.Forward)
 	})
 	server.Start()

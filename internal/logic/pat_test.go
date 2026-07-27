@@ -2,12 +2,10 @@ package logic
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"testing"
 	"time"
 
-	"platform/gokit/errs"
 	"platform/services/identity/internal/iderr"
 	"platform/services/identity/internal/pat"
 	"platform/services/identity/internal/repo"
@@ -36,11 +34,10 @@ func advanceClock(nowPtr *time.Time, d time.Duration) {
 // Local helpers (self-contained — do not depend on other *_test.go files)
 // ---------------------------------------------------------------------------
 
-// codeOfErr returns the *errs.Coded code string, or "" if not a Coded error.
+// patCodeOfErr returns the public Problem code, or "" for an unmapped error.
 func patCodeOfErr(err error) string {
-	var c *errs.Coded
-	if errors.As(err, &c) {
-		return c.Code
+	if value, ok := iderr.Resolve(err); ok {
+		return value.Code
 	}
 	return ""
 }
@@ -165,8 +162,8 @@ func TestCreatePAT_ScopeWithSpace(t *testing.T) {
 	if patCodeOfErr(err) != iderr.CodePATScopeInvalid {
 		t.Errorf("scope with space: want PATScopeInvalid, got %v", err)
 	}
-	var coded *errs.Coded
-	if !errors.As(err, &coded) || coded.Params["reason"] != "invalid_scope" || coded.Params["index"] != 0 {
+	coded, ok := iderr.Resolve(err)
+	if !ok || coded.Params["reason"] != "invalid_scope" || coded.Params["index"] != 0 {
 		t.Errorf("scope params: %#v", coded)
 	}
 }
@@ -182,8 +179,8 @@ func TestCreatePAT_TooManyScopes(t *testing.T) {
 	if patCodeOfErr(err) != iderr.CodePATScopeInvalid {
 		t.Errorf(">50 scopes: want PATScopeInvalid, got %v", err)
 	}
-	var coded *errs.Coded
-	if !errors.As(err, &coded) || coded.Params["reason"] != "too_many_scopes" || coded.Params["max"] != 50 {
+	coded, ok := iderr.Resolve(err)
+	if !ok || coded.Params["reason"] != "too_many_scopes" || coded.Params["max"] != 50 {
 		t.Errorf("scope count params: %#v", coded)
 	}
 }

@@ -12,11 +12,11 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 
-	"platform/gokit/ghttpx"
 	"platform/services/identity/internal/controller"
 	"platform/services/identity/internal/logic"
 	"platform/services/identity/internal/oauthlogin"
 	"platform/services/identity/internal/repo"
+	identityruntime "platform/services/identity/internal/runtime"
 )
 
 // TestE2E_OAuthOnlyUnbindClosedLoop reproduces the reported "Google 登录后点解绑没反应"
@@ -47,7 +47,7 @@ func TestE2E_OAuthOnlyUnbindClosedLoop(t *testing.T) {
 	s.SetAddr("127.0.0.1:0") // loopback-only: avoids the Windows Firewall prompt
 	s.SetDumpRouterMap(false)
 	s.Group("/", func(grp *ghttp.RouterGroup) {
-		grp.Middleware(ghttpx.Middleware)
+		grp.Middleware(identityruntime.APIMiddleware)
 		grp.Bind(authCtl)
 	})
 	s.Group("/", func(grp *ghttp.RouterGroup) {

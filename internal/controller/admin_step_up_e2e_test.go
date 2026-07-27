@@ -16,12 +16,12 @@ import (
 	"github.com/gogf/gf/v2/test/gtest"
 	"github.com/google/uuid"
 
-	"platform/gokit/ghttpx"
 	"platform/services/identity/internal/authentication"
 	"platform/services/identity/internal/controller"
 	"platform/services/identity/internal/logic"
 	"platform/services/identity/internal/oidc"
 	"platform/services/identity/internal/repo"
+	identityruntime "platform/services/identity/internal/runtime"
 	"platform/services/identity/stepup"
 )
 
@@ -44,7 +44,7 @@ func TestAdminMutationRequiresActionBoundOneTimeProof(t *testing.T) {
 		server := g.Server(t.Name())
 		server.SetAddr("127.0.0.1:0")
 		server.SetDumpRouterMap(false)
-		server.Use(ghttpx.Middleware)
+		server.Use(identityruntime.APIMiddleware)
 		server.Group("/", func(group *ghttp.RouterGroup) { group.Bind(ctl) })
 		server.Start()
 		defer server.Shutdown()
