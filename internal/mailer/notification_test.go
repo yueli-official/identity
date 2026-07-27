@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"platform/gokit/notificationclient"
+	"github.com/yueli-official/notification/client"
 )
 
 type captureNotification struct {

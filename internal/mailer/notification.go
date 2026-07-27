@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"platform/gokit/notificationclient"
+	"github.com/yueli-official/notification/client"
 )
 
 type notificationSender interface {
