@@ -3,3 +3,6 @@
 manifest/config/config.yaml
 account/node_modules/
 account/pnpm-debug.log*
+nuxt/node_modules/
+nuxt/pnpm-debug.log*
+.release/

@@ -10,6 +10,8 @@
     "account:dev": "pnpm --dir account dev",
     "account:test": "pnpm --dir account test",
     "account:typecheck": "pnpm --dir account typecheck",
-    "account:build": "pnpm --dir account build"
+    "account:build": "pnpm --dir account build",
+    "nuxt:test": "pnpm --dir nuxt test",
+    "nuxt:pack": "pnpm --dir nuxt pack --dry-run"
   }
 }

@@ -48,6 +48,14 @@ tasks:
     phase: test
     cwd: account
     command: [pnpm, build]
+  - name: identity-nuxt-unit
+    phase: test
+    cwd: nuxt
+    command: [pnpm, test]
+  - name: identity-nuxt-pack
+    phase: test
+    cwd: nuxt
+    command: [pnpm, pack, --dry-run]
 
 processes:
   - name: identity

@@ -2,6 +2,11 @@
   "name": "@yueli/identity-nuxt",
   "version": "0.1.0",
   "license": "Apache-2.0",
+  "packageManager": "pnpm@10.28.2",
+  "engines": {
+    "node": "24.18.x",
+    "pnpm": "10.28.x"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/yueli-official/identity.git",
@@ -15,6 +20,12 @@
     "nuxt.config.ts",
     "README.md"
   ],
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "vue-demi"
+    ]
+  },
   "scripts": {
     "test": "vitest run"
   },

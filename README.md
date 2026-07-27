@@ -46,6 +46,22 @@ Identity 是站群唯一身份提供方，负责账户、凭据、公开资料�
 Account 使用的错误码目录位于 `contracts/errors/catalog.json`，由
 `go run ./cmd/errorcatalog` 生成；CI 使用 `go run ./cmd/errorcatalog --check` 拒绝目录漂移。
 
+## Nuxt 消费端
+
+`nuxt/` 发布 `@yueli/identity-nuxt`，由 Identity 直接拥有产品站点共用的 OIDC BFF、密封会话、
+刷新去重、访客会话延续与账户控件。授权码回调会使用 Identity RS256 JWKS 验证 ID Token 的签名、
+issuer、audience、expiry 与 nonce；浏览器不会获得访问令牌。产品仍拥有自己的 OIDC client 注册、
+回调地址、下游 API 和领域授权。
+
+该 package 直接消费 Foundation `js-v0.2.0` 的 HTTP/UI/Nuxt runtime 正式制品，不依赖 Platform
+workspace 或相邻源码。验证命令：
+
+```powershell
+pnpm --dir nuxt install --frozen-lockfile
+pnpm --dir nuxt test
+pnpm --dir nuxt pack --dry-run
+```
+
 ## 目录地图
 
 - `api/v1/`：业务请求与响应契约。
@@ -94,6 +110,8 @@ pnpm --dir account install --frozen-lockfile
 pnpm --dir account test
 pnpm --dir account typecheck
 pnpm --dir account build
+pnpm --dir nuxt test
+pnpm --dir nuxt pack --dry-run
 ```
 
 `publishertrust` 是离线运维命令。Identity runtime 只配置 leaf signing key、root 公钥和已签 manifest；

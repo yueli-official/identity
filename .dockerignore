@@ -2,4 +2,6 @@
 .doctor
 .data
 account
+nuxt
+.release
 manifest/config/config.yaml
