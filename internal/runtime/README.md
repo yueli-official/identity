@@ -3,6 +3,7 @@
 本目录拥有 Identity 对通用 Foundation primitive 的服务级组合，不包含身份领域规则。
 
 - `health.go`：组合 PostgreSQL/Redis readiness 与 Foundation health runner；
+- `auth.go`：组合 Foundation JWKS source 与 token verifier；
 - `openapi.go`：处理显式 OpenAPI 导出；
 - `telemetry.go`：读取 Identity 运行环境并组装 Foundation telemetry provider 与 HTTP client。
 

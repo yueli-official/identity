@@ -27,7 +27,6 @@ import (
 	"github.com/yueli-official/foundation/go/work"
 	workpostgres "github.com/yueli-official/foundation/go/work/postgres"
 	"github.com/yueli-official/notification/client"
-	"platform/gokit/authhttp"
 	"platform/gokit/ghttpx"
 	"platform/gokit/privacycatalog"
 	"platform/gokit/privacyhttp"
@@ -778,7 +777,7 @@ func main() {
 
 	// Business API: raw-success/Problem middleware applied to this group only.
 	s.Group("/", func(grp *ghttp.RouterGroup) {
-		grp.Middleware(apiMiddleware, authhttp.Optional(identityVerifier))
+		grp.Middleware(apiMiddleware, identityruntime.OptionalAuth(identityVerifier))
 		grp.GET("/healthz", controller.Healthz)
 		grp.GET("/readyz", identityruntime.ReadinessHandler(map[string]identityruntime.ReadinessCheck{
 			"database": identityruntime.DatabaseReadiness,

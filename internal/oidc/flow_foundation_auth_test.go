@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/yueli-official/foundation/go/jwks"
-	"platform/gokit/authsetup"
+	identityruntime "platform/services/identity/internal/runtime"
 )
 
 // TestAccessTokenVerifiableByFoundation is the cross-service contract proof:
@@ -30,7 +30,7 @@ func TestAccessTokenVerifiableByFoundation(t *testing.T) {
 
 	// Build the verifier exactly as a resource server would: a remote JWKS source
 	// pointed at the IdP, and the IdP base URL as the expected issuer.
-	v, err := authsetup.NewRemoteVerifier(authsetup.RemoteVerifierConfig{
+	v, err := identityruntime.NewRemoteVerifier(identityruntime.RemoteVerifierConfig{
 		JWKSURL: env.base + "/oauth2/jwks.json",
 		Issuer:  env.base,
 		Transport: jwks.RemoteOptions{
