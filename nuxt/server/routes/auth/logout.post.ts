@@ -6,6 +6,13 @@
 // has no end_session.)
 export default defineEventHandler((event) => {
   const cfg = oidcConfig(event)
+  const origin = getRequestHeader(event, "origin");
+  if (origin && origin !== getRequestURL(event).origin) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: "Cross-origin logout is not allowed",
+    });
+  }
   deleteCookie(event, SESSION_COOKIE, { path: '/' })
 
   const query = new URLSearchParams({

@@ -1,6 +1,4 @@
-// @platform/auth — a Nuxt layer implementing the OIDC BFF for consumer sites.
-// Consuming apps `extends` it and set their own
-// client/issuer/downstream via runtimeConfig (NUXT_* env in prod).
+// @yueli/identity-nuxt — Identity-owned OIDC BFF layer for consumer sites.
 export default defineNuxtConfig({
   runtimeConfig: {
     // Server-only secrets.
@@ -9,6 +7,7 @@ export default defineNuxtConfig({
     downstreamBase: "", // NUXT_DOWNSTREAM_BASE — the backend service base URL
     guestSessionTtlSeconds: 0, // NUXT_GUEST_SESSION_TTL_SECONDS — consumer-selected; Identity clamps it
     guestCookieSecure: process.env.NODE_ENV === "production",
+    authCookieSecure: process.env.NODE_ENV === "production",
     guestClaimTargets: [], // consumer-owned resource endpoints; each receives an Identity-signed claim assertion
     public: {
       oidcIssuer: "http://localhost:8081", // NUXT_PUBLIC_OIDC_ISSUER
@@ -17,6 +16,7 @@ export default defineNuxtConfig({
       oidcPostLogoutRedirectUri: "", // NUXT_PUBLIC_OIDC_POST_LOGOUT_REDIRECT_URI — exact registered URI
       oidcScopes: "openid profile email roles offline_access",
       operatorSubs: "", // NUXT_PUBLIC_OPERATOR_SUBS — UI hint only; APIs remain authoritative
+      accountUrl: "http://localhost:3000",
     },
   },
 });

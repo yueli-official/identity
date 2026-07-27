@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { platformAccountMenuMessages } from "@platform/ui/account-menu";
 import {
   AccountMenu,
   type AccountMenuAction,
 } from "@yueli/ui/account-menu/pattern";
+import { identityAccountMenuMessages } from "../utils/account-menu";
 
 const props = withDefaults(
   defineProps<{
@@ -76,7 +76,7 @@ async function handleLogin(): Promise<void> {
     :context-actions="resolvedContextActions"
     :utility-actions
     :logout
-    :messages="platformAccountMenuMessages"
+    :messages="identityAccountMenuMessages"
   />
   <UButton
     v-else

@@ -33,6 +33,7 @@ export async function sessionForEvent(event: H3Event, _options: SessionOptions =
     const next = sessionFromTokens(tok, session)
     setCookie(event, SESSION_COOKIE, seal(next, cfg.sealSecret), {
       httpOnly: true,
+      secure: cfg.cookieSecure,
       sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 24 * 7

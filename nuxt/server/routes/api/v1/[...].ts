@@ -1,19 +1,20 @@
-// BFF proxy: forwards /api/v1/** to the downstream service, injecting the
-// session's access token as a Bearer header (refreshing it first if near expiry).
-// Anonymous requests (no session) are forwarded without a token, so public
-// endpoints keep working logged-out.
-export default defineEventHandler(async (event) => {
-  const cfg = oidcConfig(event);
-  const method = getMethod(event).toUpperCase();
-  let authHeaders = await sessionAuthHeaders(event);
-  if (!authHeaders.authorization) {
-    authHeaders = ["GET", "HEAD", "OPTIONS"].includes(method)
-      ? await guestSessionAuthHeaders(event, cfg.clientId, false)
-      : await guestSessionAuthHeaders(event, cfg.clientId);
-  }
-  const headers = platformProxyHeaders(event, authHeaders);
-  return await proxyRequest(event, cfg.downstreamBase + event.path, {
-    headers,
-    streamRequest: true,
-  });
+import { createBffHandler } from "@yueli/nuxt-runtime/server";
+
+export default createBffHandler({
+  mountPath: "/api/v1",
+  resolveTarget({ event }) {
+    return identityBffTarget(oidcConfig(event).downstreamBase);
+  },
+  credential: {
+    async resolve({ event }) {
+      const cfg = oidcConfig(event);
+      let headers = await sessionAuthHeaders(event);
+      if (!headers.authorization) {
+        headers = ["GET", "HEAD", "OPTIONS"].includes(event.method)
+          ? await guestSessionAuthHeaders(event, cfg.clientId, false)
+          : await guestSessionAuthHeaders(event, cfg.clientId);
+      }
+      return identityBffCredential(headers);
+    },
+  },
 });

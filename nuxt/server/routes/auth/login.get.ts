@@ -4,10 +4,12 @@ export default defineEventHandler((event) => {
   const cfg = oidcConfig(event)
   const { verifier, challenge } = pkce()
   const state = randomToken()
+  const nonce = randomToken()
   const returnTo = safeReturnTo(getQuery(event).return_to as string)
 
-  setCookie(event, TX_COOKIE, seal({ verifier, state, returnTo }, cfg.sealSecret), {
+  setCookie(event, TX_COOKIE, seal({ verifier, state, nonce, returnTo }, cfg.sealSecret), {
     httpOnly: true,
+    secure: cfg.cookieSecure,
     sameSite: 'lax',
     path: '/',
     maxAge: 600
@@ -19,6 +21,7 @@ export default defineEventHandler((event) => {
     redirect_uri: cfg.redirectUri,
     scope: cfg.scopes,
     state,
+    nonce,
     code_challenge: challenge,
     code_challenge_method: 'S256'
   }).toString()}`

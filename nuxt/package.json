@@ -1,21 +1,40 @@
 {
-  "name": "@platform/auth",
-  "private": true,
+  "name": "@yueli/identity-nuxt",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yueli-official/identity.git",
+    "directory": "nuxt"
+  },
   "type": "module",
   "main": "./nuxt.config.ts",
+  "files": [
+    "app",
+    "server",
+    "nuxt.config.ts",
+    "README.md"
+  ],
   "scripts": {
     "test": "vitest run"
   },
-  "dependencies": {
-    "@platform/manage": "workspace:*",
-    "@platform/ui": "workspace:*",
-    "@yueli/ui": "workspace:*",
-    "vue": "catalog:"
+  "peerDependencies": {
+    "@nuxt/ui": "^4.9.0",
+    "@yueli/nuxt-runtime": "^0.1.0",
+    "@yueli/ui": "^0.1.0",
+    "nuxt": "^4.4.0",
+    "vue": "^3.5.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "catalog:",
-    "@vue/test-utils": "catalog:",
-    "happy-dom": "catalog:",
-    "vitest": "catalog:"
+    "@nuxt/ui": "4.9.0",
+    "@yueli/http-runtime": "https://github.com/yueli-official/foundation/releases/download/js-v0.2.0/yueli-http-runtime-0.1.0.tgz",
+    "@yueli/nuxt-runtime": "https://github.com/yueli-official/foundation/releases/download/js-v0.2.0/yueli-nuxt-runtime-0.1.0.tgz",
+    "@yueli/ui": "https://github.com/yueli-official/foundation/releases/download/js-v0.2.0/yueli-ui-0.1.0.tgz",
+    "@vitejs/plugin-vue": "6.0.7",
+    "@vue/test-utils": "2.4.6",
+    "happy-dom": "20.10.6",
+    "nuxt": "4.4.8",
+    "vitest": "4.1.10",
+    "vue": "3.5.39"
   }
 }

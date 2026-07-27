@@ -4,10 +4,18 @@
 // (The node reference makes node:crypto + Buffer resolve under each app's
 // vue-tsc, which checks this layer's server code with the client tsconfig.)
 // Tokens live only server-side; the browser only ever holds the sealed cookie.
-import { randomBytes, createHash, createCipheriv, createDecipheriv } from 'node:crypto'
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  createPublicKey,
+  randomBytes,
+  verify as verifySignature,
+} from "node:crypto";
 import type { H3Event } from 'h3'
 
 export interface OidcCfg {
+  issuer: string
   clientId: string
   clientSecret: string
   redirectUri: string
@@ -15,9 +23,11 @@ export interface OidcCfg {
   scopes: string
   authorizeEndpoint: string
   tokenEndpoint: string
+  jwksEndpoint: string
   endSessionEndpoint: string
   downstreamBase: string
   sealSecret: string
+  cookieSecure: boolean
 }
 
 export interface Session {
@@ -34,6 +44,7 @@ export function oidcConfig(event: H3Event): OidcCfg {
   const rc = useRuntimeConfig(event)
   const issuer = (rc.public.oidcIssuer as string).replace(/\/$/, '')
   return {
+    issuer,
     clientId: rc.public.oidcClientId as string,
     clientSecret: rc.oidcClientSecret as string,
     redirectUri: rc.public.oidcRedirectUri as string,
@@ -41,9 +52,11 @@ export function oidcConfig(event: H3Event): OidcCfg {
     scopes: (rc.public.oidcScopes as string) || 'openid profile email roles offline_access',
     authorizeEndpoint: issuer + '/oauth2/authorize',
     tokenEndpoint: issuer + '/oauth2/token',
+    jwksEndpoint: issuer + '/oauth2/jwks.json',
     endSessionEndpoint: issuer + '/oauth2/end_session',
     downstreamBase: (rc.downstreamBase as string).replace(/\/$/, ''),
-    sealSecret: rc.sealSecret as string
+    sealSecret: rc.sealSecret as string,
+    cookieSecure: Boolean(rc.authCookieSecure),
   }
 }
 
@@ -90,14 +103,134 @@ export function unseal<T>(token: string | undefined, secret: string): T | null {
   }
 }
 
-// decodeJwt reads a JWT's payload WITHOUT verifying it. Only used for display
-// claims (sub/email/name) on tokens we just received over a trusted channel.
-export function decodeJwt(token: string): Record<string, any> {
-  try {
-    return JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8'))
-  } catch {
-    return {}
+interface JwtHeader {
+  alg?: string;
+  kid?: string;
+}
+
+export interface VerifiedIdentityClaims {
+  iss: string;
+  sub: string;
+  aud: string | string[];
+  azp?: string;
+  exp: number;
+  iat?: number;
+  nonce: string;
+  email?: string;
+  name?: string;
+  preferred_username?: string;
+  picture?: string;
+  roles?: string[];
+}
+
+interface JwksDocument {
+  keys?: Array<Record<string, unknown>>;
+}
+
+const jwksCache = new Map<
+  string,
+  { expiresAt: number; keys: Array<Record<string, unknown>> }
+>();
+const JWKS_TTL_MS = 5 * 60 * 1000;
+
+function decodeJwtPart<T>(part: string): T {
+  return JSON.parse(Buffer.from(part, "base64url").toString("utf8")) as T;
+}
+
+async function fetchJwks(
+  cfg: OidcCfg,
+  forceRefresh = false,
+): Promise<Array<Record<string, unknown>>> {
+  const cached = jwksCache.get(cfg.jwksEndpoint);
+  if (!forceRefresh && cached && cached.expiresAt > Date.now()) {
+    return cached.keys;
   }
+  const document = await $fetch<JwksDocument>(cfg.jwksEndpoint, {
+    timeout: 2_000,
+  });
+  const keys = Array.isArray(document.keys) ? document.keys : [];
+  if (!keys.length) throw new Error("Identity JWKS is empty");
+  jwksCache.set(cfg.jwksEndpoint, {
+    expiresAt: Date.now() + JWKS_TTL_MS,
+    keys,
+  });
+  return keys;
+}
+
+async function verifyJwtSignature(
+  signingInput: string,
+  signature: Buffer,
+  header: JwtHeader,
+  cfg: OidcCfg,
+): Promise<boolean> {
+  for (const forceRefresh of [false, true]) {
+    const keys = await fetchJwks(cfg, forceRefresh);
+    const candidates = keys.filter(
+      (key) =>
+        (!header.kid || key.kid === header.kid) &&
+        (!key.alg || key.alg === "RS256") &&
+        (!key.use || key.use === "sig") &&
+        key.kty === "RSA",
+    );
+    for (const jwk of candidates) {
+      try {
+        const key = createPublicKey({ key: jwk, format: "jwk" });
+        if (
+          verifySignature(
+            "RSA-SHA256",
+            Buffer.from(signingInput),
+            key,
+            signature,
+          )
+        ) {
+          return true;
+        }
+      } catch {
+        // Ignore malformed or incompatible keys and try the next candidate.
+      }
+    }
+  }
+  return false;
+}
+
+export async function verifyIdentityIdToken(
+  token: string | undefined,
+  cfg: OidcCfg,
+  expectedNonce: string,
+): Promise<VerifiedIdentityClaims> {
+  if (!token) throw new Error("Identity did not return an ID Token");
+  const parts = token.split(".");
+  if (parts.length !== 3) throw new Error("Identity returned an invalid ID Token");
+  const encodedHeader = parts[0]!;
+  const encodedClaims = parts[1]!;
+  const encodedSignature = parts[2]!;
+  const header = decodeJwtPart<JwtHeader>(encodedHeader);
+  if (header.alg !== "RS256") {
+    throw new Error("Identity ID Token uses an unsupported algorithm");
+  }
+  const verified = await verifyJwtSignature(
+    `${encodedHeader}.${encodedClaims}`,
+    Buffer.from(encodedSignature, "base64url"),
+    header,
+    cfg,
+  );
+  if (!verified) throw new Error("Identity ID Token signature is invalid");
+
+  const claims = decodeJwtPart<VerifiedIdentityClaims>(encodedClaims);
+  const now = Math.floor(Date.now() / 1000);
+  const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+  if (
+    claims.iss !== cfg.issuer ||
+    !claims.sub ||
+    !audiences.includes(cfg.clientId) ||
+    (audiences.length > 1 && claims.azp !== cfg.clientId) ||
+    !Number.isFinite(claims.exp) ||
+    claims.exp <= now ||
+    claims.nonce !== expectedNonce
+  ) {
+    throw new Error("Identity ID Token claims are invalid");
+  }
+  return claims;
 }
 
 interface TokenResponse {
@@ -151,18 +284,26 @@ export function refreshSingleFlight(cfg: OidcCfg, refresh: string): Promise<Toke
 }
 
 // sessionFromTokens builds a Session from a token response.
-export function sessionFromTokens(tok: TokenResponse, prev?: Session): Session {
-  const claims = decodeJwt(tok.id_token || tok.access_token)
+export function sessionFromTokens(
+  tok: TokenResponse,
+  prev?: Session,
+  verifiedClaims?: VerifiedIdentityClaims,
+): Session {
+  if (!prev && !verifiedClaims) {
+    throw new Error("Verified Identity claims are required for a new session");
+  }
+  const claims = verifiedClaims;
   return {
     access: tok.access_token,
     refresh: tok.refresh_token || prev?.refresh,
     exp: Date.now() + (tok.expires_in ?? 600) * 1000,
     user: prev?.user || {
-      sub: claims.sub,
-      email: claims.email,
-      name: claims.name || claims.preferred_username || claims.email,
-      avatar: claims.picture,
-      roles: Array.isArray(claims.roles) ? claims.roles : []
+      sub: claims!.sub,
+      email: claims!.email,
+      name:
+        claims!.name || claims!.preferred_username || claims!.email,
+      avatar: claims!.picture,
+      roles: Array.isArray(claims!.roles) ? claims!.roles : [],
     }
   }
 }
@@ -170,7 +311,24 @@ export function sessionFromTokens(tok: TokenResponse, prev?: Session): Session {
 // safeReturnTo only allows same-origin relative paths (open-redirect guard).
 export function safeReturnTo(raw: string | undefined | null): string {
   if (!raw || raw[0] !== '/') return '/'
-  if (/[\\\r\n\t]/.test(raw)) return '/'
-  if (raw[1] === '/') return '/'
+  let candidate = raw;
+  for (let pass = 0; pass < 8; pass += 1) {
+    if (
+      candidate[0] !== "/" ||
+      candidate[1] === "/" ||
+      /[\\\u0000-\u001f\u007f]/u.test(candidate)
+    ) {
+      return "/";
+    }
+    if (!candidate.includes("%")) break;
+    try {
+      const decoded = decodeURIComponent(candidate);
+      if (decoded === candidate) break;
+      candidate = decoded;
+    } catch {
+      return "/";
+    }
+    if (pass === 7) return "/";
+  }
   return raw
 }

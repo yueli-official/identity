@@ -4,6 +4,7 @@
 interface Tx {
   verifier: string
   state: string
+  nonce: string
   returnTo: string
 }
 
@@ -18,10 +19,12 @@ export default defineEventHandler(async (event) => {
   }
 
   const tok = await exchangeCode(cfg, q.code as string, tx.verifier)
-  const session = sessionFromTokens(tok)
+  const claims = await verifyIdentityIdToken(tok.id_token, cfg, tx.nonce)
+  const session = sessionFromTokens(tok, undefined, claims)
 
   setCookie(event, SESSION_COOKIE, seal(session, cfg.sealSecret), {
     httpOnly: true,
+    secure: cfg.cookieSecure,
     sameSite: 'lax',
     path: '/',
     maxAge: 60 * 60 * 24 * 7

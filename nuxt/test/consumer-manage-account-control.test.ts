@@ -3,15 +3,14 @@ import { mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ConsumerManageAccountControl from "../app/components/ConsumerManageAccountControl.vue";
 
-const ManageUserMenu = defineComponent({
-  name: "ManageUserMenu",
+const AccountMenu = defineComponent({
+  name: "AccountMenu",
   props: {
     name: String,
     email: String,
     avatarUrl: String,
-    homeTo: String,
-    settingsTo: String,
-    showAppearance: Boolean,
+    utilityActions: Array,
+    appearance: Object,
     triggerMode: String,
     logout: Function,
   },
@@ -34,12 +33,14 @@ const user = ref<{
 } | null>(null);
 const login = vi.fn();
 const logout = vi.fn();
+const navigateTo = vi.fn();
 
 describe("ConsumerManageAccountControl", () => {
   beforeEach(() => {
     user.value = null;
     login.mockReset();
     logout.mockReset();
+    navigateTo.mockReset();
     vi.stubGlobal("useAuth", () => ({
       user,
       loggedIn: computed(() => Boolean(user.value)),
@@ -49,6 +50,8 @@ describe("ConsumerManageAccountControl", () => {
     vi.stubGlobal("useRuntimeConfig", () => ({
       public: { accountUrl: "https://account.example" },
     }));
+    vi.stubGlobal("useColorMode", () => ({ preference: "system" }));
+    vi.stubGlobal("navigateTo", navigateTo);
   });
 
   it("delegates authenticated management identity to the restricted menu", () => {
@@ -65,23 +68,25 @@ describe("ConsumerManageAccountControl", () => {
         showAppearance: true,
         triggerMode: "sidebar",
       },
-      global: { stubs: { ManageUserMenu, UButton } },
+      global: { stubs: { AccountMenu, UButton } },
     });
 
-    expect(wrapper.getComponent(ManageUserMenu).props()).toMatchObject({
+    const menu = wrapper.getComponent(AccountMenu);
+    expect(menu.props()).toMatchObject({
       name: "月离",
       email: "user@example.com",
       avatarUrl: "https://identity.example/avatar.png",
-      homeTo: "",
-      settingsTo: "https://account.example",
-      showAppearance: true,
       triggerMode: "sidebar",
     });
+    expect(
+      menu.props("utilityActions").map((item: { label: string }) => item.label),
+    ).toEqual(["用户设置"]);
+    expect(menu.props("appearance")).toMatchObject({ value: "system" });
   });
 
   it("uses the shared login action for anonymous operators", async () => {
     const wrapper = mount(ConsumerManageAccountControl, {
-      global: { stubs: { ManageUserMenu, UButton } },
+      global: { stubs: { AccountMenu, UButton } },
     });
 
     await wrapper.get("button").trigger("click");

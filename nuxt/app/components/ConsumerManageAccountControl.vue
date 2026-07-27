@@ -1,7 +1,16 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { ManageUserMenu } from "@platform/manage/components";
-import type { AccountMenuTriggerMode } from "@yueli/ui/account-menu/pattern";
+import {
+  AccountMenu,
+  type AccountMenuAction,
+  type AccountMenuAppearance,
+  type AccountMenuAppearanceValue,
+  type AccountMenuTriggerMode,
+} from "@yueli/ui/account-menu/pattern";
+import {
+  identityAccountMenuAppearanceMessages,
+  identityAccountMenuMessages,
+} from "../utils/account-menu";
 
 const props = withDefaults(
   defineProps<{
@@ -24,6 +33,44 @@ const { user, loggedIn, login, logout } = useAuth();
 const accountUrl = computed(
   () => useRuntimeConfig().public.accountUrl || "http://localhost:3000",
 );
+const colorMode = useColorMode();
+
+function appearanceValue(value: string): AccountMenuAppearanceValue {
+  return value === "light" || value === "dark" ? value : "system";
+}
+
+const appearance = computed<AccountMenuAppearance | undefined>(() =>
+  props.showAppearance
+    ? {
+        value: appearanceValue(colorMode.preference),
+        messages: identityAccountMenuAppearanceMessages,
+        onChange: (value) => {
+          colorMode.preference = value;
+        },
+      }
+    : undefined,
+);
+
+const utilityActions = computed<AccountMenuAction[]>(() => {
+  const actions: AccountMenuAction[] = [];
+  if (props.homeTo) {
+    actions.push({
+      label: props.homeLabel,
+      icon: "i-tabler-arrow-back-up",
+      to: props.homeTo,
+    });
+  }
+  if (accountUrl.value && accountUrl.value !== props.homeTo) {
+    actions.push({
+      label: "用户设置",
+      icon: "i-tabler-user-cog",
+      onSelect: async () => {
+        await navigateTo(accountUrl.value, { external: true });
+      },
+    });
+  }
+  return actions;
+});
 
 async function handleLogin(): Promise<void> {
   await login();
@@ -31,17 +78,16 @@ async function handleLogin(): Promise<void> {
 </script>
 
 <template>
-  <ManageUserMenu
+  <AccountMenu
     v-if="loggedIn"
     :name="user?.name"
     :email="user?.email"
     :avatar-url="user?.avatar"
-    :home-to="props.homeTo"
-    :home-label="props.homeLabel"
-    :settings-to="accountUrl"
-    :show-appearance="props.showAppearance"
+    :utility-actions
+    :appearance
     :trigger-mode="props.triggerMode"
     :logout
+    :messages="identityAccountMenuMessages"
   />
   <UButton
     v-else
