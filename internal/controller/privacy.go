@@ -9,8 +9,8 @@ import (
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/yueli-official/foundation/go/privacy"
 
-	v1 "platform/services/identity/api/v1"
-	"platform/services/identity/internal/authentication"
+	v1 "github.com/yueli-official/identity/api/v1"
+	"github.com/yueli-official/identity/internal/authentication"
 )
 
 const privacyRecentAuthentication = 5 * time.Minute

@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"platform/services/identity/internal/oidc"
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/oidc"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 func TestOpenAPIRepositoriesAreHermetic(t *testing.T) {

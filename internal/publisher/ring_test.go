@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"platform/services/identity/internal/publisher"
+	"github.com/yueli-official/identity/internal/publisher"
 )
 
 func TestKeyAdministrationRequiresPrepublishedManifestBeforeActivation(t *testing.T) {

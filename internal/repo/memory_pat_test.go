@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 func TestMemory_PAT_InsertIncreasesID(t *testing.T) {

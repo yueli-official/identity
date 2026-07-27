@@ -18,9 +18,9 @@ import (
 	"github.com/go-jose/go-jose/v3/jwt"
 	"github.com/google/uuid"
 
-	"platform/services/identity/internal/authentication"
-	"platform/services/identity/internal/model"
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/authentication"
+	"github.com/yueli-official/identity/internal/model"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 type StepUpProofInput struct {

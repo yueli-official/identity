@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"platform/services/identity/internal/actor"
+	"github.com/yueli-official/identity/internal/actor"
 )
 
 type otherKey struct{}

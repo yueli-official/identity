@@ -8,12 +8,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/yueli-official/foundation/go/abuse"
 
-	"platform/services/identity/internal/authentication"
-	"platform/services/identity/internal/identityabuse"
-	"platform/services/identity/internal/iderr"
-	"platform/services/identity/internal/model"
-	identitypassword "platform/services/identity/internal/password"
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/authentication"
+	"github.com/yueli-official/identity/internal/identityabuse"
+	"github.com/yueli-official/identity/internal/iderr"
+	"github.com/yueli-official/identity/internal/model"
+	identitypassword "github.com/yueli-official/identity/internal/password"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 type LoginInput struct {

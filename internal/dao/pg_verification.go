@@ -6,7 +6,7 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/os/gtime"
 
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 // CreateVerification inserts an issued email token row (stored hashed, with TTL).

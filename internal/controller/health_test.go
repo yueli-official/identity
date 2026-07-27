@@ -8,7 +8,7 @@ import (
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/gogf/gf/v2/test/gtest"
 
-	"platform/services/identity/internal/controller"
+	"github.com/yueli-official/identity/internal/controller"
 )
 
 // TestHealthz verifies that GET /healthz returns the raw health representation.

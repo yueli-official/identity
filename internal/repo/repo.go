@@ -7,7 +7,7 @@ import (
 	"errors"
 	"time"
 
-	"platform/services/identity/internal/model"
+	"github.com/yueli-official/identity/internal/model"
 )
 
 var (

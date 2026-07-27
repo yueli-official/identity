@@ -3,8 +3,8 @@ package logic
 import (
 	"context"
 
-	"platform/services/identity/internal/actor"
-	"platform/services/identity/internal/iderr"
+	"github.com/yueli-official/identity/internal/actor"
+	"github.com/yueli-official/identity/internal/iderr"
 )
 
 // DefaultRole is granted to every identity at creation time (password register

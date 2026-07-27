@@ -3,8 +3,8 @@ package oidc
 import (
 	"time"
 
-	"platform/services/identity/internal/authentication"
-	"platform/services/identity/internal/model"
+	"github.com/yueli-official/identity/internal/authentication"
+	"github.com/yueli-official/identity/internal/model"
 )
 
 // scopeSet builds a membership set for quick scope checks.

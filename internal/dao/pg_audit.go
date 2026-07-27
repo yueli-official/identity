@@ -7,7 +7,7 @@ import (
 
 	"github.com/gogf/gf/v2/frame/g"
 
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 // auditRow is a DAO-internal struct that mirrors the audit_logs table columns.

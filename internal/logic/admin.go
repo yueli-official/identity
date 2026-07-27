@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 
-	"platform/services/identity/internal/actor"
-	"platform/services/identity/internal/iderr"
-	"platform/services/identity/internal/model"
-	identitypassword "platform/services/identity/internal/password"
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/actor"
+	"github.com/yueli-official/identity/internal/iderr"
+	"github.com/yueli-official/identity/internal/model"
+	identitypassword "github.com/yueli-official/identity/internal/password"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 // AdminListUsers serves the admin user-management list (filtered + paginated).

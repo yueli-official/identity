@@ -19,7 +19,7 @@ import (
 	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 
-	"platform/services/identity/internal/identitymaintenance"
+	"github.com/yueli-official/identity/internal/identitymaintenance"
 )
 
 func TestMigrationUpDownUpLifecycle(t *testing.T) {

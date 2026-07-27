@@ -8,11 +8,11 @@ import (
 
 	"github.com/gogf/gf/v2/net/ghttp"
 
-	v1 "platform/services/identity/api/v1"
-	"platform/services/identity/internal/assetclient"
-	"platform/services/identity/internal/iderr"
-	"platform/services/identity/internal/logic"
-	"platform/services/identity/internal/oidc"
+	v1 "github.com/yueli-official/identity/api/v1"
+	"github.com/yueli-official/identity/internal/assetclient"
+	"github.com/yueli-official/identity/internal/iderr"
+	"github.com/yueli-official/identity/internal/logic"
+	"github.com/yueli-official/identity/internal/oidc"
 )
 
 // maxImageBytes caps a single avatar/cover upload (the account UI already crops

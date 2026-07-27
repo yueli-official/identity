@@ -8,7 +8,7 @@ import (
 	"github.com/ory/fosite/handler/openid"
 	"github.com/ory/fosite/token/jwt"
 
-	"platform/services/identity/internal/authentication"
+	"github.com/yueli-official/identity/internal/authentication"
 )
 
 // Session is the fosite session type used throughout the identity service.

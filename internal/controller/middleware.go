@@ -3,7 +3,7 @@ package controller
 import (
 	"github.com/gogf/gf/v2/net/ghttp"
 
-	"platform/services/identity/internal/actor"
+	"github.com/yueli-official/identity/internal/actor"
 )
 
 // ActorMiddleware reads request-scoped metadata (IP, User-Agent, X-Request-Id)

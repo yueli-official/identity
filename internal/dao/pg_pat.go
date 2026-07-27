@@ -8,7 +8,7 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/os/gtime"
 
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 // patRow is a DAO-internal struct that mirrors the pat_tokens table columns.

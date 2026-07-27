@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	identityruntime "platform/services/identity/internal/runtime"
+	identityruntime "github.com/yueli-official/identity/internal/runtime"
 )
 
 const githubAPIVersion = "2026-03-10"

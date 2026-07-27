@@ -3,7 +3,7 @@ package dao
 import (
 	"context"
 
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 // GetRoles returns the identity's granted role slugs, sorted by slug ascending

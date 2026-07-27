@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 
-	"platform/services/identity/internal/authentication"
-	"platform/services/identity/internal/iderr"
-	"platform/services/identity/internal/model"
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/authentication"
+	"github.com/yueli-official/identity/internal/iderr"
+	"github.com/yueli-official/identity/internal/model"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 // AuthenticatedSession resolves the server-side session and its active identity.

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"platform/services/identity/internal/iderr"
+	"github.com/yueli-official/identity/internal/iderr"
 )
 
 func TestCodesDeclareExpectedStatus(t *testing.T) {

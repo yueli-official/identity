@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"platform/services/identity/internal/model"
+	"github.com/yueli-official/identity/internal/model"
 )
 
 // AdminListUsers filters/sorts/pages the in-memory identities, mirroring the PG

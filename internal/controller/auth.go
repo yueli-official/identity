@@ -9,10 +9,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/yueli-official/foundation/go/privacy"
 
-	v1 "platform/services/identity/api/v1"
-	"platform/services/identity/internal/authentication"
-	"platform/services/identity/internal/logic"
-	"platform/services/identity/stepup"
+	v1 "github.com/yueli-official/identity/api/v1"
+	"github.com/yueli-official/identity/internal/authentication"
+	"github.com/yueli-official/identity/internal/logic"
+	"github.com/yueli-official/identity/stepup"
 )
 
 const sessionCookie = "id_session"

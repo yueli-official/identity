@@ -4,10 +4,10 @@ import (
 	"context"
 
 	"github.com/gogf/gf/v2/frame/g"
-	"platform/services/identity/internal/actor"
-	"platform/services/identity/internal/githubbinding"
-	"platform/services/identity/internal/publisher"
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/actor"
+	"github.com/yueli-official/identity/internal/githubbinding"
+	"github.com/yueli-official/identity/internal/publisher"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 // Audit event names (dotted).

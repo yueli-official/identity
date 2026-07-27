@@ -7,8 +7,8 @@ import (
 
 	"github.com/ory/fosite"
 
-	"platform/services/identity/internal/model"
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/model"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 // Store adapts our Backend + ClientRepo to fosite's storage interfaces.

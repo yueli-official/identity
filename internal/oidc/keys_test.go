@@ -10,8 +10,8 @@ import (
 	josejwt "github.com/go-jose/go-jose/v3/jwt"
 
 	foundationauth "github.com/yueli-official/foundation/go/auth"
-	"platform/services/identity/internal/oidc"
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/oidc"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 func TestMintServiceTokenIdentifiesIdentityService(t *testing.T) {

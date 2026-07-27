@@ -7,7 +7,7 @@ import (
 	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/frame/g"
 
-	"platform/services/identity/internal/authentication"
+	"github.com/yueli-official/identity/internal/authentication"
 )
 
 func (p *PG) GetOrCreatePasskeyUser(

@@ -9,12 +9,12 @@ import (
 	"github.com/gogf/gf/v2/net/ghttp"
 	foundationauth "github.com/yueli-official/foundation/go/auth"
 
-	v1 "platform/services/identity/api/v1"
-	"platform/services/identity/internal/actor"
-	"platform/services/identity/internal/iderr"
-	"platform/services/identity/internal/logic"
-	"platform/services/identity/internal/model"
-	"platform/services/identity/internal/repo"
+	v1 "github.com/yueli-official/identity/api/v1"
+	"github.com/yueli-official/identity/internal/actor"
+	"github.com/yueli-official/identity/internal/iderr"
+	"github.com/yueli-official/identity/internal/logic"
+	"github.com/yueli-official/identity/internal/model"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 // requireAdmin resolves the caller from a verified Bearer Principal when one is

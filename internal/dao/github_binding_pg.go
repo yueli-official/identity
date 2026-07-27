@@ -8,7 +8,7 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/google/uuid"
 
-	"platform/services/identity/internal/githubbinding"
+	"github.com/yueli-official/identity/internal/githubbinding"
 )
 
 type githubBindingRow struct {

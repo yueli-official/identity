@@ -9,9 +9,9 @@ import (
 	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/google/uuid"
 
-	"platform/services/identity/internal/dao"
-	"platform/services/identity/internal/model"
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/dao"
+	"github.com/yueli-official/identity/internal/model"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 func newDAO(t *testing.T, db gdb.DB) *dao.PG {

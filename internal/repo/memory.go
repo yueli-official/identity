@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"platform/services/identity/internal/model"
+	"github.com/yueli-official/identity/internal/model"
 )
 
 // memRoleCatalog is the fixed role catalog the in-memory store validates grants

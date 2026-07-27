@@ -5,7 +5,7 @@ import (
 
 	"github.com/gogf/gf/v2/net/ghttp"
 
-	v1 "platform/services/identity/api/v1"
+	v1 "github.com/yueli-official/identity/api/v1"
 )
 
 func (c *Controller) Me(ctx context.Context, _ *v1.MeReq) (*v1.MeRes, error) {

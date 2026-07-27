@@ -10,9 +10,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"platform/services/identity/internal/authentication"
-	"platform/services/identity/internal/dao"
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/authentication"
+	"github.com/yueli-official/identity/internal/dao"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 func TestPGPasskeyLifecycleAndAuthenticationSession(t *testing.T) {

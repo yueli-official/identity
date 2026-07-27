@@ -16,13 +16,13 @@ import (
 	"github.com/gogf/gf/v2/test/gtest"
 	"github.com/google/uuid"
 
-	"platform/services/identity/internal/authentication"
-	"platform/services/identity/internal/controller"
-	"platform/services/identity/internal/logic"
-	"platform/services/identity/internal/oidc"
-	"platform/services/identity/internal/repo"
-	identityruntime "platform/services/identity/internal/runtime"
-	"platform/services/identity/stepup"
+	"github.com/yueli-official/identity/internal/authentication"
+	"github.com/yueli-official/identity/internal/controller"
+	"github.com/yueli-official/identity/internal/logic"
+	"github.com/yueli-official/identity/internal/oidc"
+	"github.com/yueli-official/identity/internal/repo"
+	identityruntime "github.com/yueli-official/identity/internal/runtime"
+	"github.com/yueli-official/identity/stepup"
 )
 
 func TestAdminMutationRequiresActionBoundOneTimeProof(t *testing.T) {

@@ -11,8 +11,8 @@ import (
 
 	"github.com/gogf/gf/v2/database/gredis"
 
-	"platform/services/identity/internal/model"
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/model"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 // Redis wraps *gredis.Redis and satisfies repo.SessionStore and

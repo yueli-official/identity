@@ -3,11 +3,11 @@ package controller
 import (
 	"context"
 
-	v1 "platform/services/identity/api/v1"
-	"platform/services/identity/internal/actor"
-	"platform/services/identity/internal/iderr"
-	"platform/services/identity/internal/logic"
-	"platform/services/identity/internal/publisher"
+	v1 "github.com/yueli-official/identity/api/v1"
+	"github.com/yueli-official/identity/internal/actor"
+	"github.com/yueli-official/identity/internal/iderr"
+	"github.com/yueli-official/identity/internal/logic"
+	"github.com/yueli-official/identity/internal/publisher"
 )
 
 const (

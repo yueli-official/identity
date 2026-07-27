@@ -3,8 +3,8 @@ package controller
 import (
 	"testing"
 
-	v1 "platform/services/identity/api/v1"
-	"platform/services/identity/internal/authentication"
+	v1 "github.com/yueli-official/identity/api/v1"
+	"github.com/yueli-official/identity/internal/authentication"
 )
 
 func TestStepUpRequirementValidation(t *testing.T) {

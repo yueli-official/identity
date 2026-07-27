@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
-	v1 "platform/services/identity/api/v1"
-	"platform/services/identity/internal/model"
+	v1 "github.com/yueli-official/identity/api/v1"
+	"github.com/yueli-official/identity/internal/model"
 )
 
 // PublicProfile returns the public display subset of one identity's profile.

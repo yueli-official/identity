@@ -6,10 +6,10 @@ import (
 	"time"
 
 	foundationauth "github.com/yueli-official/foundation/go/auth"
-	"platform/services/identity/internal/guest"
-	"platform/services/identity/internal/model"
-	"platform/services/identity/internal/oidc"
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/guest"
+	"github.com/yueli-official/identity/internal/model"
+	"github.com/yueli-official/identity/internal/oidc"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 func fixture(t *testing.T) (*guest.Service, *repo.Memory, *oidc.Manager, time.Time) {

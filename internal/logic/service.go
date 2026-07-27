@@ -5,12 +5,12 @@ import (
 	"time"
 
 	"github.com/yueli-official/foundation/go/abuse"
-	"platform/services/identity/internal/authentication"
-	"platform/services/identity/internal/identityabuse"
-	"platform/services/identity/internal/mailer"
-	identitypassword "platform/services/identity/internal/password"
-	"platform/services/identity/internal/pat"
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/authentication"
+	"github.com/yueli-official/identity/internal/identityabuse"
+	"github.com/yueli-official/identity/internal/mailer"
+	identitypassword "github.com/yueli-official/identity/internal/password"
+	"github.com/yueli-official/identity/internal/pat"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 // Config holds tunables (rate-limit, session TTL); values are plan-level defaults.

@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"platform/services/identity/internal/model"
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/model"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 func TestRecoveringSessionStoreRestoresCacheFromDurableStore(t *testing.T) {

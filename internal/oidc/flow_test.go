@@ -21,11 +21,11 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 	"golang.org/x/crypto/bcrypt"
 
-	"platform/services/identity/internal/controller"
-	"platform/services/identity/internal/logic"
-	"platform/services/identity/internal/model"
-	"platform/services/identity/internal/oidc"
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/controller"
+	"github.com/yueli-official/identity/internal/logic"
+	"github.com/yueli-official/identity/internal/model"
+	"github.com/yueli-official/identity/internal/oidc"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 // callbackURI is the redirect_uri shared by the in-memory demo clients seeded by

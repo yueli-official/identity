@@ -8,9 +8,9 @@ import (
 	"encoding/hex"
 	"errors"
 
-	"platform/services/identity/internal/iderr"
-	identitypassword "platform/services/identity/internal/password"
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/iderr"
+	identitypassword "github.com/yueli-official/identity/internal/password"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 // newToken mints an opaque URL-safe token and its sha256-hex storage hash. Only

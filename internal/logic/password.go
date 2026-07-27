@@ -3,8 +3,8 @@ package logic
 import (
 	"context"
 
-	"platform/services/identity/internal/iderr"
-	identitypassword "platform/services/identity/internal/password"
+	"github.com/yueli-official/identity/internal/iderr"
+	identitypassword "github.com/yueli-official/identity/internal/password"
 )
 
 var defaultPasswordManager = identitypassword.New(identitypassword.DefaultConfig())

@@ -9,8 +9,8 @@ import (
 	"github.com/ory/fosite/handler/openid"
 	"github.com/ory/fosite/storage"
 
-	"platform/services/identity/internal/oidc"
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/oidc"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 // The session must satisfy BOTH interfaces (the JWT-access-token gotcha).

@@ -10,8 +10,8 @@ import (
 
 	"github.com/gogf/gf/v2/net/ghttp"
 
-	"platform/services/identity/internal/logic"
-	"platform/services/identity/internal/oauthlogin"
+	"github.com/yueli-official/identity/internal/logic"
+	"github.com/yueli-official/identity/internal/oauthlogin"
 )
 
 // oauthStateCookie holds the short-lived CSRF nonce that must match the nonce

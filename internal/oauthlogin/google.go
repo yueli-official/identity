@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	identityruntime "platform/services/identity/internal/runtime"
+	identityruntime "github.com/yueli-official/identity/internal/runtime"
 )
 
 // GoogleProvider implements Provider against Google's OAuth2 + v2 userinfo

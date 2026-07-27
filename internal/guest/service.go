@@ -13,9 +13,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"platform/services/identity/internal/model"
-	"platform/services/identity/internal/oidc"
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/model"
+	"github.com/yueli-official/identity/internal/oidc"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 var (

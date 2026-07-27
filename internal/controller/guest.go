@@ -7,9 +7,9 @@ import (
 	"time"
 
 	foundationauth "github.com/yueli-official/foundation/go/auth"
-	v1 "platform/services/identity/api/v1"
-	"platform/services/identity/internal/guest"
-	"platform/services/identity/internal/iderr"
+	v1 "github.com/yueli-official/identity/api/v1"
+	"github.com/yueli-official/identity/internal/guest"
+	"github.com/yueli-official/identity/internal/iderr"
 )
 
 type Guest struct {

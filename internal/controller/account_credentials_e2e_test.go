@@ -12,11 +12,11 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 
-	"platform/services/identity/internal/controller"
-	"platform/services/identity/internal/logic"
-	"platform/services/identity/internal/oauthlogin"
-	"platform/services/identity/internal/repo"
-	identityruntime "platform/services/identity/internal/runtime"
+	"github.com/yueli-official/identity/internal/controller"
+	"github.com/yueli-official/identity/internal/logic"
+	"github.com/yueli-official/identity/internal/oauthlogin"
+	"github.com/yueli-official/identity/internal/repo"
+	identityruntime "github.com/yueli-official/identity/internal/runtime"
 )
 
 // TestE2E_OAuthOnlyUnbindClosedLoop reproduces the reported "Google 登录后点解绑没反应"

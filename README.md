@@ -3,7 +3,7 @@
 - 生命周期：活跃的平台服务
 - 权威来源：Catalog `platformServices.identity`、迁移和生成的 OpenAPI
 - 消费者：Account、全部产品 BFF/API、Asset 及其他平台服务
-- 验证：`go test ./services/identity/...`
+- 验证：进入本目录并设置 `GOWORK=off` 后执行 `go test ./...`
 
 Identity 是站群唯一身份提供方，负责账户、凭据、公开资料、登录会话、角色、个人访问令牌、OAuth2/OIDC 客户端与签名密钥。产品服务拥有领域权限和内容；它们消费 Identity subject 与 scope，不能复制用户记录或自行实现登录。
 
@@ -72,14 +72,16 @@ pnpm platformctl dev status --root .
 隔离开发时，把 `manifest/config/config.example.yaml` 复制为忽略的 `config.yaml`。必须提供 PostgreSQL、Redis 和至少 32 字节且稳定的 `GF_OIDC_GLOBALSECRET`；`oidc.issuer` 必须等于外部可访问的 Identity origin。
 
 ```powershell
-go run ./services/identity/cmd/publishertrust `
+Set-Location services/identity
+$env:GOWORK = "off"
+go run ./cmd/publishertrust `
   -issuer http://localhost:8081 `
-  -key-ring services/identity/.data/publisher/key-ring.json `
-  -root-key services/identity/.data/publisher-offline/root-key.pem `
-  -root-public services/identity/.data/publisher/trust-root.json `
-  -manifest services/identity/.data/publisher/trust-manifest.json
-go run ./services/identity/cmd/identity
-go test ./services/identity/...
+  -key-ring .data/publisher/key-ring.json `
+  -root-key .data/publisher-offline/root-key.pem `
+  -root-public .data/publisher/trust-root.json `
+  -manifest .data/publisher/trust-manifest.json
+go run ./cmd/identity
+go test ./...
 ```
 
 `publishertrust` 是离线运维命令。Identity runtime 只配置 leaf signing key、root 公钥和已签 manifest；

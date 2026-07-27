@@ -8,8 +8,8 @@ import (
 
 	"github.com/gogf/gf/v2/net/ghttp"
 
-	"platform/services/identity/internal/iderr"
-	"platform/services/identity/stepup"
+	"github.com/yueli-official/identity/internal/iderr"
+	"github.com/yueli-official/identity/stepup"
 )
 
 const stepUpProofHeader = "X-Step-Up-Proof"

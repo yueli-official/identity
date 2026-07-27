@@ -9,7 +9,7 @@ import (
 	"encoding/pem"
 	"testing"
 
-	"platform/services/identity/internal/publisher"
+	"github.com/yueli-official/identity/internal/publisher"
 )
 
 func TestSecretAndCryptoSignerProvidersExposeOnlyPublicMaterial(t *testing.T) {

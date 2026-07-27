@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"platform/services/identity/internal/authentication"
-	"platform/services/identity/internal/model"
+	"github.com/yueli-official/identity/internal/authentication"
+	"github.com/yueli-official/identity/internal/model"
 )
 
 // NewRecoveringSessionStore keeps Redis as the hot path while using durable as

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"platform/services/identity/internal/dao"
-	"platform/services/identity/internal/publisher"
+	"github.com/yueli-official/identity/internal/dao"
+	"github.com/yueli-official/identity/internal/publisher"
 )
 
 func TestPublisherAttestationStoreIsIdempotent(t *testing.T) {

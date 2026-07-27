@@ -13,12 +13,12 @@ import (
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/ory/fosite"
 
-	"platform/services/identity/internal/authentication"
-	"platform/services/identity/internal/logic"
-	"platform/services/identity/internal/model"
-	"platform/services/identity/internal/oauthlogin"
-	"platform/services/identity/internal/oidc"
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/authentication"
+	"github.com/yueli-official/identity/internal/logic"
+	"github.com/yueli-official/identity/internal/model"
+	"github.com/yueli-official/identity/internal/oauthlogin"
+	"github.com/yueli-official/identity/internal/oidc"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 // OIDCController handles the OAuth2/OIDC protocol endpoints.

@@ -8,7 +8,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"platform/services/identity/internal/password"
+	"github.com/yueli-official/identity/internal/password"
 )
 
 func TestPolicyUsesNFCUnicodeCodePointsAndContext(t *testing.T) {

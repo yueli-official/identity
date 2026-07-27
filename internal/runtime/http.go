@@ -12,7 +12,7 @@ import (
 	"github.com/gogf/gf/v2/util/guid"
 	goframeapi "github.com/yueli-official/foundation/go/goframe/api"
 	"github.com/yueli-official/foundation/go/goframe/ratelimit"
-	"platform/services/identity/internal/iderr"
+	"github.com/yueli-official/identity/internal/iderr"
 )
 
 const defaultRateLimitPerMinute = 600

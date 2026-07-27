@@ -16,7 +16,7 @@ import (
 	"github.com/yueli-official/foundation/go/privacy"
 	"github.com/yueli-official/foundation/go/work"
 
-	identitycatalog "platform/services/identity/internal/identityprivacy/catalog"
+	identitycatalog "github.com/yueli-official/identity/internal/identityprivacy/catalog"
 )
 
 func Definition(configuredOwners ...privacy.OwnerDefinition) privacy.Definition {

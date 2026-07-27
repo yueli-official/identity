@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"platform/services/identity/internal/publisher"
+	"github.com/yueli-official/identity/internal/publisher"
 )
 
 const SubmissionManifestSchema = "https://yueli.dev/registry/github-submission/v1"

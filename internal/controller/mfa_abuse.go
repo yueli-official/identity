@@ -8,8 +8,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/yueli-official/foundation/go/abuse"
 
-	"platform/services/identity/internal/authentication"
-	"platform/services/identity/internal/logic"
+	"github.com/yueli-official/identity/internal/authentication"
+	"github.com/yueli-official/identity/internal/logic"
 )
 
 func admitMFAVerification(

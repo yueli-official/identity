@@ -3,7 +3,7 @@ package logic_test
 import (
 	"testing"
 
-	"platform/services/identity/internal/logic"
+	"github.com/yueli-official/identity/internal/logic"
 )
 
 func TestHashAndVerifyPassword(t *testing.T) {

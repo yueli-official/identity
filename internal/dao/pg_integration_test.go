@@ -10,8 +10,8 @@ import (
 	_ "github.com/gogf/gf/contrib/drivers/pgsql/v2"
 	"github.com/gogf/gf/v2/database/gdb"
 
-	"platform/services/identity/internal/dao"
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/dao"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 func newDB(t *testing.T) gdb.DB {

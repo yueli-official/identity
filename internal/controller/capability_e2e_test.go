@@ -16,11 +16,11 @@ import (
 	"github.com/gogf/gf/v2/test/gtest"
 
 	"github.com/yueli-official/foundation/go/capability"
-	"platform/services/identity/internal/controller"
-	"platform/services/identity/internal/identitycap"
-	"platform/services/identity/internal/logic"
-	"platform/services/identity/internal/repo"
-	identityruntime "platform/services/identity/internal/runtime"
+	"github.com/yueli-official/identity/internal/controller"
+	"github.com/yueli-official/identity/internal/identitycap"
+	"github.com/yueli-official/identity/internal/logic"
+	"github.com/yueli-official/identity/internal/repo"
+	identityruntime "github.com/yueli-official/identity/internal/runtime"
 )
 
 type capabilityAuditStore struct {

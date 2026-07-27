@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"platform/services/identity/internal/authentication"
-	"platform/services/identity/internal/model"
+	"github.com/yueli-official/identity/internal/authentication"
+	"github.com/yueli-official/identity/internal/model"
 )
 
 func TestDiscoveryAdvertisesRefreshAndLogout(t *testing.T) {

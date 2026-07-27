@@ -7,9 +7,9 @@ import (
 
 	"github.com/gogf/gf/v2/frame/g"
 
-	"platform/services/identity/internal/iderr"
-	"platform/services/identity/internal/pat"
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/iderr"
+	"github.com/yueli-official/identity/internal/pat"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 // PATVerification is returned by VerifyPAT on success.

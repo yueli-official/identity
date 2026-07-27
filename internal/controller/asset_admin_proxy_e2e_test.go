@@ -16,11 +16,11 @@ import (
 	coreauth "github.com/yueli-official/foundation/go/auth"
 	"github.com/yueli-official/foundation/go/problem"
 
-	"platform/services/identity/internal/controller"
-	"platform/services/identity/internal/logic"
-	"platform/services/identity/internal/oidc"
-	"platform/services/identity/internal/repo"
-	identityruntime "platform/services/identity/internal/runtime"
+	"github.com/yueli-official/identity/internal/controller"
+	"github.com/yueli-official/identity/internal/logic"
+	"github.com/yueli-official/identity/internal/oidc"
+	"github.com/yueli-official/identity/internal/repo"
+	identityruntime "github.com/yueli-official/identity/internal/runtime"
 )
 
 type assetProxyVerifierFunc func(context.Context, string) (*coreauth.Principal, error)

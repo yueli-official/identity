@@ -11,8 +11,8 @@ import (
 	_ "github.com/gogf/gf/contrib/nosql/redis/v2" // register the go-redis adapter
 	"github.com/gogf/gf/v2/database/gredis"
 
-	"platform/services/identity/internal/cache"
-	"platform/services/identity/internal/model"
+	"github.com/yueli-official/identity/internal/cache"
+	"github.com/yueli-official/identity/internal/model"
 )
 
 func newRedis(t *testing.T) *cache.Redis {

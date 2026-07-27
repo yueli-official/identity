@@ -5,10 +5,10 @@ import (
 	"errors"
 	"testing"
 
-	"platform/services/identity/internal/actor"
-	"platform/services/identity/internal/logic"
-	"platform/services/identity/internal/model"
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/actor"
+	"github.com/yueli-official/identity/internal/logic"
+	"github.com/yueli-official/identity/internal/model"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 // ---------------------------------------------------------------------------

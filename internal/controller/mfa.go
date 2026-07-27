@@ -8,9 +8,9 @@ import (
 
 	"github.com/gogf/gf/v2/net/ghttp"
 
-	v1 "platform/services/identity/api/v1"
-	"platform/services/identity/internal/authentication"
-	"platform/services/identity/internal/iderr"
+	v1 "github.com/yueli-official/identity/api/v1"
+	"github.com/yueli-official/identity/internal/authentication"
+	"github.com/yueli-official/identity/internal/iderr"
 )
 
 const mfaSecurityRecentAuthentication = 10 * time.Minute

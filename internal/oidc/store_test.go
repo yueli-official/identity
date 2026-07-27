@@ -11,8 +11,8 @@ import (
 	"github.com/ory/fosite/handler/pkce"
 	"github.com/ory/fosite/storage"
 
-	"platform/services/identity/internal/model"
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/model"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 // Compile-time: Store satisfies every fosite storage facet the provider uses.

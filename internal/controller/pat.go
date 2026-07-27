@@ -7,8 +7,8 @@ import (
 
 	"github.com/gogf/gf/v2/frame/g"
 
-	v1 "platform/services/identity/api/v1"
-	"platform/services/identity/internal/iderr"
+	v1 "github.com/yueli-official/identity/api/v1"
+	"github.com/yueli-official/identity/internal/iderr"
 )
 
 // patRFC3339 formats a *time.Time as RFC3339, returning "" for nil.

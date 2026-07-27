@@ -8,11 +8,11 @@ import (
 
 	foundationauth "github.com/yueli-official/foundation/go/auth"
 
-	v1 "platform/services/identity/api/v1"
-	"platform/services/identity/internal/githubbinding"
-	"platform/services/identity/internal/iderr"
-	"platform/services/identity/internal/logic"
-	"platform/services/identity/internal/publisher"
+	v1 "github.com/yueli-official/identity/api/v1"
+	"github.com/yueli-official/identity/internal/githubbinding"
+	"github.com/yueli-official/identity/internal/iderr"
+	"github.com/yueli-official/identity/internal/logic"
+	"github.com/yueli-official/identity/internal/publisher"
 )
 
 const githubSubmissionAuthorizeScope = "publisher:github-submission:authorize"

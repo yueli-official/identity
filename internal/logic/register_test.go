@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"platform/services/identity/internal/iderr"
-	"platform/services/identity/internal/logic"
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/iderr"
+	"github.com/yueli-official/identity/internal/logic"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 func newSvc() *logic.Service { return logic.New(repo.NewMemory(), logic.DefaultConfig()) }

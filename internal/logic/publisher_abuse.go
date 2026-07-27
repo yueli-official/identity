@@ -5,8 +5,8 @@ import (
 
 	"github.com/yueli-official/foundation/go/abuse"
 
-	"platform/services/identity/internal/identityabuse"
-	"platform/services/identity/internal/iderr"
+	"github.com/yueli-official/identity/internal/identityabuse"
+	"github.com/yueli-official/identity/internal/iderr"
 )
 
 // AdmitPublisherAttestation protects signing operations while letting an exact

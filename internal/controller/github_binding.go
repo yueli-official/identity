@@ -11,12 +11,12 @@ import (
 
 	"github.com/gogf/gf/v2/net/ghttp"
 
-	v1 "platform/services/identity/api/v1"
-	"platform/services/identity/internal/actor"
-	"platform/services/identity/internal/authentication"
-	"platform/services/identity/internal/githubbinding"
-	"platform/services/identity/internal/iderr"
-	"platform/services/identity/internal/logic"
+	v1 "github.com/yueli-official/identity/api/v1"
+	"github.com/yueli-official/identity/internal/actor"
+	"github.com/yueli-official/identity/internal/authentication"
+	"github.com/yueli-official/identity/internal/githubbinding"
+	"github.com/yueli-official/identity/internal/iderr"
+	"github.com/yueli-official/identity/internal/logic"
 )
 
 const githubBindingRecentAuthentication = 10 * time.Minute

@@ -4,7 +4,7 @@ package model
 import (
 	"time"
 
-	"platform/services/identity/internal/authentication"
+	"github.com/yueli-official/identity/internal/authentication"
 )
 
 type Status string

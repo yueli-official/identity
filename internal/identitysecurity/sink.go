@@ -5,10 +5,10 @@ import (
 
 	"github.com/gogf/gf/v2/frame/g"
 
-	"platform/services/identity/internal/actor"
-	"platform/services/identity/internal/authentication"
-	"platform/services/identity/internal/mailer"
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/actor"
+	"github.com/yueli-official/identity/internal/authentication"
+	"github.com/yueli-official/identity/internal/mailer"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 type Sink struct {

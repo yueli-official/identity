@@ -7,8 +7,8 @@ import (
 	"errors"
 	"testing"
 
-	"platform/services/identity/internal/dao"
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/dao"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 // TestPGOAuthRoundTrip exercises the PG OAuthRepo against a real database.

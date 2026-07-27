@@ -7,8 +7,8 @@ import (
 
 	"github.com/gogf/gf/v2/database/gdb"
 
-	"platform/services/identity/internal/model"
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/model"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 func (p *PG) CreateGuestSession(ctx context.Context, session model.GuestSession) error {

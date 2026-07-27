@@ -3,7 +3,7 @@ package oauthlogin_test
 import (
 	"testing"
 
-	"platform/services/identity/internal/oauthlogin"
+	"github.com/yueli-official/identity/internal/oauthlogin"
 )
 
 func TestState_RoundTrip(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"platform/services/identity/internal/model"
+	"github.com/yueli-official/identity/internal/model"
 )
 
 // TestOIDCMultiClientSSO proves single sign-on across two OIDC clients: one IdP

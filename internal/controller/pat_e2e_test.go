@@ -32,10 +32,10 @@ import (
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/gogf/gf/v2/test/gtest"
 
-	"platform/services/identity/internal/controller"
-	"platform/services/identity/internal/logic"
-	"platform/services/identity/internal/repo"
-	identityruntime "platform/services/identity/internal/runtime"
+	"github.com/yueli-official/identity/internal/controller"
+	"github.com/yueli-official/identity/internal/logic"
+	"github.com/yueli-official/identity/internal/repo"
+	identityruntime "github.com/yueli-official/identity/internal/runtime"
 )
 
 func TestE2E_PAT(t *testing.T) {

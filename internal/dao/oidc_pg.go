@@ -3,8 +3,8 @@ package dao
 import (
 	"context"
 
-	"platform/services/identity/internal/model"
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/model"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 // GetClient loads a registered OIDC client from oidc_clients. gdb's pgsql driver

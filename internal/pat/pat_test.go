@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"platform/services/identity/internal/pat"
+	"github.com/yueli-official/identity/internal/pat"
 )
 
 // TestGenerate checks uniqueness, prefix, and length of generated tokens.

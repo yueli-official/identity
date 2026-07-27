@@ -4,9 +4,9 @@ import (
 	"context"
 	"strings"
 
-	"platform/services/identity/internal/iderr"
-	"platform/services/identity/internal/model"
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/iderr"
+	"github.com/yueli-official/identity/internal/model"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 // ProfileUpdate carries the user-editable profile fields from the account UI.

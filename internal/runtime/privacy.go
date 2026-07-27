@@ -7,7 +7,7 @@ import (
 	foundationauth "github.com/yueli-official/foundation/go/auth"
 	"github.com/yueli-official/foundation/go/privacy"
 	privacygoframe "github.com/yueli-official/foundation/go/privacy/goframe"
-	"platform/services/identity/internal/iderr"
+	"github.com/yueli-official/identity/internal/iderr"
 )
 
 func PrivacyOwnerHandler(host privacy.OwnerHost, requiredScope string) ghttp.HandlerFunc {

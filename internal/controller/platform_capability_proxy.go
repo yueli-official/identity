@@ -12,7 +12,7 @@ import (
 
 	"github.com/gogf/gf/v2/net/ghttp"
 
-	"platform/services/identity/internal/oidc"
+	"github.com/yueli-official/identity/internal/oidc"
 )
 
 type CapabilityProxyTarget struct {

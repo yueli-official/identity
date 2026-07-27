@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"platform/services/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/repo"
 )
 
 type fakeRevoker struct{ bySession, byIdentity []string }
