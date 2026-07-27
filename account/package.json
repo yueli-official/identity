@@ -1,0 +1,31 @@
+{
+  "name": "account",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.2",
+  "engines": {
+    "node": "24.18.x",
+    "pnpm": "10.28.x"
+  },
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "typecheck": "nuxt typecheck",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@nuxt/ui": "4.9.0",
+    "@yueli/http-runtime": "https://github.com/yueli-official/foundation/releases/download/js-v0.1.0/yueli-http-runtime-0.1.0.tgz",
+    "@yueli/ui": "https://github.com/yueli-official/foundation/releases/download/js-v0.1.0/yueli-ui-0.1.0.tgz",
+    "dayjs": "1.11.13",
+    "nuxt": "4.4.8",
+    "qrcode": "1.5.4",
+    "tailwindcss": "4.3.1",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@iconify-json/tabler": "1.2.35",
+    "@types/qrcode": "1.5.6",
+    "vitest": "4.1.10"
+  }
+}
