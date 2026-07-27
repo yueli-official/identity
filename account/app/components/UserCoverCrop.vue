@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { createPlatformNotifier } from '@platform/ui/feedback'
+import { createAccountNotifier } from '~/utils/feedback'
 
 // Banner-ratio cover crop + upload. Canvas crop ported from the donor
 // (nuxtblog/web UserCoverCrop); upload posts the cropped JPEG to the IdP cover
@@ -13,7 +13,7 @@ defineProps<{
 const emit = defineEmits<{ 'update:modelValue': [url: string] }>()
 
 const { call } = useApi()
-const toast = createPlatformNotifier(useToast())
+const toast = createAccountNotifier(useToast())
 
 const COVER_CW = 640
 const COVER_CH = 200

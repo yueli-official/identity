@@ -6,7 +6,7 @@ import type {
   AssetStorageBackendEvent,
   AssetStorageBackendForm
 } from '~/types/asset-admin'
-import { createPlatformNotifier } from '@platform/ui/feedback'
+import { createAccountNotifier } from '~/utils/feedback'
 
 interface UseAssetStorageBackendsOptions {
   reloadAll: () => Promise<void>
@@ -14,7 +14,7 @@ interface UseAssetStorageBackendsOptions {
 
 export function useAssetStorageBackends(options: UseAssetStorageBackendsOptions) {
   const { call } = useApi()
-  const toast = createPlatformNotifier(useToast())
+  const toast = createAccountNotifier(useToast())
 
   const storageBackends = ref<AssetStorageBackend[]>([])
   const storageBackendOpen = ref(false)

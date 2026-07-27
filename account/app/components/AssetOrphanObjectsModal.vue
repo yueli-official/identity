@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ManageEmpty } from '@platform/manage/components'
+import { ManageEmpty } from '~/components/manage'
 import type { AssetOrphanObjectForm, AssetOrphanObjectResult } from '~/types/asset-admin'
 
 interface SelectOption {

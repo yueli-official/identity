@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
-import { ManageEmpty } from '@platform/manage/components'
+import { ManageEmpty } from '~/components/manage'
 import type { AssetProfile, AssetSite, AssetVariant } from '~/types/asset-admin'
 
 const { profiles, variants, sites, profileActions, variantActions } = defineProps<{

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ManageUserMenu } from "@platform/manage/components";
+import { ManageUserMenu } from "~/components/manage";
 import type {
   AdminNavigationItem,
   AdminSearchGroup,

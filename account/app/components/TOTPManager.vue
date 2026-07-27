@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { createPlatformNotifier } from '@platform/ui/feedback'
+import { createAccountNotifier } from '~/utils/feedback'
 import type { TOTPEnrollment, TOTPEntry } from '~/composables/useMFA'
 
 const props = defineProps<{ recovery?: boolean }>()
 const emit = defineEmits<{ recovered: [] }>()
-const toast = createPlatformNotifier(useToast())
+const toast = createAccountNotifier(useToast())
 const mfa = useMFA()
 const modalOpen = ref(false)
 const removeOpen = ref(false)

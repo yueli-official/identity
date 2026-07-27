@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { createPlatformNotifier } from '@platform/ui/feedback'
+import { createAccountNotifier } from '~/utils/feedback'
 import type { PasskeyEntry } from '~/composables/usePasskeys'
 import { passkeyErrorMessage } from '~/composables/usePasskeys'
 
 const emit = defineEmits<{ changed: [] }>()
-const toast = createPlatformNotifier(useToast())
+const toast = createAccountNotifier(useToast())
 const passkeys = usePasskeys()
 const browserSupported = ref(false)
 const adding = ref(false)

@@ -12,8 +12,8 @@ import { useVueCollectionWorkflow } from '@yueli/ui/collection/vue'
 import { createVueRouterCollectionQuerySync } from '@yueli/ui/collection/vue-router'
 import { PageHeader } from '@yueli/ui/dashboard/pattern'
 import { useMinimumLoading } from '@yueli/ui/feedback'
-import { abs } from '@platform/ui/date'
-import { createPlatformNotifier } from '@platform/ui/feedback'
+import { abs } from '~/utils/date'
+import { createAccountNotifier } from '~/utils/feedback'
 import {
   adminStepUpFailureMessage,
   isAdminStepUpInterruptedError
@@ -27,7 +27,7 @@ useSeoMeta({ title: '用户管理 · 控制台' })
 const { me } = useSession()
 const { call } = useApi()
 const adminStepUp = useAdminStepUp()
-const toast = createPlatformNotifier(useToast())
+const toast = createAccountNotifier(useToast())
 const router = useRouter()
 
 interface AdminUser {

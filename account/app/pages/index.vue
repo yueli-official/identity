@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
-import { SOCIAL_PLATFORMS, socialPlatform } from '@platform/ui/social'
-import { createPlatformNotifier } from '@platform/ui/feedback'
+import { SOCIAL_PLATFORMS, socialPlatform } from '~/utils/social'
+import { createAccountNotifier } from '~/utils/feedback'
 import { useActionFeedback } from '@yueli/ui/feedback'
 import { ActionFeedbackButton } from '@yueli/ui/feedback/pattern'
 import type { SocialLink } from '~/composables/useSession'
@@ -11,7 +11,7 @@ definePageMeta({ middleware: 'auth' })
 
 const { me, refresh, logout } = useSession()
 const { call } = useApi()
-const toast = createPlatformNotifier(useToast())
+const toast = createAccountNotifier(useToast())
 
 const initial = computed(() =>
   (me.value?.displayName || me.value?.email || '?').charAt(0).toUpperCase()

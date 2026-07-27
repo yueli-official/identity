@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { createPlatformNotifier } from '@platform/ui/feedback'
+import { createAccountNotifier } from '~/utils/feedback'
 
 // Square avatar crop + upload. The canvas crop interaction is ported from the
 // donor (nuxtblog/web UserAvatarCrop); the upload posts the cropped JPEG to the
@@ -14,7 +14,7 @@ defineProps<{
 const emit = defineEmits<{ 'update:modelValue': [url: string] }>()
 
 const { call } = useApi()
-const toast = createPlatformNotifier(useToast())
+const toast = createAccountNotifier(useToast())
 
 const AVATAR_C = 320
 const HIT = 14

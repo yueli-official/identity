@@ -1,5 +1,5 @@
 import type { AssetGrant, AssetGrantForm, AssetItem, CreatedAssetGrant } from '~/types/asset-admin'
-import { createPlatformNotifier } from '@platform/ui/feedback'
+import { createAccountNotifier } from '~/utils/feedback'
 import { apiErrorMessage } from '../utils/api-errors'
 
 interface UseAssetGrantsOptions {
@@ -8,7 +8,7 @@ interface UseAssetGrantsOptions {
 
 export function useAssetGrants(options: UseAssetGrantsOptions) {
   const { call } = useApi()
-  const toast = createPlatformNotifier(useToast())
+  const toast = createAccountNotifier(useToast())
   const grants = ref<AssetGrant[]>([])
   const totalGrants = ref(0)
   const grantPage = ref(1)

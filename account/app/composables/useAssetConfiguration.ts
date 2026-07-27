@@ -1,5 +1,5 @@
 import type { Ref } from 'vue'
-import { createPlatformNotifier } from '@platform/ui/feedback'
+import { createAccountNotifier } from '~/utils/feedback'
 import { apiErrorMessage } from '../utils/api-errors'
 import type {
   AssetProfile,
@@ -23,7 +23,7 @@ interface UseAssetConfigurationOptions {
 
 export function useAssetConfiguration(options: UseAssetConfigurationOptions) {
   const { call } = useApi()
-  const toast = createPlatformNotifier(useToast())
+  const toast = createAccountNotifier(useToast())
   const sites = ref<AssetSite[]>([])
   const profiles = ref<AssetProfile[]>([])
   const variants = ref<AssetVariant[]>([])

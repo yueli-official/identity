@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { platformAccountMenuMessages } from "@platform/ui/account-menu";
+import { accountMenuMessages } from "~/utils/account-menu";
 import {
   AccountMenu,
   type AccountMenuAction,
@@ -54,7 +54,7 @@ const handleLogout = async () => {
             :avatar-url="me.avatarUrl || ''"
             :utility-actions="utilityActions"
             :logout="handleLogout"
-            :messages="platformAccountMenuMessages"
+            :messages="accountMenuMessages"
           />
         </div>
       </div>

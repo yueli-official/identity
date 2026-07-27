@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from "@nuxt/ui";
-import { ManageEmpty } from "@platform/manage/components";
+import { ManageEmpty } from "~/components/manage";
 import { CollectionPagination } from "@yueli/ui/collection/pattern";
-import { abs } from "@platform/ui/date";
+import { abs } from "~/utils/date";
 import type { AssetGrant } from "~/types/asset-admin";
 
 const { grants, total, pageSize, actionsFor } = defineProps<{

@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
-import { SkeletonList } from '@platform/manage/components'
+import { SkeletonList } from '~/components/manage'
 import { createCollectionRouteQueryCodec, createJsonCollectionQueryPolicy, type CollectionPanelState, type CollectionWorkflow } from '@yueli/ui/collection'
 import { useVueCollectionWorkflow } from '@yueli/ui/collection/vue'
 import { createVueRouterCollectionQuerySync } from '@yueli/ui/collection/vue-router'
 import { PageHeader } from '@yueli/ui/dashboard/pattern'
 import { useMinimumLoading } from '@yueli/ui/feedback'
-import { createPlatformNotifier } from '@platform/ui/feedback'
+import { createAccountNotifier } from '~/utils/feedback'
 import type {
   AssetAdminSection,
   AssetAdminStats as Stats,
@@ -23,7 +23,7 @@ definePageMeta({ layout: 'admin', middleware: 'admin' })
 useSeoMeta({ title: '资源管理 · 控制台' })
 
 const { call } = useApi()
-const toast = createPlatformNotifier(useToast())
+const toast = createAccountNotifier(useToast())
 const router = useRouter()
 const ALL = '__all__' as const
 

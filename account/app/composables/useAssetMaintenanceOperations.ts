@@ -1,5 +1,5 @@
 import type { Ref } from 'vue'
-import { createPlatformNotifier } from '@platform/ui/feedback'
+import { createAccountNotifier } from '~/utils/feedback'
 import { apiErrorMessage } from '../utils/api-errors'
 import type {
   AssetBatchRebuildResult,
@@ -31,7 +31,7 @@ export interface AssetMaintenanceOperationFeedback {
 
 export function useAssetMaintenanceOperations(options: UseAssetMaintenanceOperationsOptions) {
   const { call } = useApi()
-  const toast = createPlatformNotifier(useToast())
+  const toast = createAccountNotifier(useToast())
   const allBackends = '__all__'
   const operationFeedback = ref<AssetMaintenanceOperationFeedback | null>(null)
 

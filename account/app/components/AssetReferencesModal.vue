@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ManageEmpty, SkeletonList } from '@platform/manage/components'
+import { ManageEmpty, SkeletonList } from '~/components/manage'
 import type { AssetReference } from '~/types/asset-admin'
 
 withDefaults(defineProps<{

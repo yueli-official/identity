@@ -1,5 +1,5 @@
 import type { Ref } from 'vue'
-import { createPlatformNotifier } from '@platform/ui/feedback'
+import { createAccountNotifier } from '~/utils/feedback'
 import { apiErrorMessage } from '../utils/api-errors'
 import type { AssetMaintenanceTask } from '~/types/asset-admin'
 
@@ -14,7 +14,7 @@ interface UseAssetMaintenanceTasksOptions {
 
 export function useAssetMaintenanceTasks(options: UseAssetMaintenanceTasksOptions) {
   const { call } = useApi()
-  const toast = createPlatformNotifier(useToast())
+  const toast = createAccountNotifier(useToast())
   const maintenanceTasks = ref<AssetMaintenanceTask[]>([])
   const controllingMaintenanceTaskId = ref('')
   const queueingSelectedRebuild = ref(false)

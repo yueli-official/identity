@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { rel } from '@platform/ui/date'
+import { rel } from '~/utils/date'
 import type { PlatformServiceResult } from '#shared/types/platform'
 
 const { service } = defineProps<{ service: PlatformServiceResult }>()

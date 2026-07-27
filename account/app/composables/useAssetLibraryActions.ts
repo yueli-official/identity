@@ -1,5 +1,5 @@
 import type { AssetItem, AssetReference, AssetSecurityDetail } from '~/types/asset-admin'
-import { createPlatformNotifier } from '@platform/ui/feedback'
+import { createAccountNotifier } from '~/utils/feedback'
 import { apiErrorMessage } from '../utils/api-errors'
 
 interface UseAssetLibraryActionsOptions {
@@ -8,7 +8,7 @@ interface UseAssetLibraryActionsOptions {
 
 export function useAssetLibraryActions(options: UseAssetLibraryActionsOptions) {
   const { call } = useApi()
-  const toast = createPlatformNotifier(useToast())
+  const toast = createAccountNotifier(useToast())
   const references = ref<AssetReference[]>([])
   const referenceAsset = ref<AssetItem | null>(null)
   const referencesOpen = computed({ get: () => !!referenceAsset.value, set: value => { if (!value) referenceAsset.value = null } })

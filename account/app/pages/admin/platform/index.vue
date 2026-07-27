@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { PageHeader } from '@yueli/ui/dashboard/pattern'
-import { rel } from '@platform/ui/date'
+import { rel } from '~/utils/date'
 import type { CapabilityGapReason, PlatformStatusResponse } from '#shared/types/platform'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })

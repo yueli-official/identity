@@ -10,10 +10,9 @@
   },
   "dependencies": {
     "@nuxt/ui": "catalog:",
-    "@platform/ui": "workspace:*",
-    "@platform/manage": "workspace:*",
     "@yueli/http-runtime": "workspace:*",
     "@yueli/ui": "workspace:*",
+    "dayjs": "1.11.13",
     "nuxt": "catalog:",
     "qrcode": "catalog:",
     "tailwindcss": "catalog:",

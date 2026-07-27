@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ManageEmpty } from '@platform/manage/components'
-import { abs } from '@platform/ui/date'
+import { ManageEmpty } from '~/components/manage'
+import { abs } from '~/utils/date'
 import type { AssetMaintenanceTask, AssetMaintenanceTaskResult } from '~/types/asset-admin'
 
 const {
