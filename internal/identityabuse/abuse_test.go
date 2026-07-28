@@ -8,6 +8,13 @@ import (
 	"github.com/yueli-official/foundation/go/abuse"
 )
 
+func TestDefinitionVersionAdvancesWithPublisherAction(t *testing.T) {
+	definition := Definition(Policy{})
+	if got, want := definition.Version, uint64(2); got != want {
+		t.Fatalf("definition version = %d, want %d after adding publisher action", got, want)
+	}
+}
+
 func TestRegistrationBudgetRejectsAtomically(t *testing.T) {
 	module, err := abuse.NewMemory(
 		abuse.MustCompile(Definition(Policy{

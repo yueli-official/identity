@@ -82,7 +82,7 @@ func Definition(policy Policy) abuse.Definition {
 		}
 	}
 	return abuse.Definition{
-		Version: 1, Consumer: "identity",
+		Version: 2, Consumer: "identity",
 		Actions: []abuse.ActionDefinition{
 			{
 				Key: ActionRegister,
