@@ -16,7 +16,7 @@ import (
 
 func main() {
 	var (
-		issuer       = flag.String("issuer", "", "Identity issuer URI")
+		issuer       = flag.String("issuer", os.Getenv("IDENTITY_ISSUER"), "Identity issuer URI (or IDENTITY_ISSUER)")
 		keyRing      = flag.String("key-ring", "", "publisher local key ring JSON path")
 		rootKey      = flag.String("root-key", "", "offline root PKCS8 PEM path")
 		rootPublic   = flag.String("root-public", "", "output trust root JSON path")

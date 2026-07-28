@@ -33,6 +33,29 @@ migrations:
     databaseUrlEnv: IDENTITY_DATABASE_URL
 
 tasks:
+  - name: account-dependencies
+    phase: prepare
+    cwd: account
+    command: [pnpm, install, --frozen-lockfile]
+  - name: publisher-trust
+    phase: prepare
+    command:
+      - go
+      - run
+      - ./cmd/publishertrust
+      - -key-ring
+      - .data/publisher/key-ring.json
+      - -root-key
+      - .data/publisher-offline/root-key.pem
+      - -root-public
+      - .data/publisher/trust-root.json
+      - -manifest
+      - .data/publisher/trust-manifest.json
+      - -version
+      - "3"
+  - name: development-seed
+    phase: prepare
+    command: [go, run, ./cmd/devseed]
   - name: backend-unit
     phase: test
     command: [go, test, ./...]
