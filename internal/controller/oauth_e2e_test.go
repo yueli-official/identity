@@ -212,6 +212,101 @@ func TestE2E_GoogleLogin(t *testing.T) {
 	}
 }
 
+func TestE2E_GoogleBindRequiresLiveOriginalSession(t *testing.T) {
+	const stateSecret = "0123456789abcdef0123456789abcdef"
+	const returnTo = "/profile"
+
+	store := repo.NewMemory()
+	svc := logic.New(store, logic.DefaultConfig())
+	ctx := context.Background()
+	identity, err := svc.Register(ctx, logic.RegisterInput{
+		Email: "bind@example.com", Password: "correct horse battery",
+	})
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	login, err := svc.Login(ctx, logic.LoginInput{
+		Email: identity.Email, Password: "correct horse battery",
+	})
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+
+	provider := &fakeProvider{
+		authBase: "https://accounts.example.test",
+		user: oauthlogin.UserInfo{
+			ProviderUID: "bind-sub", Email: identity.Email,
+			EmailVerified: true, DisplayName: "Bind",
+		},
+	}
+	oauthCtl := controller.NewOAuth(svc, provider, false, []byte(stateSecret), "/login")
+	server := g.Server(t.Name())
+	server.SetAddr("127.0.0.1:0")
+	server.SetDumpRouterMap(false)
+	server.Group("/", func(group *ghttp.RouterGroup) {
+		group.GET("/api/v1/auth/oauth/google/start", oauthCtl.GoogleStart)
+		group.GET("/api/v1/auth/oauth/google/callback", oauthCtl.GoogleCallback)
+	})
+	server.Start()
+	defer server.Shutdown()
+
+	base := fmt.Sprintf("http://127.0.0.1:%d", server.GetListenedPort())
+	baseURL, err := url.Parse(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jar.SetCookies(baseURL, []*http.Cookie{{
+		Name: "id_session", Value: login.SessionID, Path: "/",
+	}})
+	client := &http.Client{
+		Jar: jar,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+
+	start, err := client.Get(base + "/api/v1/auth/oauth/google/start?" + url.Values{
+		"intent": {"bind"}, "return_to": {returnTo},
+	}.Encode())
+	if err != nil {
+		t.Fatalf("bind start: %v", err)
+	}
+	start.Body.Close()
+	authorizeURL, err := url.Parse(start.Header.Get("Location"))
+	if err != nil {
+		t.Fatalf("parse authorize URL: %v", err)
+	}
+	state := authorizeURL.Query().Get("state")
+	if state == "" {
+		t.Fatal("bind start did not include state")
+	}
+
+	if err := svc.Logout(ctx, login.SessionID); err != nil {
+		t.Fatalf("revoke original session: %v", err)
+	}
+	callback, err := client.Get(base + "/api/v1/auth/oauth/google/callback?" + url.Values{
+		"code": {"good-code"}, "state": {state},
+	}.Encode())
+	if err != nil {
+		t.Fatalf("bind callback: %v", err)
+	}
+	callback.Body.Close()
+	if got := callback.Header.Get("Location"); got != returnTo+"?error=oauth_bind" {
+		t.Fatalf("bind callback Location = %q", got)
+	}
+	credentials, err := store.ListOAuthCredentials(ctx, identity.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(credentials) != 0 {
+		t.Fatalf("revoked session linked credentials: %+v", credentials)
+	}
+}
+
 // oauthStateCookieName mirrors the controller's oauthStateCookie const (which is
 // unexported and lives in the controller package, not this _test package).
 const oauthStateCookieName = "g_oauth_state"

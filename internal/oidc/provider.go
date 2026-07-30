@@ -2,6 +2,8 @@ package oidc
 
 import (
 	"context"
+	"net"
+	"net/url"
 	"time"
 
 	"github.com/ory/fosite"
@@ -16,6 +18,9 @@ type Config struct {
 	AccessTTL    time.Duration
 	IDTTL        time.Duration
 	RefreshTTL   time.Duration // refresh token lifespan (e.g. 30d)
+	// AllowPrivateHTTPRedirects is only for explicit local-device environments.
+	// Production keeps the Fosite HTTPS/localhost policy.
+	AllowPrivateHTTPRedirects bool
 }
 
 // NewProvider builds the fosite OAuth2 provider with a JWT access-token
@@ -34,6 +39,7 @@ func NewProvider(store fosite.Storage, cfg Config, keyGetter func(context.Contex
 		EnforcePKCEForPublicClients:    true,
 		EnablePKCEPlainChallengeMethod: false,
 		GlobalSecret:                   cfg.GlobalSecret,
+		RedirectSecureChecker:          redirectSecureChecker(cfg.AllowPrivateHTTPRedirects),
 	}
 	strat := &compose.CommonStrategy{
 		CoreStrategy: compose.NewOAuth2JWTStrategy(
@@ -62,4 +68,17 @@ func NewProvider(store fosite.Storage, cfg Config, keyGetter func(context.Contex
 		// service-scope signed delivery.
 		compose.OAuth2ClientCredentialsGrantFactory,
 	)
+}
+
+func redirectSecureChecker(allowPrivateHTTP bool) func(context.Context, *url.URL) bool {
+	return func(ctx context.Context, redirectURI *url.URL) bool {
+		if fosite.IsRedirectURISecure(ctx, redirectURI) {
+			return true
+		}
+		if !allowPrivateHTTP || redirectURI == nil || redirectURI.Scheme != "http" {
+			return false
+		}
+		ip := net.ParseIP(redirectURI.Hostname())
+		return ip != nil && (ip.IsPrivate() || ip.IsLoopback())
+	}
 }

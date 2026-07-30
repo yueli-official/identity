@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/lib/pq"
-	_ "github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
 )
 

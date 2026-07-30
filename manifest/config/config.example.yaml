@@ -26,6 +26,11 @@ redis:
     db: 0
 auth:
   sessionIdleTtl: "720h" # 30 days; Redis is a cache, PG remains the durable session source
+pat:
+  # Optional independent root. When empty, Identity derives the PAT HMAC key
+  # from the required oidc.globalSecret; no fixed production fallback is used.
+  hmacSecret: ""
+  maxPerUser: 20
 webauthn:
   # rpId is the registrable account-domain suffix, never a URL. Every origin
   # must exactly match a browser origin allowed to create/use credentials.
@@ -55,6 +60,9 @@ oidc:
   issuer: "http://localhost:8081"
   audience: "identity-api" # audience for scoped machine discovery tokens
   refreshTtl: "720h" # 30 days; access/id tokens stay 10m (set in code)
+  # Local-device environments may explicitly allow HTTP callbacks to RFC1918
+  # IP addresses. Keep false everywhere else; public HTTP remains rejected.
+  allowPrivateHttpRedirects: false
   globalSecret: "" # set via env GF_OIDC_GLOBALSECRET (>=32 bytes), never commit a real value
   google:
     clientId: "" # set via env GF_OIDC_GOOGLE_CLIENTID
@@ -89,7 +97,7 @@ githubBinding:
   # together; the callback URL must exactly match the GitHub App registration.
   clientId: "" # env GF_GITHUBBINDING_CLIENTID
   clientSecret: "" # secret manager: GF_GITHUBBINDING_CLIENTSECRET
-  redirectUrl: "https://account.example.com/api/v1/account/github-bindings/callback"
+  redirectUrl: "" # e.g. https://account.example.com/api/v1/account/github-bindings/callback
   webhookSecret: "" # secret manager: GF_GITHUBBINDING_WEBHOOKSECRET
   attemptTtl: "10m"
 maintenance:

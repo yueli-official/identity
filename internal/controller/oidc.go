@@ -316,7 +316,10 @@ func (c *OIDCController) Token(r *ghttp.Request) {
 		c.provider.WriteAccessError(ctx, w, accessReq, err)
 		return
 	}
-	c.refreshRolesClaim(ctx, accessReq)
+	if err := c.refreshRolesClaim(ctx, accessReq); err != nil {
+		c.provider.WriteAccessError(ctx, w, accessReq, err)
+		return
+	}
 	c.applyServiceClaims(ctx, accessReq)
 	resp, err := c.provider.NewAccessResponse(ctx, accessReq)
 	if err != nil {
@@ -329,21 +332,33 @@ func (c *OIDCController) Token(r *ghttp.Request) {
 // refreshRolesClaim re-fetches the identity's current roles and overwrites the
 // "roles" claim on the (already deep-cloned, live) refresh-grant session, so the
 // freshly-signed access-token JWT — and the id token if it is re-minted — carry
-// up-to-date roles. No-op unless this is a refresh_token grant that was granted
-// the "roles" scope. The roles claim must mirror BuildSession's authorize-time
-// shape (a non-nil slice). It is a no-op on the authorization_code grant, whose
-// session already holds fresh authorize-time roles.
-func (c *OIDCController) refreshRolesClaim(ctx context.Context, accessReq fosite.AccessRequester) {
-	if !accessReq.GetGrantTypes().ExactOne("refresh_token") || !accessReq.GetGrantedScopes().Has("roles") {
-		return
+// up-to-date roles. Every refresh grant revalidates the current account
+// lifecycle, even when the client did not request roles. When roles were
+// granted, the claim mirrors BuildSession's non-nil authorize-time shape.
+func (c *OIDCController) refreshRolesClaim(ctx context.Context, accessReq fosite.AccessRequester) error {
+	if !accessReq.GetGrantTypes().ExactOne("refresh_token") {
+		return nil
 	}
 	sess, ok := accessReq.GetSession().(*oidc.Session)
 	if !ok || sess.JWTClaims == nil {
-		return
+		return fosite.ErrInvalidGrant
 	}
-	roles, err := c.svc.GetRoles(ctx, sess.JWTClaims.Subject)
+	identity, err := c.svc.GetByID(ctx, sess.JWTClaims.Subject)
+	if errors.Is(err, repo.ErrIdentityMissing) {
+		return fosite.ErrInvalidGrant
+	}
 	if err != nil {
-		return // keep the cloned authorize-time roles rather than dropping them
+		return fosite.ErrTemporarilyUnavailable.WithWrap(err)
+	}
+	if identity.Status != model.StatusActive {
+		return fosite.ErrInvalidGrant
+	}
+	if !accessReq.GetGrantedScopes().Has("roles") {
+		return nil
+	}
+	roles, err := c.svc.GetRoles(ctx, identity.ID)
+	if err != nil {
+		return fosite.ErrTemporarilyUnavailable.WithWrap(err)
 	}
 	if roles == nil {
 		roles = []string{}
@@ -360,6 +375,7 @@ func (c *OIDCController) refreshRolesClaim(ctx context.Context, accessReq fosite
 	if sess.DefaultSession != nil && sess.DefaultSession.Claims != nil && sess.DefaultSession.Claims.Extra != nil {
 		sess.DefaultSession.Claims.Extra["roles"] = roles
 	}
+	return nil
 }
 
 // applyServiceClaims stamps the service identity onto a client_credentials
@@ -435,7 +451,7 @@ func (c *OIDCController) Userinfo(r *ghttp.Request) {
 
 	sub := ar.GetSession().GetSubject()
 	id, err := c.svc.GetByID(ctx, sub)
-	if err != nil {
+	if err != nil || id.Status != model.StatusActive {
 		r.Response.WriteHeader(401)
 		r.Response.WriteJson(map[string]string{"error": "invalid_token"})
 		return

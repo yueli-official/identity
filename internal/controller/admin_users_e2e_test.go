@@ -182,6 +182,11 @@ func TestAdminUserManagement(t *testing.T) {
 			t.Assert(gjson.New(body).Get("total").Int(), 0)
 			_, err := svc.Login(ctx, logic.LoginInput{Email: "target@b.com", Password: "admin reset password phrase"})
 			t.AssertNE(err, nil)
+
+			statusPath := "/api/v1/admin/users/" + targetID + "/status"
+			body, status = do(http.MethodPut, statusPath, `{"status":"active"}`, adminHdr)
+			t.Assert(status, 400)
+			t.Assert(gjson.New(body).Get("code").String(), "identity.invalid_status")
 		}
 	})
 }

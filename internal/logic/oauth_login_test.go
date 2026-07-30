@@ -6,6 +6,7 @@ import (
 
 	"github.com/yueli-official/identity/internal/iderr"
 	"github.com/yueli-official/identity/internal/logic"
+	"github.com/yueli-official/identity/internal/model"
 	"github.com/yueli-official/identity/internal/repo"
 )
 
@@ -76,5 +77,35 @@ func TestOAuthLogin_NoEmail_Rejected(t *testing.T) {
 	})
 	if codeOfErr(err) != iderr.CodeOAuthNoEmail {
 		t.Fatalf("want oauth_no_email, got %v", err)
+	}
+}
+
+func TestOAuthLogin_DoesNotLinkCredentialToDisabledIdentity(t *testing.T) {
+	ctx := context.Background()
+	m := repo.NewMemory()
+	s := logic.New(m, logic.DefaultConfig())
+	base, err := m.CreateIdentityWithProfile(ctx, repo.NewIdentityInput{
+		Email: "disabled@example.com", DisplayName: "Disabled", PasswordHash: "h",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := m.SetIdentityStatus(ctx, base.ID, model.StatusDisabled); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = s.OAuthLogin(ctx, logic.OAuthLoginInput{
+		Provider: "google", ProviderUID: "disabled-provider-sub",
+		Email: "disabled@example.com", EmailVerified: true,
+	})
+	if codeOfErr(err) != iderr.CodeAccountDisabled {
+		t.Fatalf("want account disabled, got %v", err)
+	}
+	credentials, err := m.ListOAuthCredentials(ctx, base.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(credentials) != 0 {
+		t.Fatalf("disabled identity gained credentials: %+v", credentials)
 	}
 }

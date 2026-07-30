@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gogf/gf/v2/frame/g"
@@ -116,6 +117,7 @@ func newRuntimeRepositories(openAPIExport bool) runtimeRepositories {
 func main() {
 	ctx := gctx.New()
 	var err error
+	identityruntime.EnableEnvironmentConfig()
 	openAPIExport := identityruntime.OpenAPIRequested()
 	if !openAPIExport {
 		shutdown, err := identityruntime.StartTelemetry(ctx, "identity-api")
@@ -244,11 +246,13 @@ func main() {
 		}()
 	}
 
-	// PAT HMAC secret: warn at startup when falling back to the insecure dev key.
-	cfg.PATHMACSecret = g.Cfg().MustGet(ctx, "pat.hmacSecret").String()
-	if cfg.PATHMACSecret == "" {
-		g.Log().Warning(ctx, "pat.hmacSecret not set; using insecure dev fallback key")
-	}
+	// PATs use a domain-separated key. A dedicated secret may be rotated or
+	// managed independently; otherwise the already-required OIDC root secret is
+	// used as input. Production never reaches the package's hermetic test default.
+	cfg.PATHMACSecret = patHMACSecret(
+		g.Cfg().MustGet(ctx, "pat.hmacSecret").String(),
+		globalSecret,
+	)
 	if maxPerUser := g.Cfg().MustGet(ctx, "pat.maxPerUser", 0).Int(); maxPerUser > 0 {
 		cfg.PATMaxPerUser = maxPerUser
 	}
@@ -655,6 +659,9 @@ func main() {
 		AccessTTL:    10 * time.Minute,
 		IDTTL:        10 * time.Minute,
 		RefreshTTL:   refreshTTL,
+		AllowPrivateHTTPRedirects: g.Cfg().
+			MustGet(ctx, "oidc.allowPrivateHttpRedirects", false).
+			Bool(),
 	}, mgr.KeyGetter)
 	oidcCtl := controller.NewOIDC(
 		provider, mgr, svc, repositories.clients, issuer, loginURL,
@@ -828,4 +835,11 @@ func main() {
 
 	g.Log().Info(ctx, "identity-service starting")
 	s.Run()
+}
+
+func patHMACSecret(configured, global string) string {
+	if secret := strings.TrimSpace(configured); secret != "" {
+		return secret
+	}
+	return global
 }

@@ -1,6 +1,7 @@
 package controller_test
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -27,7 +28,7 @@ func TestHealthz(t *testing.T) {
 		client := g.Client()
 		client.SetPrefix(fmt.Sprintf("http://127.0.0.1:%d", port))
 
-		resp := client.GetContent(nil, "/healthz")
+		resp := client.GetContent(context.Background(), "/healthz")
 		t.Assert(g.NewVar(resp).MapStrAny()["status"], "up")
 	})
 }

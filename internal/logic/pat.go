@@ -8,6 +8,7 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 
 	"github.com/yueli-official/identity/internal/iderr"
+	"github.com/yueli-official/identity/internal/model"
 	"github.com/yueli-official/identity/internal/pat"
 	"github.com/yueli-official/identity/internal/repo"
 )
@@ -135,13 +136,20 @@ func (s *Service) VerifyPAT(ctx context.Context, presented string) (PATVerificat
 		return PATVerification{}, iderr.PATInvalid()
 	}
 
-	// 3. Check expiry: !After means at-or-past expiry boundary.
+	// 3. A PAT cannot outlive the account's active lifecycle. Status changes
+	// must take effect even when the token itself has no expiry.
+	identity, err := s.store.GetByID(ctx, row.IdentityID)
+	if err != nil || identity.Status != model.StatusActive {
+		return PATVerification{}, iderr.PATInvalid()
+	}
+
+	// 4. Check expiry: !After means at-or-past expiry boundary.
 	now := s.now()
 	if row.ExpiresAt != nil && !row.ExpiresAt.After(now) {
 		return PATVerification{}, iderr.PATExpired()
 	}
 
-	// 4. Throttled touch (best-effort: at most once per minute).
+	// 5. Throttled touch (best-effort: at most once per minute).
 	if row.LastUsedAt == nil || now.Sub(*row.LastUsedAt) >= time.Minute {
 		if err := s.store.TouchPATLastUsed(ctx, row.ID, now); err != nil {
 			g.Log().Errorf(ctx, "pat: touch last_used %d failed: %v", row.ID, err)

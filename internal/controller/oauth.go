@@ -104,6 +104,14 @@ func (c *OAuthController) GoogleCallback(r *ghttp.Request) {
 	// session) and return to the account page. returnTo is the same-origin page
 	// the account UI started the bind from.
 	if bind != "" {
+		current, sessionErr := c.svc.Me(
+			ctx,
+			r.Cookie.Get(sessionCookie, "").String(),
+		)
+		if sessionErr != nil || current.ID != bind {
+			r.Response.RedirectTo(withError(returnTo, "oauth_bind"))
+			return
+		}
 		if berr := c.svc.BindOAuth(ctx, bind, c.google.Name(), ui.ProviderUID, ui.Email, ui.EmailVerified); berr != nil {
 			r.Response.RedirectTo(withError(returnTo, "oauth_bind"))
 			return

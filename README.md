@@ -1,7 +1,7 @@
 # 身份服务
 
 - 生命周期：活跃的平台服务
-- 权威来源：本仓源码、版本化迁移、`doctor.yaml` 和生成的 OpenAPI
+- 权威来源：本仓源码、版本化迁移、配置模板和生成的 OpenAPI
 - 消费者：Account、全部产品 BFF/API、Asset 及其他平台服务
 - 验证：进入本目录并设置 `GOWORK=off` 后执行 `go test ./...`
 
@@ -81,20 +81,9 @@ pnpm --dir nuxt pack --dry-run
 
 ## 开发
 
-仓库自治清单位于 `doctor.yaml`。安装统筹仓库提供的 Doctor CLI 后，在本仓执行：
-
-```text
-doctor check
-doctor test
-doctor up --detach
-doctor status --check
-doctor logs identity
-doctor down
-```
-
-`check` 不启动进程或修改数据库；缺少运行配置、数据库 URL 或可选 Asset/Notification 地址时会明确给出警告。
-`up` 要求先把 `manifest/config/config.example.yaml` 复制为忽略的 `config.yaml`。必须提供 PostgreSQL、Redis
-和至少 32 字节且稳定的 `GF_OIDC_GLOBALSECRET`；`oidc.issuer` 必须等于外部可访问的 Identity origin。
+单仓源码开发要求先把 `manifest/config/config.example.yaml` 复制为忽略的 `config.yaml`。必须提供
+PostgreSQL、Redis 和至少 32 字节且稳定的 `GF_OIDC_GLOBALSECRET`；`oidc.issuer` 必须等于外部可访问的
+Identity origin。需要与 Asset 或其他消费者一起联调时，由 Workspace 的环境定义统一准备、启停和收集日志。
 
 ```powershell
 $env:GOWORK = "off"
@@ -113,6 +102,35 @@ pnpm --dir account build
 pnpm --dir nuxt test
 pnpm --dir nuxt pack --dry-run
 ```
+
+## Docker Compose 部署
+
+根目录 `compose.yaml` 是本仓的标准独立部署入口，包含 Identity、Account、schema migration、
+Publisher 本地信任初始化、PostgreSQL 和 Redis。先复制环境模板并替换两个 `REQUIRED` 值；部署在 HTTPS
+反向代理后时还要设置 `IDENTITY_COOKIE_SECURE=true`，并把 issuer、Account origin、WebAuthn RP ID/origin
+改成真实公网值。
+
+```powershell
+Copy-Item .env.compose.example .env
+docker compose config
+docker compose up -d --build
+docker compose down
+```
+
+如果 PostgreSQL 和 Redis 已由基础设施提供，只需把 `.env` 中的数据库、迁移 URL 和 Redis 地址指向现有
+实例，再使用 external override；它会保留迁移和 Publisher 初始化，但不会启动本仓的 PostgreSQL/Redis：
+
+```powershell
+docker compose -f compose.yaml -f compose.external.yaml config
+docker compose -f compose.yaml -f compose.external.yaml up -d --build
+docker compose -f compose.yaml -f compose.external.yaml down
+```
+
+`compose.external.yaml` 使用 Compose 2.24.4 引入的 `!override`/`!reset`。生产环境可以把
+`IDENTITY_IMAGE` 与 `IDENTITY_ACCOUNT_IMAGE` 指向已发布镜像而不在目标机编译。`identity-publisher-offline`
+卷只挂载到一次性初始化容器，运行中的 Identity 只能看到 leaf key ring、trust root 和签名后的 manifest。
+正式多实例部署应把 `publisher.mode` 替换为 KMS/HSM adapter，不把这个单机 local-file 初始化当作生产根密钥
+管理方案。
 
 `publishertrust` 是离线运维命令。Identity runtime 只配置 leaf signing key、root 公钥和已签 manifest；
 offline root 私钥不得复制到运行环境。生产环境使用 KMS/HSM leaf adapter，并通过受控发布流程递增

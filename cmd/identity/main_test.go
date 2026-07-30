@@ -25,3 +25,16 @@ func TestOpenAPIRepositoriesAreHermetic(t *testing.T) {
 		t.Fatalf("initialize OpenAPI signing keys without PostgreSQL: %v", err)
 	}
 }
+
+func TestPATHMACSecret(t *testing.T) {
+	t.Run("dedicated secret wins", func(t *testing.T) {
+		if got := patHMACSecret("  dedicated-secret  ", "global-secret"); got != "dedicated-secret" {
+			t.Fatalf("patHMACSecret() = %q", got)
+		}
+	})
+	t.Run("global secret is the safe default", func(t *testing.T) {
+		if got := patHMACSecret("", "global-secret"); got != "global-secret" {
+			t.Fatalf("patHMACSecret() = %q", got)
+		}
+	})
+}

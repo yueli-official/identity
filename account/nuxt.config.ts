@@ -1,6 +1,10 @@
 // Nuxt 4 config for the account-center app.
 // @nuxt/fonts ships bundled inside @nuxt/ui v4, so it is not listed as a
 // separate module here (@nuxt/ui registers it automatically).
+const identityApiBase = (
+  process.env.NUXT_API_BASE || "http://127.0.0.1:8081"
+).replace(/\/+$/, "");
+
 export default defineNuxtConfig({
   modules: ["@nuxt/ui", "@yueli/ui"],
   css: ["~/assets/css/main.css"],
@@ -17,7 +21,7 @@ export default defineNuxtConfig({
     // a relative /api on the server falls through to the SPA catch-all. Hitting
     // the backend by absolute URL fixes SSR auth (hard loads / deep links).
     // Override in prod with NUXT_API_BASE.
-    apiBase: process.env.NUXT_API_BASE || "http://127.0.0.1:8081",
+    apiBase: identityApiBase,
     platformCatalogFingerprint:
       process.env.NUXT_PLATFORM_CATALOG_FINGERPRINT || "local-unversioned",
     platformEnvironment: process.env.NUXT_PLATFORM_ENVIRONMENT || "local",
@@ -39,10 +43,10 @@ export default defineNuxtConfig({
     // icon (e.g. dropdown items that mount on open). Backend routes are all
     // under /api/v1.
     devProxy: {
-      "/api/v1": { target: "http://127.0.0.1:8081/api/v1", changeOrigin: true },
-      "/oauth2": { target: "http://127.0.0.1:8081/oauth2", changeOrigin: true },
+      "/api/v1": { target: `${identityApiBase}/api/v1`, changeOrigin: true },
+      "/oauth2": { target: `${identityApiBase}/oauth2`, changeOrigin: true },
       "/.well-known": {
-        target: "http://127.0.0.1:8081/.well-known",
+        target: `${identityApiBase}/.well-known`,
         changeOrigin: true,
       },
     },

@@ -6,3 +6,4 @@ account/pnpm-debug.log*
 nuxt/node_modules/
 nuxt/pnpm-debug.log*
 .release/
+.env

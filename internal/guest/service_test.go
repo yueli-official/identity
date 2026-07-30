@@ -16,8 +16,8 @@ func fixture(t *testing.T) (*guest.Service, *repo.Memory, *oidc.Manager, time.Ti
 	t.Helper()
 	store := repo.NewMemory()
 	store.SetClient(model.OIDCClient{
-		ID:        "gallery-main-web",
-		Audiences: []string{"gallery-main-web", "asset-api"},
+		ID:        "consumer-web",
+		Audiences: []string{"consumer-web", "asset-api"},
 	})
 	keys, err := oidc.NewManager(context.Background(), store)
 	if err != nil {
@@ -35,14 +35,14 @@ func fixture(t *testing.T) (*guest.Service, *repo.Memory, *oidc.Manager, time.Ti
 
 func TestCreateUsesRequestedTTLAndReturnsEffectiveExpiry(t *testing.T) {
 	service, _, _, now := fixture(t)
-	created, err := service.Create(context.Background(), "gallery-main-web", 10*24*time.Hour)
+	created, err := service.Create(context.Background(), "consumer-web", 10*24*time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if created.EffectiveTTL != 10*24*time.Hour || !created.ExpiresAt.Equal(now.Add(10*24*time.Hour)) {
 		t.Fatalf("created = %+v", created)
 	}
-	clamped, err := service.Create(context.Background(), "gallery-main-web", 90*24*time.Hour)
+	clamped, err := service.Create(context.Background(), "consumer-web", 90*24*time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,11 +53,11 @@ func TestCreateUsesRequestedTTLAndReturnsEffectiveExpiry(t *testing.T) {
 
 func TestTokenIsShortLivedGuestAndResourceBound(t *testing.T) {
 	service, _, keys, now := fixture(t)
-	created, err := service.Create(context.Background(), "gallery-main-web", 30*24*time.Hour)
+	created, err := service.Create(context.Background(), "consumer-web", 30*24*time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
-	issued, err := service.Token(context.Background(), "gallery-main-web", created.SessionToken, "asset-api")
+	issued, err := service.Token(context.Background(), "consumer-web", created.SessionToken, "asset-api")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,32 +75,32 @@ func TestTokenIsShortLivedGuestAndResourceBound(t *testing.T) {
 		t.Fatal(err)
 	}
 	subjectKind, _ := principal.Claim("subject_kind")
-	if principal.Subject != created.SubjectID || principal.ClientID != "gallery-main-web" || subjectKind != "guest" {
+	if principal.Subject != created.SubjectID || principal.ClientID != "consumer-web" || subjectKind != "guest" {
 		t.Fatalf("principal = %+v", principal)
 	}
-	if _, err := service.Token(context.Background(), "gallery-main-web", created.SessionToken, "commerce-api"); err == nil {
+	if _, err := service.Token(context.Background(), "consumer-web", created.SessionToken, "commerce-api"); err == nil {
 		t.Fatal("unregistered audience was accepted")
 	}
 }
 
 func TestClaimIsIdempotentForOneUserAndRejectsAnother(t *testing.T) {
 	service, _, keys, now := fixture(t)
-	created, err := service.Create(context.Background(), "gallery-main-web", time.Hour)
+	created, err := service.Create(context.Background(), "consumer-web", time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
-	first, err := service.Claim(context.Background(), "gallery-main-web", created.SessionToken, "11111111-1111-4111-8111-111111111111")
+	first, err := service.Claim(context.Background(), "consumer-web", created.SessionToken, "11111111-1111-4111-8111-111111111111")
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := service.Claim(context.Background(), "gallery-main-web", created.SessionToken, "11111111-1111-4111-8111-111111111111")
+	second, err := service.Claim(context.Background(), "consumer-web", created.SessionToken, "11111111-1111-4111-8111-111111111111")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if first.SubjectID != second.SubjectID || first.UserID != second.UserID {
 		t.Fatalf("claim is not idempotent: %+v %+v", first, second)
 	}
-	assertion, err := service.ClaimForAudience(context.Background(), "gallery-main-web", created.SessionToken, first.UserID, "asset-api")
+	assertion, err := service.ClaimForAudience(context.Background(), "consumer-web", created.SessionToken, first.UserID, "asset-api")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +116,7 @@ func TestClaimIsIdempotentForOneUserAndRejectsAnother(t *testing.T) {
 	if principal.Subject != first.UserID || !principal.HasScope("guest:claim") || guestSubject != created.SubjectID {
 		t.Fatalf("claim principal = %+v", principal)
 	}
-	if _, err := service.Claim(context.Background(), "gallery-main-web", created.SessionToken, "22222222-2222-4222-8222-222222222222"); err == nil {
+	if _, err := service.Claim(context.Background(), "consumer-web", created.SessionToken, "22222222-2222-4222-8222-222222222222"); err == nil {
 		t.Fatal("guest session was claimed by a second user")
 	}
 }

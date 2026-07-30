@@ -1,0 +1,149 @@
+name: yueli-identity
+
+services:
+  identity:
+    image: ${IDENTITY_IMAGE:-yueli/identity:local}
+    build:
+      context: .
+    restart: unless-stopped
+    environment:
+      GF_GCFG_FILE: /app/manifest/config/config.example.yaml
+      GF_SERVER_ADDRESS: 0.0.0.0:8081
+      GF_DATABASE_DEFAULT_TYPE: pgsql
+      GF_DATABASE_DEFAULT_HOST: ${IDENTITY_DATABASE_HOST:-identity-postgres}
+      GF_DATABASE_DEFAULT_PORT: ${IDENTITY_DATABASE_PORT:-5432}
+      GF_DATABASE_DEFAULT_USER: ${IDENTITY_DATABASE_USER:-postgres}
+      GF_DATABASE_DEFAULT_PASS: ${IDENTITY_POSTGRES_PASSWORD:?set IDENTITY_POSTGRES_PASSWORD in .env}
+      GF_DATABASE_DEFAULT_NAME: ${IDENTITY_DATABASE_NAME:-identity}
+      GF_DATABASE_DEFAULT_EXTRA: sslmode=${IDENTITY_DATABASE_SSLMODE:-disable}
+      GF_REDIS_DEFAULT_ADDRESS: ${IDENTITY_REDIS_ADDRESS:-identity-redis:6379}
+      GF_REDIS_DEFAULT_PASS: ${IDENTITY_REDIS_PASSWORD:-}
+      GF_OIDC_ISSUER: ${IDENTITY_ISSUER:-http://localhost:8081}
+      GF_OIDC_GLOBALSECRET: ${IDENTITY_GLOBAL_SECRET:?set IDENTITY_GLOBAL_SECRET in .env}
+      GF_ACCOUNT_LOGINURL: ${IDENTITY_ACCOUNT_ORIGIN:-http://localhost:3000}/login
+      GF_ACCOUNT_BASEURL: ${IDENTITY_ACCOUNT_ORIGIN:-http://localhost:3000}
+      GF_WEBAUTHN_RPID: ${IDENTITY_WEBAUTHN_RPID:-localhost}
+      GF_WEBAUTHN_ORIGINS: ${IDENTITY_WEBAUTHN_ORIGINS:-["http://localhost:3000"]}
+      GF_COOKIE_SECURE: ${IDENTITY_COOKIE_SECURE:-false}
+      GF_PUBLISHER_MODE: local-file
+      GF_PUBLISHER_KEYRINGFILE: /app/.data/publisher/key-ring.json
+      GF_PUBLISHER_TRUSTROOTFILE: /app/.data/publisher/trust-root.json
+      GF_PUBLISHER_TRUSTMANIFESTFILE: /app/.data/publisher/trust-manifest.json
+    ports:
+      - "${IDENTITY_PORT:-8081}:8081"
+    volumes:
+      - identity-publisher:/app/.data/publisher
+    depends_on:
+      identity-postgres:
+        condition: service_healthy
+      identity-redis:
+        condition: service_healthy
+      identity-migrate:
+        condition: service_completed_successfully
+      identity-publisher-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/identity-healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  identity-account:
+    image: ${IDENTITY_ACCOUNT_IMAGE:-yueli/identity-account:local}
+    build:
+      context: ./account
+    restart: unless-stopped
+    environment:
+      NUXT_API_BASE: http://identity:8081
+      NUXT_PUBLIC_IDENTITY_AUDIENCE: identity-api
+      NUXT_PLATFORM_ENVIRONMENT: ${IDENTITY_PLATFORM_ENVIRONMENT:-standalone}
+    ports:
+      - "${IDENTITY_ACCOUNT_PORT:-3000}:3000"
+    depends_on:
+      identity:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3000/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  identity-migrate:
+    image: migrate/migrate:v4.19.1
+    restart: "no"
+    command:
+      - -path=/migrations
+      - -database=${IDENTITY_DATABASE_URL:?set IDENTITY_DATABASE_URL in .env}
+      - up
+    volumes:
+      - ./manifest/sql/migrations:/migrations:ro
+    depends_on:
+      identity-postgres:
+        condition: service_healthy
+
+  identity-publisher-init:
+    image: ${IDENTITY_IMAGE:-yueli/identity:local}
+    build:
+      context: .
+    restart: "no"
+    entrypoint: ["/usr/local/bin/publishertrust"]
+    command:
+      - -issuer
+      - ${IDENTITY_ISSUER:-http://localhost:8081}
+      - -key-ring
+      - /app/.data/publisher/key-ring.json
+      - -root-key
+      - /app/.data/publisher-offline/root-key.pem
+      - -root-public
+      - /app/.data/publisher/trust-root.json
+      - -manifest
+      - /app/.data/publisher/trust-manifest.json
+      - -version
+      - "1"
+    volumes:
+      - identity-publisher:/app/.data/publisher
+      - identity-publisher-offline:/app/.data/publisher-offline
+
+  identity-postgres:
+    image: postgres:18.4-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${IDENTITY_DATABASE_USER:-postgres}
+      POSTGRES_PASSWORD: ${IDENTITY_POSTGRES_PASSWORD:?set IDENTITY_POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${IDENTITY_DATABASE_NAME:-identity}
+    volumes:
+      - identity-postgres:/var/lib/postgresql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  identity-redis:
+    image: redis:8.4.5-alpine
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+    volumes:
+      - identity-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  identity-postgres:
+  identity-redis:
+  identity-publisher:
+  identity-publisher-offline:

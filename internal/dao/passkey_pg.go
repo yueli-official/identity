@@ -253,10 +253,15 @@ func (p *PG) CompletePasskeyRegistration(
 	return p.db.Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
 		tx = tx.Ctx(ctx)
 		session, err := tx.GetValue(`
-SELECT id
-FROM identity_sessions
-WHERE id = ? AND identity_id = ? AND expires_at > NOW()
-FOR SHARE
+SELECT sessions.id
+FROM identity_sessions AS sessions
+JOIN identities
+  ON identities.id = sessions.identity_id
+ AND identities.status = 'active'
+WHERE sessions.id = ?
+  AND sessions.identity_id = ?
+  AND sessions.expires_at > NOW()
+FOR SHARE OF sessions
 `, ceremony.SessionID, ceremony.IdentityID)
 		if err != nil {
 			return err

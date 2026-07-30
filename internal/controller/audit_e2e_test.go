@@ -284,7 +284,7 @@ func TestE2E_AuditLogging(t *testing.T) {
 			// the same session now passes the admin gate. Assert that first (confirms
 			// a promoted user gets 200), then create a fresh plain user to exercise
 			// the true non-admin 403 path:
-			body, status := doGet("/api/v1/admin/audit", cookieHdr(userSID))
+			_, status := doGet("/api/v1/admin/audit", cookieHdr(userSID))
 			t.Assert(status, 200)
 
 			_, _ = doPost("/api/v1/auth/register",
@@ -298,9 +298,9 @@ func TestE2E_AuditLogging(t *testing.T) {
 			plainSID := extractSessionCookie(plainLoginHdr)
 			t.AssertNE(plainSID, "")
 
-			body, status = doGet("/api/v1/admin/audit", cookieHdr(plainSID))
+			plainBody, status := doGet("/api/v1/admin/audit", cookieHdr(plainSID))
 			t.Assert(status, 403)
-			t.Assert(gjson.New(body).Get("code").String(), "identity.forbidden")
+			t.Assert(gjson.New(plainBody).Get("code").String(), "identity.forbidden")
 		}
 
 		// 4c. Admin session → 200 success

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/yueli-official/identity/internal/iderr"
+	"github.com/yueli-official/identity/internal/model"
 	"github.com/yueli-official/identity/internal/pat"
 	"github.com/yueli-official/identity/internal/repo"
 )
@@ -280,6 +281,7 @@ func TestVerifyPAT_Success(t *testing.T) {
 	m := repo.NewMemory()
 	svc, _ := newPATSvcClk(m)
 	ctx := context.Background()
+	seedPATIdentity(t, m, "id-1")
 
 	plaintext, _, err := svc.CreatePAT(ctx, "id-1", "tok", []string{"read", "write"}, 0)
 	if err != nil {
@@ -311,6 +313,7 @@ func TestVerifyPAT_Expired(t *testing.T) {
 	m := repo.NewMemory()
 	svc, nowPtr := newPATSvcClk(m)
 	ctx := context.Background()
+	seedPATIdentity(t, m, "id-1")
 
 	// create with 1-day expiry
 	plaintext, _, err := svc.CreatePAT(ctx, "id-1", "tok", []string{"read"}, 1)
@@ -335,6 +338,7 @@ func TestVerifyPAT_ThrottleTouch(t *testing.T) {
 	m := repo.NewMemory()
 	svc, nowPtr := newPATSvcClk(m)
 	ctx := context.Background()
+	seedPATIdentity(t, m, "id-1")
 
 	plaintext, _, err := svc.CreatePAT(ctx, "id-1", "tok", []string{"read"}, 0)
 	if err != nil {
@@ -375,6 +379,33 @@ func TestVerifyPAT_ThrottleTouch(t *testing.T) {
 	got3, _, _ := m.GetPATByHash(ctx, patHash(plaintext))
 	if got3.LastUsedAt == nil || got3.LastUsedAt.Equal(firstLastUsed) {
 		t.Errorf("LastUsedAt should be updated after >1 minute: was %v, still %v", firstLastUsed, got3.LastUsedAt)
+	}
+}
+
+func TestVerifyPAT_RejectsDisabledIdentity(t *testing.T) {
+	m := repo.NewMemory()
+	svc, _ := newPATSvcClk(m)
+	ctx := context.Background()
+	seedPATIdentity(t, m, "id-disabled")
+
+	plaintext, _, err := svc.CreatePAT(ctx, "id-disabled", "tok", []string{"read"}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := m.SetIdentityStatus(ctx, "id-disabled", model.StatusDisabled); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.VerifyPAT(ctx, plaintext); patCodeOfErr(err) != iderr.CodePATInvalid {
+		t.Fatalf("disabled identity PAT error = %v", err)
+	}
+}
+
+func seedPATIdentity(t *testing.T, store *repo.Memory, identityID string) {
+	t.Helper()
+	if _, err := store.CreateIdentityWithProfile(context.Background(), repo.NewIdentityInput{
+		ID: identityID, Email: identityID + "@example.test", PasswordHash: "test-hash",
+	}); err != nil {
+		t.Fatal(err)
 	}
 }
 

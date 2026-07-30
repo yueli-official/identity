@@ -74,3 +74,15 @@ func TestStoreRefreshInactiveMapsToFositeError(t *testing.T) {
 		t.Fatalf("want ErrInactiveToken, got %v", err)
 	}
 }
+
+func TestStoreRejectsClientAssertionJWTs(t *testing.T) {
+	st := NewStore(newMemBackend(), repo.NewMemory())
+	ctx := context.Background()
+
+	if err := st.ClientAssertionJWTValid(ctx, "jti"); err != fosite.ErrJTIKnown {
+		t.Fatalf("ClientAssertionJWTValid() = %v, want ErrJTIKnown", err)
+	}
+	if err := st.SetClientAssertionJWT(ctx, "jti", time.Now()); err != fosite.ErrJTIKnown {
+		t.Fatalf("SetClientAssertionJWT() = %v, want ErrJTIKnown", err)
+	}
+}

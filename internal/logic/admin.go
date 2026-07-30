@@ -61,6 +61,19 @@ func (s *Service) AdminSetUserStatus(ctx context.Context, targetID string, statu
 	if targetID == adminID {
 		return iderr.SelfAdminTarget()
 	}
+	current, err := s.store.GetByID(ctx, targetID)
+	if errors.Is(err, repo.ErrIdentityMissing) {
+		return iderr.IdentityNotFound()
+	}
+	if err != nil {
+		return err
+	}
+	// Deleted is terminal: its email may already have been claimed by a new
+	// identity under the partial unique index. Reanimation would either fail at
+	// storage time or create an ambiguous account lifecycle.
+	if current.Status == model.StatusDeleted && status != model.StatusDeleted {
+		return iderr.InvalidStatus(string(status))
+	}
 	if err := s.store.SetIdentityStatus(ctx, targetID, status); err != nil {
 		if errors.Is(err, repo.ErrIdentityMissing) {
 			return iderr.IdentityNotFound()

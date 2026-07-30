@@ -35,7 +35,7 @@ func (p *AssetAdminProxy) Forward(r *ghttp.Request) {
 		r.SetError(err)
 		return
 	}
-	bearer, err := p.mgr.MintServiceToken(p.issuer, adminID, p.audience, "asset:sign", 2*time.Minute, time.Now())
+	bearer, err := p.mgr.MintServiceToken(p.issuer, adminID, p.audience, "asset:admin", 2*time.Minute, time.Now())
 	if err != nil {
 		r.SetError(err)
 		return

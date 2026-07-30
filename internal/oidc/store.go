@@ -44,11 +44,15 @@ func (s *Store) GetClient(ctx context.Context, id string) (fosite.Client, error)
 	return toFositeClient(c), nil
 }
 
-// We don't use client-JWT assertions (public clients + PKCE). Accept all / store
-// nothing — these satisfy fosite.ClientManager.
-func (s *Store) ClientAssertionJWTValid(ctx context.Context, jti string) error { return nil }
-func (s *Store) SetClientAssertionJWT(ctx context.Context, jti string, exp time.Time) error {
-	return nil
+// Client JWT assertions are not part of Identity's client contract. Fosite's
+// storage interface still requires these methods, so fail closed instead of
+// pretending every assertion JTI is fresh.
+func (s *Store) ClientAssertionJWTValid(context.Context, string) error {
+	return fosite.ErrJTIKnown
+}
+
+func (s *Store) SetClientAssertionJWT(context.Context, string, time.Time) error {
+	return fosite.ErrJTIKnown
 }
 
 func toFositeClient(c model.OIDCClient) *fosite.DefaultClient {

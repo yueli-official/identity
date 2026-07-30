@@ -12,6 +12,7 @@ import (
 
 	"github.com/yueli-official/identity/internal/authentication"
 	"github.com/yueli-official/identity/internal/dao"
+	"github.com/yueli-official/identity/internal/model"
 	"github.com/yueli-official/identity/internal/repo"
 )
 
@@ -75,6 +76,30 @@ func TestPGPasskeyLifecycleAndAuthenticationSession(t *testing.T) {
 	}
 	if count, err := store.CountActivePasskeys(ctx, identity.ID); err != nil || count != 1 {
 		t.Fatalf("CountActivePasskeys() = %d, %v; want 1", count, err)
+	}
+
+	pendingRegistration := authentication.Ceremony{
+		ID: uuid.NewString(), Kind: authentication.CeremonyPasskeyRegistration,
+		IdentityID: identity.ID, SessionID: bindingSession.ID,
+		ChallengeDigest: make([]byte, 32), LibraryState: []byte(`{}`),
+		ExpiresAt: now.Add(5 * time.Minute), CreatedAt: now,
+	}
+	if err := store.CreateCeremony(ctx, pendingRegistration); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SetIdentityStatus(ctx, identity.ID, model.StatusDisabled); err != nil {
+		t.Fatal(err)
+	}
+	disabledCredential := credential
+	disabledCredential.ID = uuid.NewString()
+	disabledCredential.CredentialID = []byte("disabled-" + uuid.NewString())
+	if err := store.CompletePasskeyRegistration(
+		ctx, pendingRegistration, disabledCredential,
+	); !errors.Is(err, authentication.ErrCeremonyInvalid) {
+		t.Fatalf("disabled identity registration error = %v, want ErrCeremonyInvalid", err)
+	}
+	if err := store.SetIdentityStatus(ctx, identity.ID, model.StatusActive); err != nil {
+		t.Fatal(err)
 	}
 
 	login := authentication.Ceremony{

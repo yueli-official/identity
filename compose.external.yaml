@@ -1,0 +1,18 @@
+# Reuse externally managed PostgreSQL and Redis.
+# Requires Docker Compose 2.24.4+ for !override/!reset.
+services:
+  identity:
+    depends_on: !override
+      identity-migrate:
+        condition: service_completed_successfully
+      identity-publisher-init:
+        condition: service_completed_successfully
+
+  identity-migrate:
+    depends_on: !reset {}
+
+  identity-postgres:
+    profiles: [standalone-only]
+
+  identity-redis:
+    profiles: [standalone-only]

@@ -79,8 +79,12 @@ func TestAssetAdminProxyAcceptsVerifiedAdminBearerAndAdminCookie(t *testing.T) {
 			http.Error(writer, verifyErr.Error(), http.StatusUnauthorized)
 			return
 		}
-		if principal.Subject != adminID || !principal.HasScope("asset:sign") {
+		if principal.Subject != adminID || !principal.HasScope("asset:admin") {
 			http.Error(writer, "unexpected delegated principal", http.StatusForbidden)
+			return
+		}
+		if principal.HasScope("asset:sign") {
+			http.Error(writer, "control-plane token includes delivery scope", http.StatusForbidden)
 			return
 		}
 		writer.Header().Set("Content-Type", "application/json")

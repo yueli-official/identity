@@ -734,6 +734,49 @@ func TestOIDCRefreshRolesUpdated(t *testing.T) {
 	t.Logf("refresh access token roles = %v (admin propagated on refresh)", roles1)
 }
 
+func TestOIDCDisabledIdentityCannotUseUserinfoOrRefresh(t *testing.T) {
+	const clientID = "demo-web"
+	env := setupE2E(t, clientID)
+	// Deliberately omit roles: lifecycle enforcement applies to every refresh
+	// grant, not only clients that ask Identity to embed role claims.
+	const scope = "openid offline_access"
+
+	p := newPKCE(t)
+	code := authorizeForCode(t, env, clientID, scope, p)
+	status, body, tokens := exchangeCode(t, env, clientID, code, p.verifier)
+	assertValidTokenResponse(t, status, body, tokens, true)
+	if err := env.repo.SetIdentityStatus(env.ctx, env.subject, model.StatusDisabled); err != nil {
+		t.Fatal(err)
+	}
+
+	userinfo, err := http.NewRequestWithContext(
+		env.ctx, http.MethodGet, env.base+"/oauth2/userinfo", nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	userinfo.Header.Set("Authorization", "Bearer "+tokens.AccessToken)
+	response, err := http.DefaultClient.Do(userinfo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusUnauthorized {
+		payload, _ := io.ReadAll(response.Body)
+		t.Fatalf("disabled userinfo status=%d body=%s", response.StatusCode, payload)
+	}
+
+	refreshStatus, refreshBody, refreshed := refreshToken(
+		t, env, clientID, tokens.RefreshToken,
+	)
+	if refreshStatus == http.StatusOK || refreshed.AccessToken != "" {
+		t.Fatalf("disabled refresh succeeded: %s", refreshBody)
+	}
+	if !strings.Contains(string(refreshBody), "invalid_grant") {
+		t.Fatalf("disabled refresh should be invalid_grant: %s", refreshBody)
+	}
+}
+
 // TestOIDCRotationReplayKillsFamily is the rotation/replay defense:
 // after rt→rt2 rotation, replaying the OLD rt is rejected AND poisons the whole
 // family, so rt2 is then dead too. fosite revokes by request_id, which is reused

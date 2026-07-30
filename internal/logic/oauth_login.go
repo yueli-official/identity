@@ -101,6 +101,9 @@ func (s *Service) resolveOAuthIdentity(ctx context.Context, in OAuthLoginInput, 
 		if !in.EmailVerified {
 			return model.Identity{}, false, iderr.OAuthEmailConflict(email)
 		}
+		if existing.Status != model.StatusActive {
+			return model.Identity{}, false, iderr.AccountDisabled()
+		}
 		if lerr := s.store.LinkOAuthCredential(ctx, existing.ID, in.Provider, in.ProviderUID, email, true); lerr != nil {
 			return model.Identity{}, false, lerr
 		}

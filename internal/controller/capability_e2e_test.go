@@ -90,7 +90,7 @@ func TestCapabilityEndpointsRequireAdminAndAuditProbes(t *testing.T) {
 		body, status := request(http.MethodGet, "/api/v1/admin/capabilities", nil)
 		t.Assert(status, http.StatusUnauthorized)
 		t.Assert(gjson.New(body).Get("code").String(), "identity.not_authenticated")
-		body, status = request(http.MethodGet, "/api/v1/admin/capabilities", userHeaders)
+		_, status = request(http.MethodGet, "/api/v1/admin/capabilities", userHeaders)
 		t.Assert(status, http.StatusForbidden)
 		body, status = request(http.MethodGet, "/api/v1/admin/capabilities", adminHeaders)
 		t.Assert(status, http.StatusOK)
