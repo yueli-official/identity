@@ -16,8 +16,9 @@ fail-open 边界已关闭；Doctor 已删除，标准 Compose 同时提供自带
 
 ## Next
 
-由用户选择下一个服务继续深审。Identity 尚未提交；Docker CLI 不在当前机器，镜像启动需在具备 Docker
-Compose 2.24.4+ 的环境执行 README 命令验证。
+Identity 深审改动已在本地 commit `f0a26a6` 收口，按用户要求暂不 push。允许发布后再推送/打版并更新
+Workspace 精确锁。Docker CLI 不在当前机器，镜像启动需在具备 Docker Compose 2.24.4+ 的环境执行
+README 命令验证。
 
 ## Current execution
 
