@@ -25,7 +25,8 @@ User 标识合同与消费者迁移已完成。内部 UUIDv4 只留在 Identity 
 
 发布时先发布 Foundation 的 typed `subject_kind` 合同和 Identity Nuxt 包，再升级各产品锁定依赖；Gallery 当前安装的
 `@yueli/identity-nuxt@0.1.0` 仍会请求已删除的 `/api/v1/profiles/{sub}`，仅因旧包把该补充资料请求降级而不阻断登录。
-不得因此恢复旧接口。源码迁移和本地 CLI Playwright 已通过，发布与跨仓提交等待单独授权。
+不得因此恢复旧接口。源码迁移、本地 CLI Playwright 与跨仓提交均已完成；下一步只在获得单独授权后执行包发布和
+消费者依赖升级。
 
 ## Current execution
 
@@ -43,6 +44,8 @@ P0–P4 complete；生产源码、迁移、消费者、生成合同、全量测�
   复用数据库中旧 UUID 管理员授权的确定性 devseed 对账。
 - 2026-08-02：Identity/Account/Nuxt 与 9 个 Go 消费模块全量测试和 `go vet` 通过；Account 生产构建通过；CLI
   Playwright 2/2 通过，图片站保持运行供人工查看。
+- 2026-08-02：用户授权提交；Foundation、Identity、Asset、八个产品消费者与 Workspace 的已验证改动均已按仓库
+  提交，提交边界记录在实施与验收结果中，未 push、未发布。
 
 ## References
 

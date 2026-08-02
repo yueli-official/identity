@@ -68,7 +68,7 @@
 
 ## 发布边界
 
-- 生产源码已完成，但本 Work 不执行包发布或跨仓提交。
+- 生产源码与跨仓提交已完成；本 Work 不执行包发布或依赖版本升级。
 - Gallery 当前锁定的 `@yueli/identity-nuxt@0.1.0` 仍包含旧 `/profiles` 补充查询；先发布新 Identity Nuxt 包、
   再升级产品依赖，不能恢复旧 API 兜底。
 - Foundation typed `SubjectKind` 需先发布，再允许消费者从当前 raw verified claim 读取方式切到 typed 字段。

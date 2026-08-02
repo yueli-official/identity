@@ -60,6 +60,27 @@
 - CLI Playwright 2/2：公开 users/by-handle/batch、新旧路由、OIDC discovery、真实 OIDC 登录、Gallery 管理员页、
   Account display name/handle、`/media` WebP、无应用请求失败或 5xx。
 
+## 提交边界
+
+2026-08-02 用户授权提交已验证改动；各仓库保持独立、可回退的提交边界：
+
+| 仓库 | 提交 | 内容 |
+| --- | --- | --- |
+| Asset | `460a214` | 上一轮公开媒体 URL 与 rendition 协议重构 |
+| Foundation | `667c78d` | typed `subject_kind` 与 fail-closed verifier |
+| Identity | `4dfd144` | Public User Key、handle、OIDC subject、User API、Account/Nuxt 与迁移 |
+| Asset | `953b8ab` | Public User subject、审计及 Account media profile |
+| Blog | `a448a46` | 新 User API 与主体合同消费者迁移 |
+| Commerce | `f0baaf4` | 主体类型、授权与审计迁移 |
+| Docs | `a83b86f` | 主体类型、管理员与审计迁移 |
+| Gallery | `389e7f2` | 主体合同与旧管理员 grant 对账 |
+| Nav | `a3c9715` | 主体类型、管理员与审计迁移 |
+| Resource | `f8ccfa8` | 主体类型、管理员与审计迁移 |
+| Shop | `a3d502d` | 主体类型与管理员授权迁移 |
+| Workspace | `cd59da1` | 本地 public user seed、环境合同、Windows supervisor 修复与中文 CLI Playwright 说明 |
+
+上述提交均未 push、未打 tag、未发布。Foundation 两处既有 UI 文案和 Workspace 既有 `.gitignore` 修改没有混入。
+
 ## 发布顺序与已知边界
 
 1. 发布 Foundation typed `SubjectKind`，再升级消费者依赖。
