@@ -58,7 +58,7 @@ type Backend interface {
 	DeleteRefresh(ctx context.Context, signature string) error
 	RevokeRefreshByRequestID(ctx context.Context, requestID string) error // family
 	RevokeRefreshBySession(ctx context.Context, sessionID string) error   // passive logout (single session)
-	RevokeRefreshByIdentity(ctx context.Context, subject string) error    // logout-all
+	RevokeRefreshBySubject(ctx context.Context, subject string) error     // logout-all
 
 	// transaction (no-op on memory)
 	BeginTX(ctx context.Context) (context.Context, error)

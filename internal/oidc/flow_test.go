@@ -46,13 +46,14 @@ func noRedirectClient() *http.Client {
 // service (with the OIDC store wired as refresh revoker), the live g.Server base
 // URL, and the login session identifiers for the seeded user.
 type e2eEnv struct {
-	ctx     context.Context
-	repo    *repo.Memory
-	svc     *logic.Service
-	store   *oidc.Store
-	base    string
-	sid     string // id_session cookie value
-	subject string // identity ID == JWT sub
+	ctx        context.Context
+	repo       *repo.Memory
+	svc        *logic.Service
+	store      *oidc.Store
+	base       string
+	sid        string // id_session cookie value
+	identityID string // internal UUID used only by Identity operations
+	subject    string // explicit public OIDC subject
 }
 
 // setupE2E builds the full hermetic OIDC stack used by the e2e tests:
@@ -96,7 +97,7 @@ func setupE2E(t *testing.T, clientID string) *e2eEnv {
 		t.Fatalf("login: %v", err)
 	}
 	sid := loginOut.SessionID
-	subject := loginOut.Identity.ID
+	subject := loginOut.Identity.UserKey
 
 	// 3. Pick a free port so the issuer URL exists before the server starts.
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -128,7 +129,7 @@ func setupE2E(t *testing.T, clientID string) *e2eEnv {
 		RefreshTTL:   720 * time.Hour,
 	}, mgr.KeyGetter)
 	ctl := controller.NewOIDC(
-		provider, mgr, svc, r, base, base+"/login", false,
+		provider, mgr, svc, r, base, base+"/login", base+"/media", false,
 		[]byte("0123456789abcdef0123456789abcdef"),
 	)
 
@@ -148,13 +149,14 @@ func setupE2E(t *testing.T, clientID string) *e2eEnv {
 	t.Cleanup(func() { _ = s.Shutdown() })
 
 	return &e2eEnv{
-		ctx:     ctx,
-		repo:    r,
-		svc:     svc,
-		store:   store,
-		base:    base,
-		sid:     sid,
-		subject: subject,
+		ctx:        ctx,
+		repo:       r,
+		svc:        svc,
+		store:      store,
+		base:       base,
+		sid:        sid,
+		identityID: loginOut.Identity.ID,
+		subject:    subject,
 	}
 }
 
@@ -428,7 +430,7 @@ func TestOIDCFlow(t *testing.T) {
 		t.Fatalf("login: %v", err)
 	}
 	sid := loginOut.SessionID
-	subject := loginOut.Identity.ID
+	subject := loginOut.Identity.UserKey
 	t.Logf("logged in: sid=%s subject=%s", sid, subject)
 
 	// -----------------------------------------------------------------------
@@ -461,7 +463,7 @@ func TestOIDCFlow(t *testing.T) {
 		IDTTL:        10 * time.Minute,
 	}, mgr.KeyGetter)
 	ctl := controller.NewOIDC(
-		provider, mgr, svc, r, base, base+"/login", false,
+		provider, mgr, svc, r, base, base+"/login", base+"/media", false,
 		[]byte("0123456789abcdef0123456789abcdef"),
 	)
 
@@ -717,7 +719,7 @@ func TestOIDCRefreshRolesUpdated(t *testing.T) {
 
 	// Grant admin AFTER the authorize-time session was frozen into the refresh
 	// token. A pure-delegation Token handler would never see this change.
-	if err := env.svc.GrantRole(env.ctx, env.subject, "admin"); err != nil {
+	if err := env.svc.GrantRole(env.ctx, env.identityID, "admin"); err != nil {
 		t.Fatalf("GrantRole(admin): %v", err)
 	}
 
@@ -745,7 +747,7 @@ func TestOIDCDisabledIdentityCannotUseUserinfoOrRefresh(t *testing.T) {
 	code := authorizeForCode(t, env, clientID, scope, p)
 	status, body, tokens := exchangeCode(t, env, clientID, code, p.verifier)
 	assertValidTokenResponse(t, status, body, tokens, true)
-	if err := env.repo.SetIdentityStatus(env.ctx, env.subject, model.StatusDisabled); err != nil {
+	if err := env.repo.SetIdentityStatus(env.ctx, env.identityID, model.StatusDisabled); err != nil {
 		t.Fatal(err)
 	}
 

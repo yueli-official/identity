@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { createAccountNotifier } from '~/utils/feedback'
+import type { MediaRef } from '~/utils/media'
 
 // Square avatar crop + upload. The canvas crop interaction is ported from the
 // donor (nuxtblog/web UserAvatarCrop); the upload posts the cropped JPEG to the
 // IdP avatar proxy (cookie-authed), which stores it on the asset service and
-// commits it to the profile, returning the public URL.
+// commits its media reference to the profile.
 defineProps<{
   editable: boolean
   modelValue: string
@@ -169,8 +170,8 @@ async function confirmCrop() {
     if (!blob) throw new Error('裁剪失败')
     const fd = new FormData()
     fd.append('file', new File([blob], 'avatar.jpg', { type: 'image/jpeg' }))
-    const { avatarUrl } = await call<{ avatarUrl: string }>('/api/v1/session/avatar', { method: 'POST', body: fd })
-    emit('update:modelValue', avatarUrl)
+    const { avatar } = await call<{ avatar: MediaRef }>('/api/v1/session/avatar', { method: 'POST', body: fd })
+    emit('update:modelValue', userMediaUrl(avatar, 'thumbnail'))
     cropModalOpen.value = false
   } catch (err: any) {
     toast.add({

@@ -116,7 +116,7 @@ func (b *memBackend) RevokeRefreshBySession(_ context.Context, sessionID string)
 	return nil
 }
 
-func (b *memBackend) RevokeRefreshByIdentity(_ context.Context, subject string) error {
+func (b *memBackend) RevokeRefreshBySubject(_ context.Context, subject string) error {
 	b.revokeWhere(func(r RefreshRecord) bool { return r.Subject == subject })
 	return nil
 }

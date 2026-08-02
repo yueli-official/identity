@@ -56,23 +56,24 @@ func TestAdminRoleEndpoint(t *testing.T) {
 			return buf.String(), resp.StatusCode
 		}
 
-		// helper: register an identity and log it in, returning (id, sessionCookieHeader).
-		mkUser := func(email string) (string, map[string]string) {
+		// helper: register an identity and log it in, returning internal ID,
+		// public user key, and the session cookie header.
+		mkUser := func(email string) (string, string, map[string]string) {
 			id, err := svc.Register(ctx, logic.RegisterInput{
 				Email: email, Password: "correct horse battery", DisplayName: email,
 			})
 			t.AssertNil(err)
 			out, err := svc.Login(ctx, logic.LoginInput{Email: email, Password: "correct horse battery"})
 			t.AssertNil(err)
-			return id.ID, map[string]string{"Cookie": "id_session=" + out.SessionID}
+			return id.ID, id.UserKey, map[string]string{"Cookie": "id_session=" + out.SessionID}
 		}
 
-		adminID, adminHdr := mkUser("admin@b.com")
+		adminID, _, adminHdr := mkUser("admin@b.com")
 		t.AssertNil(svc.GrantRole(ctx, adminID, logic.AdminRole))
-		_, userHdr := mkUser("user@b.com")
-		targetID, _ := mkUser("target@b.com")
+		_, _, userHdr := mkUser("user@b.com")
+		targetID, targetKey, _ := mkUser("target@b.com")
 
-		grantPath := "/api/v1/admin/identities/" + targetID + "/roles"
+		grantPath := "/api/v1/admin/users/" + targetKey + "/roles"
 
 		// 1. Unauthenticated grant → 401 not_authenticated; target unchanged.
 		{

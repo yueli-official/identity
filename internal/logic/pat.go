@@ -15,9 +15,9 @@ import (
 
 // PATVerification is returned by VerifyPAT on success.
 type PATVerification struct {
-	IdentityID string
-	Scopes     []string
-	ExpiresAt  *time.Time
+	UserKey   string
+	Scopes    []string
+	ExpiresAt *time.Time
 }
 
 // CreatePAT generates a new Personal Access Token for the given identity.
@@ -157,8 +157,8 @@ func (s *Service) VerifyPAT(ctx context.Context, presented string) (PATVerificat
 	}
 
 	return PATVerification{
-		IdentityID: row.IdentityID,
-		Scopes:     row.Scopes,
-		ExpiresAt:  row.ExpiresAt,
+		UserKey:   identity.UserKey,
+		Scopes:    row.Scopes,
+		ExpiresAt: row.ExpiresAt,
 	}, nil
 }

@@ -14,7 +14,7 @@ interface GuestTokenIssued {
 
 interface GuestClaimIssued {
   subjectId: string;
-  userId: string;
+  userKey: string;
   claimToken: string;
 }
 

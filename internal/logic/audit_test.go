@@ -234,8 +234,8 @@ func TestAudit_Register(t *testing.T) {
 	if roleRow.Detail["role"] != logic.DefaultRole {
 		t.Errorf("role.default_granted Detail[role]: want %q, got %v", logic.DefaultRole, roleRow.Detail["role"])
 	}
-	if roleRow.Detail["best_effort"] != true {
-		t.Errorf("role.default_granted Detail[best_effort]: want true, got %v", roleRow.Detail["best_effort"])
+	if _, exists := roleRow.Detail["best_effort"]; exists {
+		t.Errorf("atomic default-role grant must not be labelled best-effort: %v", roleRow.Detail)
 	}
 }
 

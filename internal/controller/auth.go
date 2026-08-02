@@ -28,7 +28,7 @@ type Controller struct {
 }
 
 type PrivacyService interface {
-	OpenErasure(context.Context, string, string, privacy.IdempotencyKey, string, time.Time, privacy.VerificationEvidence) (privacy.RightsRequestView, error)
+	OpenErasure(context.Context, string, string, string, privacy.IdempotencyKey, string, time.Time, privacy.VerificationEvidence) (privacy.RightsRequestView, error)
 	GetByToken(context.Context, string, privacy.RightsRequestID) (privacy.RightsRequestView, error)
 }
 
@@ -73,7 +73,7 @@ func (c *Controller) Register(ctx context.Context, req *v1.RegisterReq) (*v1.Reg
 	if err != nil {
 		return nil, err
 	}
-	return &v1.RegisterRes{ID: id.ID, Email: id.Email}, nil
+	return &v1.RegisterRes{UserKey: id.UserKey, Email: id.Email}, nil
 }
 
 func (c *Controller) Login(ctx context.Context, req *v1.LoginReq) (*v1.LoginRes, error) {
@@ -92,7 +92,7 @@ func (c *Controller) Login(ctx context.Context, req *v1.LoginReq) (*v1.LoginRes,
 	}
 	if out.MFARequired {
 		return &v1.LoginRes{
-			ID: out.Identity.ID, Email: out.Identity.Email, MFARequired: true,
+			UserKey: out.Identity.UserKey, Email: out.Identity.Email, MFARequired: true,
 			MFATransaction: out.MFATransaction,
 			MFAExpiresAt:   out.MFAExpiresAt.Format(time.RFC3339),
 			MFAMethods:     out.MFAMethods,
@@ -100,7 +100,7 @@ func (c *Controller) Login(ctx context.Context, req *v1.LoginReq) (*v1.LoginRes,
 	}
 	c.setSessionCookie(r, out.SessionID)
 	return &v1.LoginRes{
-		ID: out.Identity.ID, Email: out.Identity.Email, MFARequired: false,
+		UserKey: out.Identity.UserKey, Email: out.Identity.Email, MFARequired: false,
 	}, nil
 }
 

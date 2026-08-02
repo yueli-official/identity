@@ -51,7 +51,7 @@ func (controller *Guest) GuestSessionClaim(ctx context.Context, req *v1.GuestSes
 	if err != nil {
 		return nil, guestError(err)
 	}
-	return &v1.GuestSessionClaimRes{SubjectID: claimed.SubjectID, UserID: claimed.UserID, ClaimedAt: claimed.ClaimedAt, ClaimToken: claimed.ClaimToken}, nil
+	return &v1.GuestSessionClaimRes{SubjectID: claimed.SubjectID, UserKey: claimed.UserKey, ClaimedAt: claimed.ClaimedAt, ClaimToken: claimed.ClaimToken}, nil
 }
 
 func guestError(err error) error {

@@ -6,15 +6,19 @@ export interface SessionDisplayUser {
   roles?: string[];
 }
 
-export interface PublicProfile {
-  id: string;
-  displayName: string;
-  avatarUrl: string;
+export interface MediaRef {
+  mediaKey: string;
 }
 
-export interface PublicProfileResponse {
-  code: string;
-  data?: { profile?: PublicProfile };
+export interface PublicUser {
+  userKey: string;
+  handle: string;
+  displayName: string;
+  avatar?: MediaRef;
+}
+
+export interface PublicUserResponse {
+  user?: PublicUser;
 }
 
 export function createCachedProfileFetcher<T>(
@@ -71,32 +75,36 @@ export function createCachedProfileFetcher<T>(
   };
 }
 
-export function mergePublicProfile<T extends SessionDisplayUser>(
+function mediaUrl(reference: MediaRef | undefined, rendition: string): string | undefined {
+  if (!reference?.mediaKey) return undefined;
+  return `/media/${encodeURIComponent(reference.mediaKey)}?format=webp&name=${rendition}`;
+}
+
+export function mergePublicUser<T extends SessionDisplayUser>(
   user: T,
-  profile: PublicProfile,
+  profile: PublicUser,
 ): T {
-  if (profile.id !== user.sub) return user;
+	if (profile.userKey !== user.sub) return user;
 
   return {
     ...user,
     name: profile.displayName || user.name,
-    avatar: profile.avatarUrl || undefined,
+		avatar: mediaUrl(profile.avatar, "thumbnail"),
   };
 }
 
 export async function resolveLatestDisplayUser<T extends SessionDisplayUser>(
   user: T,
   issuer: string,
-  fetchProfile: (url: string) => Promise<PublicProfileResponse>,
+	fetchProfile: (url: string) => Promise<PublicUserResponse>,
 ): Promise<T> {
   if (!issuer) return user;
 
   try {
     const response = await fetchProfile(
-      `${issuer.replace(/\/$/, "")}/api/v1/profiles/${encodeURIComponent(user.sub)}`,
-    );
-    const profile = response.code === "ok" ? response.data?.profile : undefined;
-    return profile ? mergePublicProfile(user, profile) : user;
+		`${issuer.replace(/\/$/, "")}/api/v1/users/${encodeURIComponent(user.sub)}`,
+	);
+	return response.user ? mergePublicUser(user, response.user) : user;
   } catch {
     return user;
   }

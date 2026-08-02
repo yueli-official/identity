@@ -13,19 +13,20 @@ import (
 
 // adminListCols is the projected column set for the admin user list (qualified
 // so the identities/user_profiles join is unambiguous on shared column names).
-const adminListCols = "i.id, i.email, i.email_verified, i.status, i.created_at, " +
-	"p.display_name, p.username, p.avatar_url"
+const adminListCols = "i.id, i.user_key, i.email, i.email_verified, i.status, i.created_at, " +
+	"p.display_name, p.handle, p.avatar_media_key"
 
 // adminUserScan is the flat scan target for one joined identity+profile row.
 type adminUserScan struct {
-	ID            string    `orm:"id"`
-	Email         string    `orm:"email"`
-	EmailVerified bool      `orm:"email_verified"`
-	Status        string    `orm:"status"`
-	CreatedAt     time.Time `orm:"created_at"`
-	DisplayName   string    `orm:"display_name"`
-	Username      string    `orm:"username"`
-	AvatarURL     string    `orm:"avatar_url"`
+	ID             string    `orm:"id"`
+	UserKey        string    `orm:"user_key"`
+	Email          string    `orm:"email"`
+	EmailVerified  bool      `orm:"email_verified"`
+	Status         string    `orm:"status"`
+	CreatedAt      time.Time `orm:"created_at"`
+	DisplayName    string    `orm:"display_name"`
+	Handle         string    `orm:"handle"`
+	AvatarMediaKey string    `orm:"avatar_media_key"`
 }
 
 // AdminListUsers returns a filtered, paginated page of identities joined with
@@ -48,7 +49,7 @@ func (p *PG) AdminListUsers(ctx context.Context, f repo.AdminUserFilter) ([]repo
 	}
 	if f.Keyword != "" {
 		kw := "%" + f.Keyword + "%"
-		m = m.Where("(i.email ILIKE ? OR p.display_name ILIKE ? OR p.username ILIKE ?)", kw, kw, kw)
+		m = m.Where("(i.email ILIKE ? OR p.display_name ILIKE ? OR p.handle ILIKE ?)", kw, kw, kw)
 	}
 
 	total, err := m.Count()
@@ -83,14 +84,15 @@ func (p *PG) AdminListUsers(ctx context.Context, f repo.AdminUserFilter) ([]repo
 	for _, r := range rows {
 		ids = append(ids, r.ID)
 		out = append(out, repo.AdminUserRow{
-			ID:            r.ID,
-			Email:         r.Email,
-			EmailVerified: r.EmailVerified,
-			Status:        model.Status(r.Status),
-			CreatedAt:     r.CreatedAt,
-			DisplayName:   r.DisplayName,
-			Username:      r.Username,
-			AvatarURL:     r.AvatarURL,
+			InternalID:     r.ID,
+			UserKey:        r.UserKey,
+			Email:          r.Email,
+			EmailVerified:  r.EmailVerified,
+			Status:         model.Status(r.Status),
+			CreatedAt:      r.CreatedAt,
+			DisplayName:    r.DisplayName,
+			Handle:         r.Handle,
+			AvatarMediaKey: r.AvatarMediaKey,
 		})
 	}
 
@@ -99,7 +101,7 @@ func (p *PG) AdminListUsers(ctx context.Context, f repo.AdminUserFilter) ([]repo
 		return nil, 0, err
 	}
 	for i := range out {
-		out[i].Roles = rolesByID[out[i].ID]
+		out[i].Roles = rolesByID[out[i].InternalID]
 	}
 	return out, total, nil
 }
@@ -146,6 +148,38 @@ func (p *PG) AdminUserStatusCounts(ctx context.Context) (map[string]int, error) 
 // SetIdentityStatus updates an identity's lifecycle status (and bumps updated_at).
 // Returns repo.ErrIdentityMissing when no row matched.
 func (p *PG) SetIdentityStatus(ctx context.Context, identityID string, status model.Status) error {
+	if status == model.StatusDeleted {
+		return p.db.Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+			tx = tx.Ctx(ctx)
+			current, err := tx.GetValue(
+				"SELECT handle FROM user_profiles WHERE identity_id = ? FOR UPDATE", identityID,
+			)
+			if err != nil {
+				return err
+			}
+			result, err := tx.Model("identities").Ctx(ctx).Where("id", identityID).
+				Data(g.Map{"status": string(status), "updated_at": gdb.Raw("now()")}).Update()
+			if err != nil {
+				return err
+			}
+			if affected, _ := result.RowsAffected(); affected == 0 {
+				return repo.ErrIdentityMissing
+			}
+			if !current.IsNil() && current.String() != "" {
+				if _, err := tx.Exec(
+					"UPDATE user_handle_history SET state = 'retired', retired_at = now() WHERE handle = ? AND identity_id = ?",
+					current.String(), identityID,
+				); err != nil {
+					return err
+				}
+				if _, err := tx.Model("user_profiles").Ctx(ctx).Where("identity_id", identityID).
+					Data(g.Map{"handle": nil}).Update(); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+	}
 	res, err := p.db.Model("identities").Ctx(ctx).Where("id", identityID).
 		Data(g.Map{"status": string(status), "updated_at": gdb.Raw("now()")}).Update()
 	if err != nil {

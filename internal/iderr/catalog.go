@@ -33,6 +33,7 @@ const (
 	CodeSelfAdminActionForbidden     = "identity.self_admin_action_forbidden"
 	CodeUnknownRole                  = "identity.unknown_role"
 	CodeInvalidProfile               = "identity.invalid_profile"
+	CodeHandleUnavailable            = "identity.handle_unavailable"
 	CodeSessionNotFound              = "identity.session_not_found"
 	CodeCredentialConflict           = "identity.credential_conflict"
 	CodeCredentialNotFound           = "identity.credential_not_found"
@@ -114,6 +115,7 @@ var (
 		CodeSelfAdminActionForbidden:     descriptor(CodeSelfAdminActionForbidden, http.StatusForbidden),
 		CodeUnknownRole:                  descriptor(CodeUnknownRole, http.StatusBadRequest),
 		CodeInvalidProfile:               descriptor(CodeInvalidProfile, http.StatusBadRequest),
+		CodeHandleUnavailable:            descriptor(CodeHandleUnavailable, http.StatusConflict),
 		CodeSessionNotFound:              descriptor(CodeSessionNotFound, http.StatusNotFound),
 		CodeCredentialConflict:           descriptor(CodeCredentialConflict, http.StatusConflict),
 		CodeCredentialNotFound:           descriptor(CodeCredentialNotFound, http.StatusNotFound),

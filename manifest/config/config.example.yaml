@@ -108,6 +108,9 @@ maintenance:
     batchSize: 500
 asset:
   baseUrl: "http://localhost:8082"
+  # Absolute public /media facade used for the standard OIDC picture claim.
+  # Defaults to account.baseUrl + /media; never expose Asset's internal API URL.
+  publicMediaBaseUrl: "http://localhost:3000/media"
   audience: "asset-api"
 commerce:
   baseUrl: "http://localhost:8084"

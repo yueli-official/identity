@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/gogf/gf/v2/frame/g"
-	"github.com/google/uuid"
 
 	foundationauth "github.com/yueli-official/foundation/go/auth"
 	"github.com/yueli-official/foundation/go/capability"
@@ -16,6 +15,7 @@ import (
 	"github.com/yueli-official/identity/internal/identitycap"
 	"github.com/yueli-official/identity/internal/iderr"
 	"github.com/yueli-official/identity/internal/logic"
+	"github.com/yueli-official/identity/internal/model"
 	"github.com/yueli-official/identity/internal/repo"
 )
 
@@ -136,12 +136,23 @@ func (controller *Capability) snapshot(ctx context.Context) (*capability.Snapsho
 
 func (controller *Capability) authorize(ctx context.Context, scope string) (capabilityActor, error) {
 	if principal, ok := foundationauth.FromContext(ctx); ok && principal != nil {
-		if principal.HasRole(logic.AdminRole) || principal.HasScope(scope) {
-			result := capabilityActor{rateKey: principal.ActorKey(), clientID: principal.ClientID}
-			if uuid.Validate(principal.Subject) == nil {
-				result.identityID = principal.Subject
+		subjectKind, _ := principal.Claim("subject_kind")
+		switch subjectKind {
+		case "client":
+			clientID := strings.TrimSpace(principal.ClientID)
+			if clientID != "" && principal.HasScope(scope) {
+				return capabilityActor{rateKey: clientID, clientID: clientID}, nil
 			}
-			return result, nil
+		case "user":
+			subject := strings.TrimSpace(principal.Subject)
+			if subject != "" && principal.HasRole(logic.AdminRole) && controller.auth != nil {
+				identity, err := controller.auth.svc.GetByOIDCSubject(ctx, subject)
+				if err == nil && identity.Status == model.StatusActive {
+					return capabilityActor{
+						rateKey: subject, identityID: identity.ID, clientID: principal.ClientID,
+					}, nil
+				}
+			}
 		}
 		return capabilityActor{}, iderr.Forbidden()
 	}

@@ -24,7 +24,7 @@ func fixture(t *testing.T) (*guest.Service, *repo.Memory, *oidc.Manager, time.Ti
 		t.Fatal(err)
 	}
 	now := time.Date(2026, 7, 17, 0, 0, 0, 0, time.UTC)
-	service := guest.New(store, store, keys, guest.Config{
+	service := guest.New(store, store, store, keys, guest.Config{
 		Issuer:         "https://identity.test",
 		MaxSessionTTL:  30 * 24 * time.Hour,
 		AccessTokenTTL: 10 * time.Minute,
@@ -84,23 +84,35 @@ func TestTokenIsShortLivedGuestAndResourceBound(t *testing.T) {
 }
 
 func TestClaimIsIdempotentForOneUserAndRejectsAnother(t *testing.T) {
-	service, _, keys, now := fixture(t)
+	service, store, keys, now := fixture(t)
+	firstUser, err := store.CreateIdentityWithProfile(context.Background(), repo.NewIdentityInput{
+		Email: "first@example.com", DisplayName: "First", PasswordHash: "hash", Roles: []string{"user"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondUser, err := store.CreateIdentityWithProfile(context.Background(), repo.NewIdentityInput{
+		Email: "second@example.com", DisplayName: "Second", PasswordHash: "hash", Roles: []string{"user"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	created, err := service.Create(context.Background(), "consumer-web", time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
-	first, err := service.Claim(context.Background(), "consumer-web", created.SessionToken, "11111111-1111-4111-8111-111111111111")
+	first, err := service.Claim(context.Background(), "consumer-web", created.SessionToken, firstUser.UserKey)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := service.Claim(context.Background(), "consumer-web", created.SessionToken, "11111111-1111-4111-8111-111111111111")
+	second, err := service.Claim(context.Background(), "consumer-web", created.SessionToken, firstUser.UserKey)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first.SubjectID != second.SubjectID || first.UserID != second.UserID {
+	if first.SubjectID != second.SubjectID || first.UserKey != second.UserKey {
 		t.Fatalf("claim is not idempotent: %+v %+v", first, second)
 	}
-	assertion, err := service.ClaimForAudience(context.Background(), "consumer-web", created.SessionToken, first.UserID, "asset-api")
+	assertion, err := service.ClaimForAudience(context.Background(), "consumer-web", created.SessionToken, first.UserKey, "asset-api")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,10 +125,10 @@ func TestClaimIsIdempotentForOneUserAndRejectsAnother(t *testing.T) {
 		t.Fatal(err)
 	}
 	guestSubject, _ := principal.Claim("guest_subject")
-	if principal.Subject != first.UserID || !principal.HasScope("guest:claim") || guestSubject != created.SubjectID {
+	if principal.Subject != first.UserKey || !principal.HasScope("guest:claim") || guestSubject != created.SubjectID {
 		t.Fatalf("claim principal = %+v", principal)
 	}
-	if _, err := service.Claim(context.Background(), "consumer-web", created.SessionToken, "22222222-2222-4222-8222-222222222222"); err == nil {
+	if _, err := service.Claim(context.Background(), "consumer-web", created.SessionToken, secondUser.UserKey); err == nil {
 		t.Fatal("guest session was claimed by a second user")
 	}
 }

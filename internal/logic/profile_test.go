@@ -4,8 +4,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/yueli-official/identity/internal/actor"
 	"github.com/yueli-official/identity/internal/iderr"
 	"github.com/yueli-official/identity/internal/logic"
+	"github.com/yueli-official/identity/internal/model"
 	"github.com/yueli-official/identity/internal/repo"
 )
 
@@ -29,6 +31,32 @@ func setupAccount(t *testing.T) (*repo.Memory, *logic.Service, string, string) {
 	return store, svc, id.ID, out.SessionID
 }
 
+func TestUpdateSocialLinks_UsesDedicatedValidatedBoundary(t *testing.T) {
+	ctx := context.Background()
+	_, svc, id, _ := setupAccount(t)
+	links, err := svc.UpdateSocialLinks(ctx, id, []model.SocialLink{
+		{Label: " GitHub ", URL: " https://github.com/yueli-official "},
+	})
+	if err != nil {
+		t.Fatalf("UpdateSocialLinks: %v", err)
+	}
+	if len(links) != 1 || links[0].Label != "GitHub" || links[0].URL != "https://github.com/yueli-official" {
+		t.Fatalf("normalized links = %#v", links)
+	}
+	profile, err := svc.GetProfile(ctx, id)
+	if err != nil || len(profile.SocialLinks) != 1 {
+		t.Fatalf("stored profile links = %#v, err=%v", profile.SocialLinks, err)
+	}
+	_, err = svc.UpdateSocialLinks(ctx, id, []model.SocialLink{{Label: "GitHub", URL: "javascript:alert(1)"}})
+	if codeOf(t, err) != iderr.CodeInvalidProfile {
+		t.Fatalf("invalid URL should be rejected: %v", err)
+	}
+	coded, _ := iderr.Resolve(err)
+	if coded.Params["reason"] != string(iderr.ProfileReasonSocialLinksInvalid) {
+		t.Fatalf("reason = %#v", coded.Params["reason"])
+	}
+}
+
 func codeOf(t *testing.T, err error) string {
 	t.Helper()
 	value, ok := iderr.Resolve(err)
@@ -41,9 +69,12 @@ func codeOf(t *testing.T, err error) string {
 func TestUpdateProfile_Success(t *testing.T) {
 	ctx := context.Background()
 	_, svc, id, _ := setupAccount(t)
+	if err := svc.SetProfileImage(ctx, id, "avatar", "31Pj0mXv7cfR5fdZIUvra", "asset-avatar"); err != nil {
+		t.Fatalf("SetProfileImage: %v", err)
+	}
 
 	p, err := svc.UpdateProfile(ctx, id, logic.ProfileUpdate{
-		DisplayName: "  New Name  ", Username: "newuser", AvatarURL: "https://x/a.png", Locale: "zh-CN",
+		DisplayName: "  New Name  ", Handle: " New_User ", Bio: " hello ", Locale: "zh-CN",
 	})
 	if err != nil {
 		t.Fatalf("UpdateProfile: %v", err)
@@ -51,12 +82,15 @@ func TestUpdateProfile_Success(t *testing.T) {
 	if p.DisplayName != "New Name" { // trimmed
 		t.Errorf("DisplayName = %q, want trimmed 'New Name'", p.DisplayName)
 	}
-	if p.Username != "newuser" || p.AvatarURL != "https://x/a.png" || p.Locale != "zh-CN" {
+	if p.Handle != "new_user" || p.AvatarMediaKey != "31Pj0mXv7cfR5fdZIUvra" || p.Locale != "zh-CN" {
 		t.Errorf("profile not persisted: %+v", p)
+	}
+	if p.AvatarAssetID != "asset-avatar" {
+		t.Errorf("generic update replaced Asset ownership: %+v", p)
 	}
 	// Re-read confirms persistence.
 	got, _ := svc.GetProfile(ctx, id)
-	if got.DisplayName != "New Name" || got.Username != "newuser" {
+	if got.DisplayName != "New Name" || got.Handle != "new_user" {
 		t.Errorf("GetProfile after update = %+v", got)
 	}
 }
@@ -74,6 +108,79 @@ func TestUpdateProfile_EmptyDisplayNameRejected(t *testing.T) {
 	}
 	if coded.Params["reason"] != string(iderr.ProfileReasonDisplayNameRequired) {
 		t.Fatalf("reason = %#v, want %q", coded.Params["reason"], iderr.ProfileReasonDisplayNameRequired)
+	}
+}
+
+func TestUpdateProfile_InvalidHandleRejected(t *testing.T) {
+	ctx := context.Background()
+	_, svc, id, _ := setupAccount(t)
+	_, err := svc.UpdateProfile(ctx, id, logic.ProfileUpdate{DisplayName: "Alice", Handle: "admin"})
+	if codeOf(t, err) != iderr.CodeInvalidProfile {
+		t.Fatalf("want CodeInvalidProfile, got %v", err)
+	}
+	coded, _ := iderr.Resolve(err)
+	if coded.Params["reason"] != string(iderr.ProfileReasonHandleInvalid) {
+		t.Fatalf("reason = %#v, want %q", coded.Params["reason"], iderr.ProfileReasonHandleInvalid)
+	}
+}
+
+func TestUpdateProfile_HandleCannotBeClaimedTwice(t *testing.T) {
+	ctx := context.Background()
+	_, svc, firstID, _ := setupAccount(t)
+	second, err := svc.Register(ctx, logic.RegisterInput{
+		Email: "second@e.com", Password: "correct horse battery", DisplayName: "Second",
+	})
+	if err != nil {
+		t.Fatalf("register second: %v", err)
+	}
+	if _, err := svc.UpdateProfile(ctx, firstID, logic.ProfileUpdate{DisplayName: "First", Handle: "alice"}); err != nil {
+		t.Fatalf("claim first handle: %v", err)
+	}
+	_, err = svc.UpdateProfile(ctx, second.ID, logic.ProfileUpdate{DisplayName: "Second", Handle: "ALICE"})
+	if codeOf(t, err) != iderr.CodeHandleUnavailable {
+		t.Fatalf("want CodeHandleUnavailable, got %v", err)
+	}
+}
+
+func TestPublicUserByHistoricalHandleResolvesCanonicalUser(t *testing.T) {
+	ctx := context.Background()
+	_, svc, identityID, _ := setupAccount(t)
+	if _, err := svc.UpdateProfile(ctx, identityID, logic.ProfileUpdate{DisplayName: "Alice", Handle: "alice"}); err != nil {
+		t.Fatalf("claim handle: %v", err)
+	}
+	if _, err := svc.UpdateProfile(ctx, identityID, logic.ProfileUpdate{DisplayName: "Alice", Handle: "alice_new"}); err != nil {
+		t.Fatalf("rename handle: %v", err)
+	}
+	resolved, err := svc.PublicUserByHandle(ctx, "ALICE")
+	if err != nil {
+		t.Fatalf("resolve historical handle: %v", err)
+	}
+	if resolved.Handle != "alice_new" {
+		t.Fatalf("canonical handle = %q, want alice_new", resolved.Handle)
+	}
+}
+
+func TestPublicUserHiddenAfterDeletion(t *testing.T) {
+	ctx := context.Background()
+	_, svc, targetID, _ := setupAccount(t)
+	target, err := svc.GetByID(ctx, targetID)
+	if err != nil {
+		t.Fatalf("GetByID: %v", err)
+	}
+	admin, err := svc.Register(ctx, logic.RegisterInput{
+		Email: "admin@e.com", Password: "correct horse battery", DisplayName: "Admin",
+	})
+	if err != nil {
+		t.Fatalf("register admin: %v", err)
+	}
+	if _, err := svc.PublicUser(ctx, target.UserKey); err != nil {
+		t.Fatalf("public user before deletion: %v", err)
+	}
+	if err := svc.AdminDeleteUser(actor.WithIdentity(ctx, admin.ID), targetID); err != nil {
+		t.Fatalf("AdminDeleteUser: %v", err)
+	}
+	if _, err := svc.PublicUser(ctx, target.UserKey); codeOf(t, err) != iderr.CodeIdentityNotFound {
+		t.Fatalf("deleted user remained public: %v", err)
 	}
 }
 

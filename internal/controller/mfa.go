@@ -40,7 +40,7 @@ func (c *Controller) TOTPLogin(
 		return nil, err
 	}
 	c.setSessionCookie(ghttp.RequestFromCtx(ctx), result.SessionID)
-	return &v1.TOTPLoginRes{ID: identity.ID, Email: identity.Email}, nil
+	return &v1.TOTPLoginRes{UserKey: identity.UserKey, Email: identity.Email}, nil
 }
 
 func (c *Controller) RecoveryLogin(
@@ -69,7 +69,7 @@ func (c *Controller) RecoveryLogin(
 	}
 	c.setSessionCookie(ghttp.RequestFromCtx(ctx), result.SessionID)
 	return &v1.RecoveryLoginRes{
-		ID: identity.ID, Email: identity.Email, Restricted: true,
+		UserKey: identity.UserKey, Email: identity.Email, Restricted: true,
 	}, nil
 }
 
@@ -90,8 +90,12 @@ func (c *Controller) RecoverySession(
 	if !session.Authentication.Recovery {
 		return nil, iderr.Forbidden()
 	}
+	identity, err := c.svc.GetByID(ctx, session.IdentityID)
+	if err != nil {
+		return nil, err
+	}
 	return &v1.RecoverySessionRes{
-		IdentityID: session.IdentityID, ExpiresAt: session.ExpiresAt.Format(time.RFC3339),
+		UserKey: identity.UserKey, ExpiresAt: session.ExpiresAt.Format(time.RFC3339),
 	}, nil
 }
 

@@ -9,8 +9,8 @@ type TOTPLoginReq struct {
 }
 
 type TOTPLoginRes struct {
-	ID    string `json:"id"`
-	Email string `json:"email"`
+	UserKey string `json:"userKey"`
+	Email   string `json:"email"`
 }
 
 type RecoveryLoginReq struct {
@@ -20,7 +20,7 @@ type RecoveryLoginReq struct {
 }
 
 type RecoveryLoginRes struct {
-	ID         string `json:"id"`
+	UserKey    string `json:"userKey"`
 	Email      string `json:"email"`
 	Restricted bool   `json:"restricted"`
 }
@@ -30,8 +30,8 @@ type RecoverySessionReq struct {
 }
 
 type RecoverySessionRes struct {
-	IdentityID string `json:"identityId"`
-	ExpiresAt  string `json:"expiresAt"`
+	UserKey   string `json:"userKey"`
+	ExpiresAt string `json:"expiresAt"`
 }
 
 type TOTPEnrollmentBeginReq struct {

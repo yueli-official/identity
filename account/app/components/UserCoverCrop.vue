@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { createAccountNotifier } from '~/utils/feedback'
+import type { MediaRef } from '~/utils/media'
 
 // Banner-ratio cover crop + upload. Canvas crop ported from the donor
 // (nuxtblog/web UserCoverCrop); upload posts the cropped JPEG to the IdP cover
@@ -177,8 +178,8 @@ async function confirmCrop() {
     if (!blob) throw new Error('裁剪失败')
     const fd = new FormData()
     fd.append('file', new File([blob], 'cover.jpg', { type: 'image/jpeg' }))
-    const { coverUrl } = await call<{ coverUrl: string }>('/api/v1/session/cover', { method: 'POST', body: fd })
-    emit('update:modelValue', coverUrl)
+    const { cover } = await call<{ cover: MediaRef }>('/api/v1/session/cover', { method: 'POST', body: fd })
+    emit('update:modelValue', userMediaUrl(cover, 'cover'))
     cropModalOpen.value = false
   } catch (err: any) {
     toast.add({

@@ -307,6 +307,12 @@ type InvalidProfileReason string
 
 const (
 	ProfileReasonDisplayNameRequired InvalidProfileReason = "display_name_required"
+	ProfileReasonDisplayNameTooLong  InvalidProfileReason = "display_name_too_long"
+	ProfileReasonHandleInvalid       InvalidProfileReason = "handle_invalid"
+	ProfileReasonBioTooLong          InvalidProfileReason = "bio_too_long"
+	ProfileReasonLocaleTooLong       InvalidProfileReason = "locale_too_long"
+	ProfileReasonSocialLinksInvalid  InvalidProfileReason = "social_links_invalid"
+	ProfileReasonBatchTooLarge       InvalidProfileReason = "batch_too_large"
 	ProfileReasonFileRequired        InvalidProfileReason = "file_required"
 	ProfileReasonImageTooLarge       InvalidProfileReason = "image_too_large"
 	ProfileReasonUnsupportedImage    InvalidProfileReason = "unsupported_image"
@@ -317,6 +323,12 @@ const (
 // enum rather than an implementation-detail message.
 func InvalidProfile(reason InvalidProfileReason) error {
 	return mapped(CodeInvalidProfile, map[string]any{"reason": string(reason)})
+}
+
+// HandleUnavailable deliberately merges a currently used and historically
+// retired handle so callers cannot use rename history as an account oracle.
+func HandleUnavailable() error {
+	return mapped(CodeHandleUnavailable, nil)
 }
 
 // SessionNotFound: the target session does not exist OR is not owned by the

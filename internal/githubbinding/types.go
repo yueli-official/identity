@@ -97,11 +97,12 @@ type Provider interface {
 }
 
 type Config struct {
-	Store        Store
-	Provider     Provider
-	CipherSecret []byte
-	AttemptTTL   time.Duration
-	Now          func() time.Time
+	Store                   Store
+	Provider                Provider
+	CipherSecret            []byte
+	AttemptTTL              time.Duration
+	Now                     func() time.Time
+	ResolvePublisherSubject func(context.Context, string) (string, error)
 }
 
 type BeginResult struct {

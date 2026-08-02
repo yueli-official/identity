@@ -63,7 +63,7 @@ func TestE2E_OIDCAssuranceStepUpGate(t *testing.T) {
 			manager.KeyGetter,
 		)
 		oidcController := controller.NewOIDC(
-			provider, manager, service, store, base, base+"/login", false,
+			provider, manager, service, store, base, base+"/login", base+"/media", false,
 			[]byte("0123456789abcdef0123456789abcdef"),
 		)
 		server := ghttp.GetServer(t.Name())

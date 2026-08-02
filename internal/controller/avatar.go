@@ -25,7 +25,7 @@ const serviceTokenTTL = 2 * time.Minute
 
 // AvatarController proxies avatar/cover uploads to the asset service on behalf of
 // the cookie-authenticated caller. The IdP mints a short-lived user token and
-// drives the upload server-side, then commits the public URL to the profile.
+// drives the upload server-side, then commits the Asset media key to the profile.
 type AvatarController struct {
 	svc      *logic.Service
 	mgr      *oidc.Manager
@@ -38,22 +38,22 @@ func NewAvatar(svc *logic.Service, mgr *oidc.Manager, asset *assetclient.Client,
 	return &AvatarController{svc: svc, mgr: mgr, asset: asset, issuer: issuer, audience: audience}
 }
 
-// UploadAvatar stores the caller's avatar (square) and returns its public URL.
+// UploadAvatar stores the caller's avatar (square) and returns its media reference.
 func (c *AvatarController) UploadAvatar(ctx context.Context, req *v1.UploadAvatarReq) (*v1.UploadAvatarRes, error) {
-	url, err := c.upload(ctx, "avatar", req.File)
+	mediaKey, err := c.upload(ctx, "avatar", req.File)
 	if err != nil {
 		return nil, err
 	}
-	return &v1.UploadAvatarRes{AvatarURL: url}, nil
+	return &v1.UploadAvatarRes{Avatar: v1.MediaRef{MediaKey: mediaKey}}, nil
 }
 
-// UploadCover stores the caller's cover banner and returns its public URL.
+// UploadCover stores the caller's cover banner and returns its media reference.
 func (c *AvatarController) UploadCover(ctx context.Context, req *v1.UploadCoverReq) (*v1.UploadCoverRes, error) {
-	url, err := c.upload(ctx, "cover", req.File)
+	mediaKey, err := c.upload(ctx, "cover", req.File)
 	if err != nil {
 		return nil, err
 	}
-	return &v1.UploadCoverRes{CoverURL: url}, nil
+	return &v1.UploadCoverRes{Cover: v1.MediaRef{MediaKey: mediaKey}}, nil
 }
 
 func (c *AvatarController) upload(ctx context.Context, kind string, file *ghttp.UploadFile) (string, error) {
@@ -90,7 +90,7 @@ func (c *AvatarController) upload(ctx context.Context, kind string, file *ghttp.
 		oldAssetID = prev.CoverAssetID
 	}
 
-	bearer, err := c.mgr.MintServiceToken(c.issuer, id.ID, c.audience, "", serviceTokenTTL, time.Now())
+	bearer, err := c.mgr.MintDelegatedUserToken(c.issuer, id.UserKey, c.audience, "", serviceTokenTTL, time.Now())
 	if err != nil {
 		return "", err
 	}
@@ -101,12 +101,12 @@ func (c *AvatarController) upload(ctx context.Context, kind string, file *ghttp.
 	if err != nil {
 		return "", err
 	}
-	if err := c.svc.SetProfileImage(ctx, id.ID, kind, view.CdnURL, view.ID); err != nil {
+	if err := c.svc.SetProfileImage(ctx, id.ID, kind, view.MediaKey, view.ID); err != nil {
 		return "", err
 	}
 	// Best-effort: drop the replaced asset (skip when dedup returned the same id).
 	if oldAssetID != "" && oldAssetID != view.ID {
 		_ = c.asset.Delete(ctx, bearer, oldAssetID)
 	}
-	return view.CdnURL, nil
+	return view.MediaKey, nil
 }

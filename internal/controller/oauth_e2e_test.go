@@ -333,7 +333,7 @@ func sessionCookieValue(jar http.CookieJar, base string) string {
 }
 
 // getMeIdentity calls GET /api/v1/session/me with the jar's cookies, asserts a
-// successful response with the expected email, and returns the identity id.
+// successful response with the expected email, and returns the public user key.
 func getMeIdentity(t *testing.T, client *http.Client, base, wantEmail string) string {
 	t.Helper()
 	resp, err := client.Get(base + "/api/v1/session/me")
@@ -346,9 +346,9 @@ func getMeIdentity(t *testing.T, client *http.Client, base, wantEmail string) st
 	if email := j.Get("email").String(); email != wantEmail {
 		t.Fatalf("me: email = %q, want %q (body=%s)", email, wantEmail, body)
 	}
-	id := j.Get("id").String()
-	if id == "" {
-		t.Fatalf("me: empty identity id (body=%s)", body)
+	userKey := j.Get("userKey").String()
+	if userKey == "" {
+		t.Fatalf("me: empty public user key (body=%s)", body)
 	}
-	return id
+	return userKey
 }

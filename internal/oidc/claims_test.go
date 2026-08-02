@@ -11,10 +11,10 @@ import (
 
 func TestUserinfoScopeGating(t *testing.T) {
 	id := model.Identity{ID: "u1", Email: "a@b.com", EmailVerified: true}
-	p := model.Profile{DisplayName: "A", Username: "alice", AvatarURL: "x", Locale: "zh-CN"}
+	p := model.Profile{DisplayName: "A", Handle: "alice", AvatarMediaKey: "31Pj0mXv7cfR5fdZIUvra", Locale: "zh-CN"}
 
-	full := oidc.Userinfo(id, p, []string{"openid", "profile", "email", "roles"}, []string{"user", "admin"})
-	if full["sub"] != "u1" {
+	full := oidc.Userinfo("https://account.example/media", "usr_test-subject", id, p, []string{"openid", "profile", "email", "roles"}, []string{"user", "admin"})
+	if full["sub"] != "usr_test-subject" {
 		t.Fatalf("sub = %v", full["sub"])
 	}
 	if full["email"] != "a@b.com" {
@@ -23,12 +23,15 @@ func TestUserinfoScopeGating(t *testing.T) {
 	if full["name"] != "A" {
 		t.Fatalf("name = %v", full["name"])
 	}
+	if full["picture"] != "https://account.example/media/31Pj0mXv7cfR5fdZIUvra?format=webp&name=thumbnail" {
+		t.Fatalf("picture = %v", full["picture"])
+	}
 	if _, ok := full["roles"]; !ok {
 		t.Fatal("roles missing under roles scope")
 	}
 
 	// Without email scope, no email key.
-	noEmail := oidc.Userinfo(id, p, []string{"openid", "profile"}, nil)
+	noEmail := oidc.Userinfo("https://account.example/media", "usr_test-subject", id, p, []string{"openid", "profile"}, nil)
 	if _, ok := noEmail["email"]; ok {
 		t.Fatal("email leaked without email scope")
 	}
@@ -36,7 +39,7 @@ func TestUserinfoScopeGating(t *testing.T) {
 	if _, ok := noEmail["name"]; !ok {
 		t.Fatal("name missing under profile scope")
 	}
-	bare := oidc.Userinfo(id, p, []string{"openid"}, nil)
+	bare := oidc.Userinfo("https://account.example/media", "usr_test-subject", id, p, []string{"openid"}, nil)
 	if _, ok := bare["name"]; ok {
 		t.Fatal("name leaked without profile scope")
 	}
@@ -46,7 +49,7 @@ func TestUserinfoScopeGating(t *testing.T) {
 }
 
 func TestBuildSession_RolesClaim(t *testing.T) {
-	s := oidc.BuildSession("iss", "cli", "kid", "sid",
+	s := oidc.BuildSession("iss", "https://account.example/media", "cli", "kid", "sid", "usr_subject",
 		model.Identity{ID: "u1"}, model.Profile{},
 		[]string{"openid", "roles"}, []string{"user", "admin"},
 		authentication.Password("event-1", time.Now()), time.Now())
@@ -63,7 +66,7 @@ func TestBuildSession_RolesClaim(t *testing.T) {
 }
 
 func TestBuildSessionCarriesAccessTokenClientID(t *testing.T) {
-	s := oidc.BuildSession("iss", "blog-ai-web", "kid", "sid",
+	s := oidc.BuildSession("iss", "https://account.example/media", "blog-ai-web", "kid", "sid", "usr_subject",
 		model.Identity{ID: "u1"}, model.Profile{},
 		[]string{"openid"}, nil,
 		authentication.Password("event-1", time.Now()), time.Now())
@@ -76,7 +79,7 @@ func TestBuildSessionCarriesAccessTokenClientID(t *testing.T) {
 }
 
 func TestBuildSession_NoRolesScope_NoClaim(t *testing.T) {
-	s := oidc.BuildSession("iss", "cli", "kid", "sid",
+	s := oidc.BuildSession("iss", "https://account.example/media", "cli", "kid", "sid", "usr_subject",
 		model.Identity{ID: "u1"}, model.Profile{},
 		[]string{"openid"}, []string{"user"},
 		authentication.Password("event-1", time.Now()), time.Now())
@@ -91,14 +94,14 @@ func TestBuildSession_NoRolesScope_NoClaim(t *testing.T) {
 func TestBuildSessionSubjectAndClaims(t *testing.T) {
 	now := time.Unix(1700000000, 0).UTC()
 	id := model.Identity{ID: "u1", Email: "a@b.com", EmailVerified: true}
-	p := model.Profile{DisplayName: "A", Username: "alice", Locale: "zh-CN"}
+	p := model.Profile{DisplayName: "A", Handle: "alice", Locale: "zh-CN"}
 	authenticatedAt := now.Add(-time.Hour)
 	s := oidc.BuildSession(
-		"iss", "client1", "kid1", "", id, p,
+		"iss", "https://account.example/media", "client1", "kid1", "", "usr_subject", id, p,
 		[]string{"openid", "email", "roles"}, []string{"user"},
 		authentication.Password("event-1", authenticatedAt), now,
 	)
-	if s.GetSubject() != "u1" {
+	if s.GetSubject() != "usr_subject" {
 		t.Fatalf("subject = %q", s.GetSubject())
 	}
 	if !s.DefaultSession.Claims.AuthTime.Equal(authenticatedAt) {
@@ -118,7 +121,7 @@ func TestBuildSessionSubjectAndClaims(t *testing.T) {
 func TestBuildSessionCarriesIdPSessionID(t *testing.T) {
 	id := model.Identity{ID: "id-1", Email: "a@b.com", EmailVerified: true}
 	p := model.Profile{DisplayName: "A"}
-	s := oidc.BuildSession("iss", "client-1", "kid-1", "sess-xyz", id, p,
+	s := oidc.BuildSession("iss", "https://account.example/media", "client-1", "kid-1", "sess-xyz", "usr_subject", id, p,
 		[]string{"openid", "offline_access"}, nil,
 		authentication.Password("event-1", time.Now().UTC()), time.Now().UTC())
 	if s.IdPSessionID != "sess-xyz" {

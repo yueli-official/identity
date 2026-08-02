@@ -36,15 +36,16 @@ func (s *Service) AdminGetUser(ctx context.Context, targetID string) (repo.Admin
 		return repo.AdminUserRow{}, err
 	}
 	return repo.AdminUserRow{
-		ID:            idn.ID,
-		Email:         idn.Email,
-		EmailVerified: idn.EmailVerified,
-		Status:        idn.Status,
-		CreatedAt:     idn.CreatedAt,
-		DisplayName:   prof.DisplayName,
-		Username:      prof.Username,
-		AvatarURL:     prof.AvatarURL,
-		Roles:         roles,
+		InternalID:     idn.ID,
+		UserKey:        idn.UserKey,
+		Email:          idn.Email,
+		EmailVerified:  idn.EmailVerified,
+		Status:         idn.Status,
+		CreatedAt:      idn.CreatedAt,
+		DisplayName:    prof.DisplayName,
+		Handle:         prof.Handle,
+		AvatarMediaKey: prof.AvatarMediaKey,
+		Roles:          roles,
 	}, nil
 }
 
@@ -139,20 +140,19 @@ func (s *Service) AdminResetPassword(ctx context.Context, targetID, newPassword 
 // email + password, creates the identity, and grants the requested roles
 // (defaulting to {user}). Returns the created identity.
 func (s *Service) AdminCreateUser(ctx context.Context, in RegisterInput, roles []string) (model.Identity, error) {
+	requested := make([]string, 0, len(roles)+1)
+	seen := map[string]bool{}
+	for _, role := range append([]string{DefaultRole}, roles...) {
+		if role == "" || seen[role] {
+			continue
+		}
+		seen[role] = true
+		requested = append(requested, role)
+	}
+	in.Roles = requested
 	id, err := s.Register(ctx, in)
 	if err != nil {
 		return model.Identity{}, err
-	}
-	for _, role := range roles {
-		if role == DefaultRole {
-			continue // Register already granted the default role
-		}
-		if err := s.store.GrantRole(ctx, id.ID, role); err != nil {
-			if errors.Is(err, repo.ErrUnknownRole) {
-				return model.Identity{}, iderr.UnknownRole(role)
-			}
-			return model.Identity{}, err
-		}
 	}
 	s.audit(ctx, AuditEvent{
 		Event:    EvAdminUserCreated,
@@ -168,7 +168,5 @@ func (s *Service) AdminCreateUser(ctx context.Context, in RegisterInput, roles [
 // (best-effort; failures are swallowed so the primary mutation still succeeds).
 func (s *Service) killSessions(ctx context.Context, identityID string) {
 	_ = s.store.DeleteSessionsByIdentity(ctx, identityID)
-	if s.revoker != nil {
-		_ = s.revoker.RevokeRefreshByIdentity(ctx, identityID)
-	}
+	_ = s.revokeRefreshByIdentity(ctx, identityID)
 }

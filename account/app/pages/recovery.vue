@@ -6,7 +6,7 @@ const completed = ref(false)
 const leaving = ref(false)
 const { data, pending, error } = await useAsyncData(
   'restricted-recovery-session',
-  () => call<{ identityId: string, expiresAt: string }>('/api/v1/account/recovery'),
+  () => call<{ userKey: string, expiresAt: string }>('/api/v1/account/recovery'),
 )
 const recoveryExpiry = useExpiryCountdown(() => data.value?.expiresAt ?? '')
 const recoveryUnavailable = computed(() => !!error.value || !data.value || recoveryExpiry.expired.value)

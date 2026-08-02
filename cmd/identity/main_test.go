@@ -38,3 +38,16 @@ func TestPATHMACSecret(t *testing.T) {
 		}
 	})
 }
+
+func TestValidatePublicMediaBaseURL(t *testing.T) {
+	for _, value := range []string{"https://account.example/media", "http://127.0.0.1:3000/media"} {
+		if err := validatePublicMediaBaseURL(value); err != nil {
+			t.Fatalf("validatePublicMediaBaseURL(%q) = %v", value, err)
+		}
+	}
+	for _, value := range []string{"/media", "ftp://cdn.example/media", "https://user:pass@cdn.example/media", "https://cdn.example/media?x=1", "https://cdn.example/media#x"} {
+		if err := validatePublicMediaBaseURL(value); err == nil {
+			t.Fatalf("validatePublicMediaBaseURL(%q) accepted unsafe value", value)
+		}
+	}
+}

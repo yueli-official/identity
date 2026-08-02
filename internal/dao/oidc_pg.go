@@ -14,7 +14,7 @@ import (
 // "cannot convert []string to pq.StringArray", which made every client load fail.
 func (p *PG) GetClient(ctx context.Context, id string) (model.OIDCClient, error) {
 	row, err := p.db.GetOne(ctx,
-		"SELECT id, public, secret_hash, secret_ref, redirect_uris, post_logout_redirect_uris, audiences, grant_types, response_types, scopes FROM oidc_clients WHERE id = $1",
+		"SELECT id, public, secret_hash, secret_ref, redirect_uris, post_logout_redirect_uris, audiences, grant_types, response_types, scopes, subject_type, subject_sector FROM oidc_clients WHERE id = $1",
 		id,
 	)
 	if err != nil {
@@ -35,6 +35,8 @@ func (p *PG) GetClient(ctx context.Context, id string) (model.OIDCClient, error)
 		GrantTypes:             row["grant_types"].Strings(),
 		ResponseTypes:          row["response_types"].Strings(),
 		Scopes:                 row["scopes"].Strings(),
+		SubjectType:            row["subject_type"].String(),
+		SubjectSector:          row["subject_sector"].String(),
 	}, nil
 }
 

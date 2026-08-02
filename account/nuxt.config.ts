@@ -4,6 +4,9 @@
 const identityApiBase = (
   process.env.NUXT_API_BASE || "http://127.0.0.1:8081"
 ).replace(/\/+$/, "");
+const assetApiBase = (
+  process.env.NUXT_ASSET_BASE || "http://127.0.0.1:8082"
+).replace(/\/+$/, "");
 
 export default defineNuxtConfig({
   modules: ["@nuxt/ui", "@yueli/ui"],
@@ -22,6 +25,7 @@ export default defineNuxtConfig({
     // the backend by absolute URL fixes SSR auth (hard loads / deep links).
     // Override in prod with NUXT_API_BASE.
     apiBase: identityApiBase,
+    assetBase: assetApiBase,
     platformCatalogFingerprint:
       process.env.NUXT_PLATFORM_CATALOG_FINGERPRINT || "local-unversioned",
     platformEnvironment: process.env.NUXT_PLATFORM_ENVIRONMENT || "local",

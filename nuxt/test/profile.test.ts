@@ -1,88 +1,88 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createCachedProfileFetcher,
-  mergePublicProfile,
+  mergePublicUser,
   resolveLatestDisplayUser,
 } from "../server/utils/profile";
 
-describe("mergePublicProfile", () => {
+describe("mergePublicUser", () => {
   it("uses the latest Identity display name and avatar", () => {
     expect(
-      mergePublicProfile(
+      mergePublicUser(
         {
-          sub: "user-1",
+          sub: "usr_0000000000000000000000",
           email: "old@example.com",
           name: "旧名称",
           avatar: "https://old.example/avatar.png",
           roles: ["member"],
         },
         {
-          id: "user-1",
+          userKey: "usr_0000000000000000000000",
+          handle: "new-name",
           displayName: "新名称",
-          avatarUrl: "https://identity.example/avatar.png",
+          avatar: { mediaKey: "31Pj0mXv7cfR5fdZIUvra" },
         },
       ),
     ).toEqual({
-      sub: "user-1",
+      sub: "usr_0000000000000000000000",
       email: "old@example.com",
       name: "新名称",
-      avatar: "https://identity.example/avatar.png",
+      avatar: "/media/31Pj0mXv7cfR5fdZIUvra?format=webp&name=thumbnail",
       roles: ["member"],
     });
   });
 
   it("clears a removed avatar without dropping private session fields", () => {
     expect(
-      mergePublicProfile(
+      mergePublicUser(
         {
-          sub: "user-1",
+          sub: "usr_0000000000000000000000",
           email: "user@example.com",
           avatar: "https://old.example/avatar.png",
         },
-        { id: "user-1", displayName: "", avatarUrl: "" },
+        { userKey: "usr_0000000000000000000000", handle: "", displayName: "" },
       ),
     ).toEqual({
-      sub: "user-1",
+      sub: "usr_0000000000000000000000",
       email: "user@example.com",
       avatar: undefined,
     });
   });
 
   it("ignores a profile for a different identity", () => {
-    const user = { sub: "user-1", name: "当前用户" };
+    const user = { sub: "usr_0000000000000000000000", name: "当前用户" };
     expect(
-      mergePublicProfile(user, {
-        id: "user-2",
+      mergePublicUser(user, {
+        userKey: "usr_1111111111111111111111",
+        handle: "other",
         displayName: "其他用户",
-        avatarUrl: "https://example.com/other.png",
+        avatar: { mediaKey: "31Pj0mXv7cfR5fdZIUvra" },
       }),
     ).toEqual(user);
   });
 
   it("resolves the current profile from the configured Identity issuer", async () => {
     const fetchProfile = vi.fn().mockResolvedValue({
-      code: "ok",
-      data: {
-        profile: {
-          id: "user/1",
-          displayName: "月离",
-          avatarUrl: "https://identity.example/avatar.png",
-        },
+      user: {
+        userKey: "usr_0000000000000000000000",
+        handle: "yueli",
+        displayName: "月离",
+        avatar: { mediaKey: "31Pj0mXv7cfR5fdZIUvra" },
       },
     });
 
     await expect(
       resolveLatestDisplayUser(
-        { sub: "user/1", name: "旧名称" },
+        { sub: "usr_0000000000000000000000", name: "旧名称" },
         "https://identity.example/",
         fetchProfile,
       ),
     ).resolves.toMatchObject({
       name: "月离",
-      avatar: "https://identity.example/avatar.png",
+      avatar: "/media/31Pj0mXv7cfR5fdZIUvra?format=webp&name=thumbnail",
     });
     expect(fetchProfile).toHaveBeenCalledWith(
-      "https://identity.example/api/v1/profiles/user%2F1",
+      "https://identity.example/api/v1/users/usr_0000000000000000000000",
     );
   });
 

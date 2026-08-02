@@ -19,16 +19,17 @@ import (
 const defaultAttemptTTL = 10 * time.Minute
 
 type Module struct {
-	store    Store
-	provider Provider
-	aead     cipher.AEAD
-	ttl      time.Duration
-	now      func() time.Time
-	random   io.Reader
+	store                   Store
+	provider                Provider
+	aead                    cipher.AEAD
+	ttl                     time.Duration
+	now                     func() time.Time
+	random                  io.Reader
+	resolvePublisherSubject func(context.Context, string) (string, error)
 }
 
 func New(config Config) (*Module, error) {
-	if config.Store == nil || config.Provider == nil || len(config.CipherSecret) < 32 {
+	if config.Store == nil || config.Provider == nil || config.ResolvePublisherSubject == nil || len(config.CipherSecret) < 32 {
 		return nil, ErrUnavailable
 	}
 	key := sha256.Sum256(append([]byte("identity/github-binding/pkce/v1\x00"), config.CipherSecret...))
@@ -51,6 +52,7 @@ func New(config Config) (*Module, error) {
 	return &Module{
 		store: config.Store, provider: config.Provider, aead: aead,
 		ttl: ttl, now: now, random: rand.Reader,
+		resolvePublisherSubject: config.ResolvePublisherSubject,
 	}, nil
 }
 

@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/lib/pq"
+	"github.com/yueli-official/identity/internal/user"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -22,8 +23,10 @@ type seed struct {
 
 type account struct {
 	ID          string `json:"id"`
+	UserKey     string `json:"userKey"`
 	Email       string `json:"email"`
 	Password    string `json:"password"`
+	Handle      string `json:"handle"`
 	DisplayName string `json:"displayName"`
 }
 
@@ -78,8 +81,17 @@ func parseSeed(raw string) (seed, error) {
 		!strings.Contains(declared.Account.Email, "@") ||
 		len(declared.Account.Password) < 12 ||
 		strings.TrimSpace(declared.Account.DisplayName) == "" {
-		return seed{}, fmt.Errorf("account id, email, displayName and a password of at least 12 characters are required")
+		return seed{}, fmt.Errorf("account id, userKey, email, handle, displayName and a password of at least 12 characters are required")
 	}
+	if _, err := user.ParsePublicKey(strings.TrimSpace(declared.Account.UserKey)); err != nil {
+		return seed{}, fmt.Errorf("account userKey: %w", err)
+	}
+	handle, err := user.NormalizeHandle(declared.Account.Handle)
+	if err != nil {
+		return seed{}, fmt.Errorf("account handle: %w", err)
+	}
+	declared.Account.UserKey = strings.TrimSpace(declared.Account.UserKey)
+	declared.Account.Handle = string(handle)
 	seen := map[string]bool{}
 	for _, client := range declared.SiteClients {
 		if strings.TrimSpace(client.ID) == "" || seen[client.ID] || len(client.RedirectURIs) == 0 {
@@ -114,16 +126,38 @@ func reconcile(ctx context.Context, db *sql.DB, declared seed) error {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `INSERT INTO identities (id, email, email_verified, status)
-		VALUES ($1, $2, TRUE, 'active')
-		ON CONFLICT (id) DO UPDATE SET email=EXCLUDED.email, email_verified=TRUE, status='active'`,
-		declared.Account.ID, declared.Account.Email); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO identities (id, user_key, email, email_verified, status)
+		VALUES ($1, $2, $3, TRUE, 'active')
+		ON CONFLICT (id) DO UPDATE SET
+			user_key=EXCLUDED.user_key, email=EXCLUDED.email, email_verified=TRUE, status='active'`,
+		declared.Account.ID, declared.Account.UserKey, declared.Account.Email); err != nil {
 		return fmt.Errorf("reconcile development identity: %w", err)
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO user_profiles (identity_id, display_name, locale, bio, social_links)
-		VALUES ($1, $2, 'zh-CN', '', '[]'::jsonb)
-		ON CONFLICT (identity_id) DO UPDATE SET display_name=EXCLUDED.display_name`,
-		declared.Account.ID, declared.Account.DisplayName); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO oidc_subjects (identity_id, sector_key, subject, subject_type)
+		VALUES ($1, 'public', $2, 'public')
+		ON CONFLICT (identity_id, sector_key) DO UPDATE SET
+			subject=EXCLUDED.subject, subject_type='public'`, declared.Account.ID, declared.Account.UserKey); err != nil {
+		return fmt.Errorf("reconcile development public subject: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE user_handle_history
+		SET state='retired', retired_at=now()
+		WHERE identity_id=$1 AND state='current' AND handle<>$2`, declared.Account.ID, declared.Account.Handle); err != nil {
+		return fmt.Errorf("retire previous development handle: %w", err)
+	}
+	result, err := tx.ExecContext(ctx, `INSERT INTO user_handle_history (handle, identity_id, state)
+		VALUES ($1, $2, 'current')
+		ON CONFLICT (handle) DO UPDATE SET state='current', retired_at=NULL
+		WHERE user_handle_history.identity_id=EXCLUDED.identity_id`, declared.Account.Handle, declared.Account.ID)
+	if err != nil {
+		return fmt.Errorf("reconcile development handle: %w", err)
+	}
+	if affected, err := result.RowsAffected(); err != nil || affected != 1 {
+		return fmt.Errorf("reconcile development handle: handle is reserved by another user")
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO user_profiles (identity_id, handle, display_name, locale, bio, social_links)
+		VALUES ($1, $2, $3, 'zh-CN', '', '[]'::jsonb)
+		ON CONFLICT (identity_id) DO UPDATE SET handle=EXCLUDED.handle, display_name=EXCLUDED.display_name`,
+		declared.Account.ID, declared.Account.Handle, declared.Account.DisplayName); err != nil {
 		return fmt.Errorf("reconcile development profile: %w", err)
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO credentials_password (identity_id, password_hash)

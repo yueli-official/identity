@@ -9,7 +9,9 @@ import (
 	v1 "github.com/yueli-official/identity/api/v1"
 	"github.com/yueli-official/identity/internal/identitycap"
 	"github.com/yueli-official/identity/internal/iderr"
+	"github.com/yueli-official/identity/internal/logic"
 	"github.com/yueli-official/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/testidentity"
 )
 
 type captureCapabilityAudit struct{ row repo.AuditRow }
@@ -23,8 +25,15 @@ func (*captureCapabilityAudit) QueryAudit(context.Context, repo.AuditFilter) ([]
 }
 
 func TestCapabilityMachineAuthorizationSeparatesReadAndProbeScopes(t *testing.T) {
-	controller := &Capability{}
-	readCtx := foundationauth.NewContext(context.Background(), &foundationauth.Principal{ClientID: "account-platform", Scopes: []string{"platform:capabilities:read"}})
+	store := repo.NewMemory()
+	identity, err := store.CreateIdentityWithProfile(context.Background(), repo.NewIdentityInput{
+		Email: "admin@example.test", DisplayName: "Admin", Roles: []string{logic.AdminRole},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	controller := &Capability{auth: New(logic.New(store, logic.DefaultConfig()), false)}
+	readCtx := foundationauth.NewContext(context.Background(), testidentity.Client(t, "account-platform", []string{"platform:capabilities:read"}))
 	actor, err := controller.authorize(readCtx, "platform:capabilities:read")
 	if err != nil || actor.rateKey != "account-platform" || actor.clientID != "account-platform" || actor.identityID != "" {
 		t.Fatalf("read authorization actor=%+v err=%v", actor, err)
@@ -37,14 +46,15 @@ func TestCapabilityMachineAuthorizationSeparatesReadAndProbeScopes(t *testing.T)
 			t.Fatalf("read token probe error = %v", err)
 		}
 	}
-	probeCtx := foundationauth.NewContext(context.Background(), &foundationauth.Principal{Subject: "operator", Scopes: []string{"platform:capabilities:probe"}})
-	actor, err = controller.authorize(probeCtx, "platform:capabilities:probe")
-	if err != nil || actor.rateKey != "operator" || actor.identityID != "" {
-		t.Fatalf("probe authorization actor=%+v err=%v", actor, err)
+	probeCtx := foundationauth.NewContext(context.Background(), testidentity.User(t, identity.UserKey, nil, []string{"platform:capabilities:probe"}))
+	if _, err := controller.authorize(probeCtx, "platform:capabilities:probe"); err == nil {
+		t.Fatal("non-admin user scope unexpectedly authorized provider probing")
 	}
-	userCtx := foundationauth.NewContext(context.Background(), &foundationauth.Principal{Subject: "4f553f75-e2d9-4f21-8d12-5f43659504f2", ClientID: "account-platform", Scopes: []string{"platform:capabilities:probe"}})
+	userCtx := foundationauth.NewContext(context.Background(), testidentity.Principal(
+		t, "user", identity.UserKey, "account-platform", []string{logic.AdminRole}, nil,
+	))
 	actor, err = controller.authorize(userCtx, "platform:capabilities:probe")
-	if err != nil || actor.rateKey != "4f553f75-e2d9-4f21-8d12-5f43659504f2" || actor.identityID != "4f553f75-e2d9-4f21-8d12-5f43659504f2" || actor.clientID != "account-platform" {
+	if err != nil || actor.rateKey != identity.UserKey || actor.identityID != identity.ID || actor.clientID != "account-platform" {
 		t.Fatalf("user-scoped machine actor=%+v err=%v", actor, err)
 	}
 }
@@ -60,7 +70,7 @@ func TestMachineProbeAuditsClientIDWithoutInvalidUUIDActor(t *testing.T) {
 	}
 	audit := &captureCapabilityAudit{}
 	controller := NewCapability(nil, registry, audit, capability.ServiceMetadata{Name: "identity", Version: "test", BuildSHA: "test", Deployment: "identity-test"})
-	ctx := foundationauth.NewContext(context.Background(), &foundationauth.Principal{Subject: "account-platform", ClientID: "account-platform", Scopes: []string{"platform:capabilities:probe"}})
+	ctx := foundationauth.NewContext(context.Background(), testidentity.Client(t, "account-platform", []string{"platform:capabilities:probe"}))
 	if _, err := controller.ProviderHealthCheck(ctx, &v1.AdminProviderHealthCheckReq{Key: "dev-mail"}); err != nil {
 		t.Fatal(err)
 	}

@@ -23,8 +23,8 @@ type PasskeyLoginFinishReq struct {
 }
 
 type PasskeyLoginFinishRes struct {
-	ID    string `json:"id"`
-	Email string `json:"email"`
+	UserKey string `json:"userKey"`
+	Email   string `json:"email"`
 }
 
 type PasskeyRegistrationBeginReq struct {

@@ -14,8 +14,8 @@ package controller_test
 //  1. Register + login → audit visible via admin endpoint; login.success entry
 //     carries non-empty ip and userAgent (proves ActorMiddleware populated ctx).
 //  2. Login failure recorded with result=failure and detail.reason=bad_password.
-//  3. Admin grant-role records actor: role.granted entry has actorId==adminID
-//     and targetId==userID and detail.role==granted role.
+//  3. Admin grant-role records actor: role.granted exposes public actor/target
+//     user keys and detail.role==granted role.
 //  4. Endpoint authz: non-admin and unauthenticated → 403 / 401; admin → 200.
 
 import (
@@ -128,7 +128,7 @@ func TestE2E_AuditLogging(t *testing.T) {
 		})
 		t.AssertNil(err)
 		t.AssertNil(svc.GrantRole(ctx, adminOut.ID, logic.AdminRole))
-		adminID := adminOut.ID
+		adminKey := adminOut.UserKey
 
 		// Log the admin in over HTTP so we get a real session cookie:
 		_, adminLoginHdr := doPost("/api/v1/auth/login",
@@ -149,10 +149,10 @@ func TestE2E_AuditLogging(t *testing.T) {
 			fmt.Sprintf(`{"email":%q,"password":%q,"displayName":"AuditUser"}`, userEmail, userPassword),
 			map[string]string{"User-Agent": testUA},
 		)
-		// Resolve the user ID via the service so we can filter audit logs:
+		// Resolve the user's public key so we can filter audit logs:
 		userIdentity, err := svc.GetByEmail(ctx, userEmail)
 		t.AssertNil(err)
-		userID := userIdentity.ID
+		userKey := userIdentity.UserKey
 
 		// Log the user in over HTTP with a recognisable User-Agent:
 		_, loginHdr := doPost("/api/v1/auth/login",
@@ -163,7 +163,7 @@ func TestE2E_AuditLogging(t *testing.T) {
 		t.AssertNE(userSID, "")
 
 		// Query the admin audit endpoint for the user's events:
-		auditURL := fmt.Sprintf("/api/v1/admin/audit?identityId=%s", userID)
+		auditURL := fmt.Sprintf("/api/v1/admin/audit?userKey=%s", userKey)
 		auditBody, auditStatus := doGet(auditURL, cookieHdr(adminSID))
 		t.Assert(auditStatus, 200)
 		aj := gjson.New(auditBody)
@@ -232,17 +232,16 @@ func TestE2E_AuditLogging(t *testing.T) {
 		t.Assert(foundFailure, true)
 
 		// =====================================================================
-		// Scenario 3: Admin grant-role → role.granted records actorId==adminID,
-		// targetId==userID, detail.role==granted-role
+		// Scenario 3: Admin grant-role exposes public actor/target user keys.
 		// =====================================================================
 
 		const grantedRole = "admin"
-		grantPath := fmt.Sprintf("/api/v1/admin/identities/%s/roles?role=%s", userID, grantedRole)
+		grantPath := fmt.Sprintf("/api/v1/admin/users/%s/roles?role=%s", userKey, grantedRole)
 		_, _ = doPost(grantPath, "", cookieHdr(adminSID))
 
 		// Query audit for role.granted on the target user:
 		roleAuditBody, roleAuditStatus := doGet(
-			fmt.Sprintf("/api/v1/admin/audit?identityId=%s&event=role.granted", userID),
+			fmt.Sprintf("/api/v1/admin/audit?userKey=%s&event=role.granted", userKey),
 			cookieHdr(adminSID),
 		)
 		t.Assert(roleAuditStatus, 200)
@@ -256,8 +255,8 @@ func TestE2E_AuditLogging(t *testing.T) {
 		for _, raw := range roleEntries {
 			entry := gjson.New(raw)
 			if entry.Get("event").String() == "role.granted" &&
-				entry.Get("targetId").String() == userID &&
-				entry.Get("actorId").String() == adminID &&
+				entry.Get("targetUserKey").String() == userKey &&
+				entry.Get("actorUserKey").String() == adminKey &&
 				entry.Get("detail.role").String() == grantedRole {
 				foundRoleEntry = true
 				break

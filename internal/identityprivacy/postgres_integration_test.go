@@ -52,10 +52,11 @@ func TestCoordinatorFinalizesIdentityAfterRemoteOwnersAndKeepsStatusCapability(t
 		t.Fatal(err)
 	}
 	if _, err := db.ExecContext(ctx, `
-CREATE TABLE identities(id uuid PRIMARY KEY, email text NOT NULL, status text NOT NULL);
+CREATE TABLE identities(id uuid PRIMARY KEY, user_key text NOT NULL, email text NOT NULL, status text NOT NULL);
 CREATE TABLE audit_logs(actor_identity_id uuid, target_identity_id uuid);
 CREATE TABLE oidc_oauth_requests(subject text);
 CREATE TABLE oidc_refresh_tokens(subject text);
+CREATE TABLE oidc_subjects(identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE CASCADE, subject text NOT NULL);
 CREATE TABLE github_identity_bindings(
   id uuid PRIMARY KEY, identity_id uuid NOT NULL, provider_account_id text NOT NULL,
   provider_node_id text NOT NULL, login_snapshot text NOT NULL,
@@ -66,8 +67,12 @@ CREATE TABLE identity_privacy_requests(
   request_id text PRIMARY KEY, identity_id uuid NOT NULL,
   status_token_hash text NOT NULL, created_at timestamptz NOT NULL DEFAULT now()
 );
-INSERT INTO identities(id,email,status)
-VALUES ('00000000-0000-0000-0000-000000000101','owner@example.com','active');
+INSERT INTO identities(id,user_key,email,status)
+VALUES ('00000000-0000-0000-0000-000000000101','usr_0000000000000000000101','owner@example.com','active');
+INSERT INTO oidc_subjects(identity_id,subject)
+VALUES ('00000000-0000-0000-0000-000000000101','usr_0000000000000000000101');
+INSERT INTO oidc_oauth_requests(subject) VALUES ('usr_0000000000000000000101');
+INSERT INTO oidc_refresh_tokens(subject) VALUES ('usr_0000000000000000000101');
 INSERT INTO audit_logs(target_identity_id)
 VALUES ('00000000-0000-0000-0000-000000000101');
 INSERT INTO github_identity_bindings(
@@ -129,7 +134,7 @@ SELECT EXISTS(SELECT 1 FROM identities WHERE id='00000000-0000-0000-0000-0000000
 	}
 	requestedAt := time.Now().UTC().Truncate(time.Microsecond)
 	view, err := service.OpenErasure(
-		ctx, "00000000-0000-0000-0000-000000000101", "owner@example.com",
+		ctx, "00000000-0000-0000-0000-000000000101", "usr_0000000000000000000101", "owner@example.com",
 		"identity-erasure-command-1", strings.Repeat("s", 48), requestedAt,
 		privacy.VerificationEvidence{
 			VerifiedAt: requestedAt, Method: "active_identity_session",

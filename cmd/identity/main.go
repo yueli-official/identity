@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -137,6 +138,12 @@ func main() {
 	secureCookie := g.Cfg().MustGet(ctx, "cookie.secure", true).Bool()
 	accountBaseURL := g.Cfg().MustGet(ctx, "account.baseUrl", "http://localhost:3000").String()
 	assetBaseURL := g.Cfg().MustGet(ctx, "asset.baseUrl", "http://localhost:8082").String()
+	publicMediaBaseURL := g.Cfg().MustGet(
+		ctx, "asset.publicMediaBaseUrl", strings.TrimRight(accountBaseURL, "/")+"/media",
+	).String()
+	if err := validatePublicMediaBaseURL(publicMediaBaseURL); err != nil {
+		panic(fmt.Sprintf("asset.publicMediaBaseUrl: %v", err))
+	}
 	assetAudience := g.Cfg().MustGet(ctx, "asset.audience").String()
 	commerceBaseURL := g.Cfg().MustGet(ctx, "commerce.baseUrl").String()
 	commerceAudience := g.Cfg().MustGet(ctx, "commerce.audience").String()
@@ -570,6 +577,10 @@ func main() {
 		githubModule, err = githubbinding.New(githubbinding.Config{
 			Store: repositories.githubStore, Provider: githubProvider,
 			CipherSecret: []byte(globalSecret),
+			ResolvePublisherSubject: func(ctx context.Context, identityID string) (string, error) {
+				identity, err := repositories.store.GetByID(ctx, identityID)
+				return identity.UserKey, err
+			},
 			AttemptTTL: g.Cfg().MustGet(
 				ctx, "githubBinding.attemptTtl", "10m",
 			).Duration(),
@@ -664,10 +675,10 @@ func main() {
 			Bool(),
 	}, mgr.KeyGetter)
 	oidcCtl := controller.NewOIDC(
-		provider, mgr, svc, repositories.clients, issuer, loginURL,
+		provider, mgr, svc, repositories.clients, issuer, loginURL, publicMediaBaseURL,
 		secureCookie, []byte(globalSecret),
 	)
-	guestCtl := controller.NewGuest(guest.New(repositories.guestStore, repositories.clients, mgr, guest.Config{
+	guestCtl := controller.NewGuest(guest.New(repositories.guestStore, repositories.clients, repositories.store, mgr, guest.Config{
 		Issuer:         issuer,
 		MaxSessionTTL:  g.Cfg().MustGet(ctx, "guest.maxSessionTtl", "720h").Duration(),
 		AccessTokenTTL: g.Cfg().MustGet(ctx, "guest.accessTokenTtl", "10m").Duration(),
@@ -835,6 +846,17 @@ func main() {
 
 	g.Log().Info(ctx, "identity-service starting")
 	s.Run()
+}
+
+func validatePublicMediaBaseURL(value string) error {
+	parsed, err := url.Parse(strings.TrimSpace(value))
+	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return errors.New("must be an absolute HTTP(S) URL")
+	}
+	if parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return errors.New("must not contain credentials, query, or fragment")
+	}
+	return nil
 }
 
 func patHMACSecret(configured, global string) string {

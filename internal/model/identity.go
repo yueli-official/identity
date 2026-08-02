@@ -17,6 +17,7 @@ const (
 
 type Identity struct {
 	ID            string    `orm:"id"`
+	UserKey       string    `orm:"user_key"`
 	Email         string    `orm:"email"` // canonical
 	EmailVerified bool      `orm:"email_verified"`
 	Status        Status    `orm:"status"`
@@ -31,17 +32,30 @@ type SocialLink struct {
 }
 
 type Profile struct {
-	IdentityID  string       `orm:"identity_id"`
-	Username    string       `orm:"username"`
-	DisplayName string       `orm:"display_name"`
-	AvatarURL   string       `orm:"avatar_url"`
-	CoverURL    string       `orm:"cover_url"`
-	Bio         string       `orm:"bio"`
-	SocialLinks []SocialLink `orm:"social_links"`
-	Locale      string       `orm:"locale"`
-	// asset ids behind avatar_url / cover_url, so a replacement can delete the old.
+	IdentityID     string       `orm:"identity_id"`
+	Handle         string       `orm:"handle"`
+	DisplayName    string       `orm:"display_name"`
+	AvatarMediaKey string       `orm:"avatar_media_key"`
+	CoverMediaKey  string       `orm:"cover_media_key"`
+	Bio            string       `orm:"bio"`
+	SocialLinks    []SocialLink `orm:"social_links"`
+	Locale         string       `orm:"locale"`
+	// Internal Asset IDs let a replacement delete the prior object; they never
+	// cross the public profile contract.
 	AvatarAssetID string `orm:"avatar_asset_id"`
 	CoverAssetID  string `orm:"cover_asset_id"`
+}
+
+// PublicUser is the public, status-filtered projection returned by the User
+// module. It deliberately excludes the internal UUID, email, roles and status.
+type PublicUser struct {
+	UserKey        string       `orm:"user_key"`
+	Handle         string       `orm:"handle"`
+	DisplayName    string       `orm:"display_name"`
+	AvatarMediaKey string       `orm:"avatar_media_key"`
+	CoverMediaKey  string       `orm:"cover_media_key"`
+	Bio            string       `orm:"bio"`
+	SocialLinks    []SocialLink `orm:"social_links"`
 }
 
 type Session = authentication.Session

@@ -35,7 +35,12 @@ func (p *AssetAdminProxy) Forward(r *ghttp.Request) {
 		r.SetError(err)
 		return
 	}
-	bearer, err := p.mgr.MintServiceToken(p.issuer, adminID, p.audience, "asset:admin", 2*time.Minute, time.Now())
+	admin, err := p.base.svc.GetByID(r.Context(), adminID)
+	if err != nil {
+		r.SetError(err)
+		return
+	}
+	bearer, err := p.mgr.MintDelegatedUserToken(p.issuer, admin.UserKey, p.audience, "asset:admin", 2*time.Minute, time.Now())
 	if err != nil {
 		r.SetError(err)
 		return

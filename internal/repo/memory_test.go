@@ -31,6 +31,36 @@ func TestMemoryIdentityCreateAndGet(t *testing.T) {
 	}
 }
 
+func TestMemoryIdentityCreationIncludesRolesAtomically(t *testing.T) {
+	ctx := context.Background()
+	m := repo.NewMemory()
+	_, err := m.CreateIdentityWithProfile(ctx, repo.NewIdentityInput{
+		Email: "bad-role@example.com", DisplayName: "Bad Role", PasswordHash: "h",
+		Roles: []string{"user", "does-not-exist"},
+	})
+	if !errors.Is(err, repo.ErrUnknownRole) {
+		t.Fatalf("want ErrUnknownRole, got %v", err)
+	}
+	if _, err := m.GetByEmail(ctx, "bad-role@example.com"); !errors.Is(err, repo.ErrIdentityMissing) {
+		t.Fatalf("failed atomic create left an identity behind: %v", err)
+	}
+
+	id, err := m.CreateIdentityWithProfile(ctx, repo.NewIdentityInput{
+		Email: "roles@example.com", DisplayName: "Roles", PasswordHash: "h",
+		Roles: []string{"user", "admin"},
+	})
+	if err != nil {
+		t.Fatalf("atomic create: %v", err)
+	}
+	roles, err := m.GetRoles(ctx, id.ID)
+	if err != nil {
+		t.Fatalf("GetRoles: %v", err)
+	}
+	if len(roles) != 2 || roles[0] != "admin" || roles[1] != "user" {
+		t.Fatalf("roles = %#v, want [admin user]", roles)
+	}
+}
+
 func TestMemoryGetProfile(t *testing.T) {
 	ctx := context.Background()
 	m := repo.NewMemory()

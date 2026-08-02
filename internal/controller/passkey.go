@@ -63,7 +63,7 @@ func (c *Controller) PasskeyLoginFinish(
 		return nil, err
 	}
 	c.setSessionCookie(request, result.SessionID)
-	return &v1.PasskeyLoginFinishRes{ID: identity.ID, Email: identity.Email}, nil
+	return &v1.PasskeyLoginFinishRes{UserKey: identity.UserKey, Email: identity.Email}, nil
 }
 
 func (c *Controller) PasskeyRegistrationBegin(

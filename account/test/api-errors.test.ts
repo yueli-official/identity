@@ -38,7 +38,7 @@ describe('Account API error presentation', () => {
       .map(entry => entry.code)
       .filter(code => code.startsWith('identity.'))
 
-    expect(identityCodes).toHaveLength(72)
+    expect(identityCodes).toHaveLength(73)
     expect(identityCodes.filter(code => !(code in IDENTITY_ERROR_MESSAGES))).toEqual([])
   })
 

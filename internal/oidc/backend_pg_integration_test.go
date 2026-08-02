@@ -150,13 +150,13 @@ func TestPGBackendRefreshRotateRevoke(t *testing.T) {
 		}
 	}
 
-	// RevokeRefreshByIdentity removes all tokens for a subject.
+	// RevokeRefreshBySubject removes all tokens for a subject.
 	put("rt-pg-6", "req-E", "sess-4", "sub-9")
-	if err := be.RevokeRefreshByIdentity(ctx, "sub-9"); err != nil {
+	if err := be.RevokeRefreshBySubject(ctx, "sub-9"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := be.GetRefresh(ctx, "rt-pg-6"); err == nil {
-		t.Fatal("rt-pg-6 should be gone after RevokeRefreshByIdentity")
+		t.Fatal("rt-pg-6 should be gone after RevokeRefreshBySubject")
 	}
 
 	// DeleteRefresh.

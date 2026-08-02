@@ -26,7 +26,7 @@ Identity 是站群唯一身份提供方，负责账户、凭据、公开资料�
 - `POST /api/v1/session/privacy/erasure`：用稳定幂等键、请求时间和客户端生成的状态能力令牌发起删除。
 - `POST /api/v1/privacy/requests/{id}/status`：凭状态能力令牌继续驱动并读取聚合结果，账号删除后仍可用。
 - `POST /api/internal/privacy/owner`：供实例内协调协议调用的 Identity Owner Host，要求 `privacy:owner`。
-- `/api/v1/profiles*`：公开资料查询。
+- `/api/v1/users/{userKey}`、`/api/v1/users?ids=...`、`/api/v1/users/by-handle/{handle}`：公开用户查询；公开契约不暴露内部 UUID。
 - `/api/v1/pat*`：个人访问令牌生命周期和验证。
 - `POST /api/v1/account/publisher-attestations`：最近认证用户对精确消费者、命名空间与制品摘要签发发布者证明。
 - `/api/v1/publisher/verification-keys`、`/api/v1/publisher/trust-manifest`：在线 key 发现与 offline-root

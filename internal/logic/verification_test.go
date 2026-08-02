@@ -15,11 +15,11 @@ import (
 // capMailer captures the links handed to the mailer so tests can replay tokens.
 type capMailer struct{ verifyLink, resetLink, verifyTo, resetTo string }
 
-type capRevoker struct{ identities []string }
+type capRevoker struct{ subjects []string }
 
 func (c *capRevoker) RevokeRefreshBySession(context.Context, string) error { return nil }
-func (c *capRevoker) RevokeRefreshByIdentity(_ context.Context, identityID string) error {
-	c.identities = append(c.identities, identityID)
+func (c *capRevoker) RevokeRefreshBySubject(_ context.Context, subject string) error {
+	c.subjects = append(c.subjects, subject)
 	return nil
 }
 
@@ -90,8 +90,8 @@ func TestPasswordReset_Flow_ForceLogout(t *testing.T) {
 	if _, err := m.GetSession(ctx, login.SessionID); err == nil {
 		t.Fatal("other sessions must be force-logged-out")
 	}
-	if len(revoker.identities) != 1 || revoker.identities[0] != reg.ID {
-		t.Fatalf("refresh revocations = %v, want [%s]", revoker.identities, reg.ID)
+	if len(revoker.subjects) != 1 || revoker.subjects[0] != reg.UserKey {
+		t.Fatalf("refresh revocations = %v, want [%s]", revoker.subjects, reg.UserKey)
 	}
 	if _, err := s.Login(ctx, logic.LoginInput{Email: "r@example.com", Password: "new password phrase"}); err != nil {
 		t.Fatal("new password must work")

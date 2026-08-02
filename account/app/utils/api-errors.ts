@@ -48,6 +48,7 @@ export const IDENTITY_ERROR_MESSAGES = {
   'identity.guest_claim_conflict': '该访客会话已经归属其他账户。',
   'identity.guest_request_invalid': '访客会话请求无效，请刷新后重试。',
   'identity.guest_session_invalid': '访客会话无效或已过期，请刷新后重试。',
+  'identity.handle_unavailable': '该 Handle 已被占用或保留，请换一个再试。',
   'identity.invalid_credentials': '邮箱或密码不正确。',
   'identity.invalid_email': '邮箱格式不正确，请检查后重新输入。',
   'identity.invalid_profile': '账户资料不符合要求，请检查后重新提交。',

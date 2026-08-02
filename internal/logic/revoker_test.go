@@ -7,14 +7,14 @@ import (
 	"github.com/yueli-official/identity/internal/repo"
 )
 
-type fakeRevoker struct{ bySession, byIdentity []string }
+type fakeRevoker struct{ bySession, bySubject []string }
 
 func (f *fakeRevoker) RevokeRefreshBySession(_ context.Context, s string) error {
 	f.bySession = append(f.bySession, s)
 	return nil
 }
-func (f *fakeRevoker) RevokeRefreshByIdentity(_ context.Context, s string) error {
-	f.byIdentity = append(f.byIdentity, s)
+func (f *fakeRevoker) RevokeRefreshBySubject(_ context.Context, s string) error {
+	f.bySubject = append(f.bySubject, s)
 	return nil
 }
 
@@ -32,10 +32,16 @@ func TestLogoutRevokesSessionBoundRefresh(t *testing.T) {
 		t.Fatalf("expected RevokeRefreshBySession(sess-1), got %v", fr.bySession)
 	}
 
-	if err := svc.LogoutAll(ctx, "id-1"); err != nil {
+	identity, err := svc.Register(ctx, RegisterInput{
+		Email: "revoke@example.com", Password: "correct horse battery", DisplayName: "Revoke",
+	})
+	if err != nil {
 		t.Fatal(err)
 	}
-	if len(fr.byIdentity) != 1 || fr.byIdentity[0] != "id-1" {
-		t.Fatalf("expected RevokeRefreshByIdentity(id-1), got %v", fr.byIdentity)
+	if err := svc.LogoutAll(ctx, identity.ID); err != nil {
+		t.Fatal(err)
+	}
+	if len(fr.bySubject) != 1 || fr.bySubject[0] != identity.UserKey {
+		t.Fatalf("expected RevokeRefreshBySubject(%s), got %v", identity.UserKey, fr.bySubject)
 	}
 }

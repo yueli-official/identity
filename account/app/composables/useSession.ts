@@ -1,26 +1,40 @@
+import type { MediaRef } from '~/utils/media'
+
 export interface SocialLink {
   label: string
   url: string
 }
 
-export interface Me {
-  id: string
+interface SessionUser {
+  userKey: string
   email: string
   emailVerified: boolean
   displayName: string
-  username: string
-  avatarUrl: string
-  coverUrl: string
+  handle: string
+  avatar?: MediaRef
+  cover?: MediaRef
   bio: string
   socialLinks: SocialLink[]
   roles: string[]
+}
+
+export interface Me extends SessionUser {
+  avatarUrl: string
+  coverUrl: string
 }
 
 export function useSession() {
   const me = useState<Me | null>('me', () => null)
   const { call } = useApi()
   async function refresh() {
-    try { me.value = await call<Me>('/api/v1/session/me') }
+    try {
+      const user = await call<SessionUser>('/api/v1/session/me')
+      me.value = {
+        ...user,
+        avatarUrl: userMediaUrl(user.avatar, 'thumbnail'),
+        coverUrl: userMediaUrl(user.cover, 'cover')
+      }
+    }
     catch { me.value = null }
     return me.value
   }

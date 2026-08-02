@@ -14,6 +14,8 @@ type OIDCClient struct {
 	GrantTypes             []string
 	ResponseTypes          []string
 	Scopes                 []string
+	SubjectType            string
+	SubjectSector          string
 }
 
 type KeyStatus string

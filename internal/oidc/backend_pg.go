@@ -132,7 +132,7 @@ func (b *pgBackend) RevokeRefreshBySession(ctx context.Context, sessionID string
 	return err
 }
 
-func (b *pgBackend) RevokeRefreshByIdentity(ctx context.Context, subject string) error {
+func (b *pgBackend) RevokeRefreshBySubject(ctx context.Context, subject string) error {
 	_, err := b.model(ctx, "oidc_refresh_tokens").Where("subject", subject).Delete()
 	return err
 }

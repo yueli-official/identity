@@ -22,6 +22,7 @@ type RegisterInput struct {
 	AttemptID   string
 	IP          string
 	Proof       string
+	Roles       []string // trusted provisioning path; empty defaults to {user}
 }
 
 func (s *Service) Register(ctx context.Context, in RegisterInput) (model.Identity, error) {
@@ -68,16 +69,24 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (model.Identit
 	if err != nil {
 		return model.Identity{}, err
 	}
+	roles := in.Roles
+	if len(roles) == 0 {
+		roles = []string{DefaultRole}
+	}
 	id, err := s.store.CreateIdentityWithProfile(ctx, repo.NewIdentityInput{
 		ID: in.ID, Email: email, DisplayName: in.DisplayName, Locale: in.Locale, PasswordHash: hash,
+		Roles: roles,
 	})
 	if errors.Is(err, repo.ErrEmailTaken) {
 		return model.Identity{}, iderr.EmailTaken(email)
 	}
 	if err != nil {
+		var unknown repo.UnknownRoleError
+		if errors.As(err, &unknown) {
+			return model.Identity{}, iderr.UnknownRole(unknown.Slug)
+		}
 		return model.Identity{}, err
 	}
-	_ = s.store.GrantRole(ctx, id.ID, DefaultRole) // best-effort default role
 	// Audit order mirrors the causal order: the identity must exist before a role
 	// can be granted, so identity.register is emitted first, then role.default_granted.
 	s.audit(ctx, AuditEvent{
@@ -90,7 +99,7 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (model.Identit
 		Event:    EvRoleDefaultGranted,
 		ActorID:  id.ID,
 		TargetID: id.ID,
-		Detail:   map[string]any{"role": DefaultRole, "best_effort": true},
+		Detail:   map[string]any{"role": DefaultRole},
 	})
 	return id, nil
 }

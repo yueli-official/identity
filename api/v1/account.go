@@ -12,23 +12,29 @@ type SocialLinkDTO struct {
 
 type UpdateProfileReq struct {
 	g.Meta      `path:"/api/v1/session/profile" method:"put" tags:"account" summary:"Update own profile"`
-	DisplayName string          `json:"displayName" v:"required#display name required"`
-	Username    string          `json:"username"`
-	AvatarURL   string          `json:"avatarUrl"`
-	CoverURL    string          `json:"coverUrl"`
+	DisplayName string `json:"displayName" v:"required#display name required"`
+	Handle      string `json:"handle"`
+	Bio         string `json:"bio"`
+	Locale      string `json:"locale"`
+}
+
+type UpdateProfileRes struct {
+	DisplayName string          `json:"displayName"`
+	Handle      string          `json:"handle"`
+	Avatar      *MediaRef       `json:"avatar,omitempty"`
+	Cover       *MediaRef       `json:"cover,omitempty"`
 	Bio         string          `json:"bio"`
 	SocialLinks []SocialLinkDTO `json:"socialLinks"`
 	Locale      string          `json:"locale"`
 }
 
-type UpdateProfileRes struct {
-	DisplayName string          `json:"displayName"`
-	Username    string          `json:"username"`
-	AvatarURL   string          `json:"avatarUrl"`
-	CoverURL    string          `json:"coverUrl"`
-	Bio         string          `json:"bio"`
+type UpdateSocialLinksReq struct {
+	g.Meta      `path:"/api/v1/session/profile/social-links" method:"put" tags:"account" summary:"Replace own social links"`
 	SocialLinks []SocialLinkDTO `json:"socialLinks"`
-	Locale      string          `json:"locale"`
+}
+
+type UpdateSocialLinksRes struct {
+	SocialLinks []SocialLinkDTO `json:"socialLinks"`
 }
 
 // ── Change password (authenticated; not the token-based reset) ──────────────

@@ -28,6 +28,7 @@ type OIDCController struct {
 	svc          *logic.Service
 	issuer       string
 	loginURL     string
+	mediaBaseURL string
 	clients      repo.ClientRepo
 	secureCookie bool
 	reauthSecret []byte
@@ -53,13 +54,13 @@ func NewOIDC(
 	keys *oidc.Manager,
 	svc *logic.Service,
 	clients repo.ClientRepo,
-	issuer, loginURL string,
+	issuer, loginURL, mediaBaseURL string,
 	secureCookie bool,
 	reauthSecret []byte,
 ) *OIDCController {
 	return &OIDCController{
 		provider: p, keys: keys, svc: svc, clients: clients,
-		issuer: issuer, loginURL: loginURL, secureCookie: secureCookie,
+		issuer: issuer, loginURL: loginURL, mediaBaseURL: mediaBaseURL, secureCookie: secureCookie,
 		reauthSecret: slices.Clone(reauthSecret),
 	}
 }
@@ -79,7 +80,7 @@ func (c *OIDCController) discoveryDoc() map[string]interface{} {
 		"scopes_supported":                      []string{"openid", "profile", "email", "roles", "offline_access"},
 		"code_challenge_methods_supported":      []string{"S256"},
 		"id_token_signing_alg_values_supported": []string{"RS256"},
-		"subject_types_supported":               []string{"public"},
+		"subject_types_supported":               []string{"public", "pairwise"},
 		"acr_values_supported": []string{
 			string(authentication.ProfileBaseline),
 			string(authentication.ProfileMultiFactor),
@@ -168,9 +169,19 @@ func (c *OIDCController) Authorize(r *ghttp.Request) {
 
 	profile, _ := c.svc.GetProfile(ctx, id.ID) // empty profile is acceptable
 	roles, _ := c.svc.GetRoles(ctx, id.ID)     // empty roles is acceptable
+	client, err := c.clients.GetClient(ctx, ar.GetClient().GetID())
+	if err != nil {
+		c.provider.WriteAuthorizeError(ctx, w, ar, fosite.ErrServerError)
+		return
+	}
+	subject, err := c.svc.OIDCSubject(ctx, id.ID, client)
+	if err != nil {
+		c.provider.WriteAuthorizeError(ctx, w, ar, fosite.ErrServerError)
+		return
+	}
 	session := oidc.BuildSession(
-		c.issuer, ar.GetClient().GetID(), c.keys.ActiveKID(), sid,
-		id, profile, ar.GetGrantedScopes(), roles, idpSession.Authentication, time.Now().UTC(),
+		c.issuer, c.mediaBaseURL, ar.GetClient().GetID(), c.keys.ActiveKID(), sid,
+		subject, id, profile, ar.GetGrantedScopes(), roles, idpSession.Authentication, time.Now().UTC(),
 	)
 	session.JWTClaims.Audience = audiences
 
@@ -343,7 +354,7 @@ func (c *OIDCController) refreshRolesClaim(ctx context.Context, accessReq fosite
 	if !ok || sess.JWTClaims == nil {
 		return fosite.ErrInvalidGrant
 	}
-	identity, err := c.svc.GetByID(ctx, sess.JWTClaims.Subject)
+	identity, err := c.svc.GetByOIDCSubject(ctx, sess.JWTClaims.Subject)
 	if errors.Is(err, repo.ErrIdentityMissing) {
 		return fosite.ErrInvalidGrant
 	}
@@ -411,6 +422,7 @@ func (c *OIDCController) applyServiceClaims(ctx context.Context, accessReq fosit
 			sess.JWTClaims.Extra = map[string]interface{}{}
 		}
 		sess.JWTClaims.Extra["client_id"] = clientID
+		sess.JWTClaims.Extra["subject_kind"] = "client"
 	}
 	if sess.DefaultSession != nil {
 		sess.DefaultSession.Subject = clientID
@@ -450,15 +462,15 @@ func (c *OIDCController) Userinfo(r *ghttp.Request) {
 	}
 
 	sub := ar.GetSession().GetSubject()
-	id, err := c.svc.GetByID(ctx, sub)
+	id, err := c.svc.GetByOIDCSubject(ctx, sub)
 	if err != nil || id.Status != model.StatusActive {
 		r.Response.WriteHeader(401)
 		r.Response.WriteJson(map[string]string{"error": "invalid_token"})
 		return
 	}
-	profile, _ := c.svc.GetProfile(ctx, sub)
-	roles, _ := c.svc.GetRoles(ctx, sub)
-	r.Response.WriteJson(oidc.Userinfo(id, profile, ar.GetGrantedScopes(), roles))
+	profile, _ := c.svc.GetProfile(ctx, id.ID)
+	roles, _ := c.svc.GetRoles(ctx, id.ID)
+	r.Response.WriteJson(oidc.Userinfo(c.mediaBaseURL, sub, id, profile, ar.GetGrantedScopes(), roles))
 }
 
 // Revoke handles POST /oauth2/revoke (RFC 7009). Raw RFC response.

@@ -5,6 +5,7 @@ package dao
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 
 	"github.com/gogf/gf/v2/database/gdb"
@@ -12,11 +13,28 @@ import (
 
 	"github.com/yueli-official/identity/internal/model"
 	"github.com/yueli-official/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/user"
 )
 
 // PG is a PostgreSQL-backed implementation of repo.IdentityRepo using gdb.
 type PG struct {
 	db gdb.DB
+}
+
+func (p *PG) SetProfileSocialLinks(ctx context.Context, identityID string, links []model.SocialLink) error {
+	document, err := json.Marshal(links)
+	if err != nil {
+		return err
+	}
+	result, err := p.db.Model("user_profiles").Ctx(ctx).Where("identity_id", identityID).
+		Data(g.Map{"social_links": string(document)}).Update()
+	if err != nil {
+		return err
+	}
+	if affected, _ := result.RowsAffected(); affected == 0 {
+		return repo.ErrIdentityMissing
+	}
+	return nil
 }
 
 // NewPG creates a PG repo backed by the given gdb.DB connection.
@@ -26,6 +44,16 @@ func NewPG(db gdb.DB) *PG { return &PG{db: db} }
 // row, and a credentials_password row inside a single transaction.
 // It returns repo.ErrEmailTaken when a UNIQUE constraint on identities.email fires.
 func (p *PG) CreateIdentityWithProfile(ctx context.Context, in repo.NewIdentityInput) (model.Identity, error) {
+	userKey := in.UserKey
+	if userKey == "" {
+		generated, err := user.NewPublicKey()
+		if err != nil {
+			return model.Identity{}, err
+		}
+		userKey = string(generated)
+	} else if _, err := user.ParsePublicKey(userKey); err != nil {
+		return model.Identity{}, err
+	}
 	var out model.Identity
 	err := p.db.Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
 		// Set context on the transaction so that subsequent Model calls inherit it.
@@ -33,9 +61,16 @@ func (p *PG) CreateIdentityWithProfile(ctx context.Context, in repo.NewIdentityI
 
 		// Insert identity row; capture the DB-generated UUID via RETURNING.
 		// TX.GetValue does not accept a ctx parameter (it uses tx.ctx set above).
-		val, err := tx.GetValue(
-			"INSERT INTO identities (email) VALUES (?) RETURNING id", in.Email,
-		)
+		if err := validateRoles(ctx, tx, in.Roles); err != nil {
+			return err
+		}
+		query := "INSERT INTO identities (user_key, email) VALUES (?, ?) RETURNING id"
+		arguments := []any{userKey, in.Email}
+		if strings.TrimSpace(in.ID) != "" {
+			query = "INSERT INTO identities (id, user_key, email) VALUES (?, ?, ?) RETURNING id"
+			arguments = []any{in.ID, userKey, in.Email}
+		}
+		val, err := tx.GetValue(query, arguments...)
 		if err != nil {
 			if isUniqueViolation(err) {
 				return repo.ErrEmailTaken
@@ -43,6 +78,11 @@ func (p *PG) CreateIdentityWithProfile(ctx context.Context, in repo.NewIdentityI
 			return err
 		}
 		id := val.String()
+		if _, err := tx.Model("oidc_subjects").Ctx(ctx).Data(g.Map{
+			"identity_id": id, "sector_key": "public", "subject": userKey, "subject_type": "public",
+		}).Insert(); err != nil {
+			return err
+		}
 
 		if _, err := tx.Model("user_profiles").Ctx(ctx).Data(g.Map{
 			"identity_id":  id,
@@ -55,6 +95,9 @@ func (p *PG) CreateIdentityWithProfile(ctx context.Context, in repo.NewIdentityI
 			"identity_id":   id,
 			"password_hash": in.PasswordHash,
 		}).Insert(); err != nil {
+			return err
+		}
+		if err := insertRoles(ctx, tx, id, in.Roles); err != nil {
 			return err
 		}
 
@@ -92,6 +135,110 @@ func (p *PG) GetByID(ctx context.Context, id string) (model.Identity, error) {
 	return out, nil
 }
 
+func (p *PG) GetByUserKey(ctx context.Context, userKey string) (model.Identity, error) {
+	var out model.Identity
+	if err := p.db.Model("identities").Ctx(ctx).Where("user_key", userKey).Scan(&out); err != nil {
+		return model.Identity{}, err
+	}
+	if out.ID == "" {
+		return model.Identity{}, repo.ErrIdentityMissing
+	}
+	return out, nil
+}
+
+func (p *PG) GetUserKeysByIDs(ctx context.Context, identityIDs []string) (map[string]string, error) {
+	out := make(map[string]string, len(identityIDs))
+	if len(identityIDs) == 0 {
+		return out, nil
+	}
+	var rows []struct {
+		ID      string `orm:"id"`
+		UserKey string `orm:"user_key"`
+	}
+	if err := p.db.Model("identities").Ctx(ctx).
+		Fields("id, user_key").WhereIn("id", identityIDs).Scan(&rows); err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		out[row.ID] = row.UserKey
+	}
+	return out, nil
+}
+
+func (p *PG) GetByOIDCSubject(ctx context.Context, subject string) (model.Identity, error) {
+	var out model.Identity
+	err := p.db.Model("oidc_subjects s").Ctx(ctx).
+		InnerJoin("identities i", "i.id = s.identity_id").
+		Fields("i.*").Where("s.subject", subject).Scan(&out)
+	if err != nil {
+		return model.Identity{}, err
+	}
+	if out.ID == "" {
+		return model.Identity{}, repo.ErrIdentityMissing
+	}
+	return out, nil
+}
+
+func (p *PG) ResolveOIDCSubject(ctx context.Context, identityID, subjectType, sector string) (string, error) {
+	identity, err := p.GetByID(ctx, identityID)
+	if err != nil {
+		return "", err
+	}
+	if subjectType == "" || subjectType == "public" {
+		_, err := p.db.Exec(ctx, `
+INSERT INTO oidc_subjects (identity_id, sector_key, subject, subject_type)
+VALUES (?, 'public', ?, 'public')
+ON CONFLICT (identity_id, sector_key) DO NOTHING`, identityID, identity.UserKey)
+		if err != nil {
+			return "", err
+		}
+		return identity.UserKey, nil
+	}
+	sector = strings.TrimSpace(sector)
+	if subjectType != "pairwise" || sector == "" {
+		return "", errors.New("invalid OIDC subject policy")
+	}
+	sectorKey := "pairwise:" + sector
+	for range 3 {
+		generated, err := user.NewPairwiseSubject()
+		if err != nil {
+			return "", err
+		}
+		_, err = p.db.Exec(ctx, `
+INSERT INTO oidc_subjects (identity_id, sector_key, subject, subject_type)
+VALUES (?, ?, ?, 'pairwise')
+ON CONFLICT (identity_id, sector_key) DO NOTHING`, identityID, sectorKey, generated)
+		if err != nil {
+			if isUniqueViolation(err) {
+				continue
+			}
+			return "", err
+		}
+		value, err := p.db.Model("oidc_subjects").Ctx(ctx).Fields("subject").
+			Where("identity_id", identityID).Where("sector_key", sectorKey).Value()
+		if err != nil {
+			return "", err
+		}
+		if value.String() != "" {
+			return value.String(), nil
+		}
+	}
+	return "", errors.New("pairwise subject collision")
+}
+
+func (p *PG) ListOIDCSubjects(ctx context.Context, identityID string) ([]string, error) {
+	values, err := p.db.Model("oidc_subjects").Ctx(ctx).Fields("subject").
+		Where("identity_id", identityID).OrderAsc("subject").Array()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		out = append(out, value.String())
+	}
+	return out, nil
+}
+
 // GetPasswordHash returns the bcrypt password hash stored for the given identity.
 // Model.Scan does not support scalar destinations; we use Value() instead.
 func (p *PG) GetPasswordHash(ctx context.Context, identityID string) (string, error) {
@@ -120,28 +267,158 @@ func (p *PG) GetProfile(ctx context.Context, identityID string) (model.Profile, 
 // social_links is stored as a JSONB document (marshalled here so the column gets
 // valid JSON text rather than a Postgres array literal).
 func (p *PG) UpdateProfile(ctx context.Context, identityID string, in repo.ProfileUpdate) error {
-	links := in.SocialLinks
-	if links == nil {
-		links = []model.SocialLink{}
-	}
-	linksJSON, err := json.Marshal(links)
+	return p.db.Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		tx = tx.Ctx(ctx)
+		current, err := tx.GetValue(
+			"SELECT COALESCE(handle, '') FROM user_profiles WHERE identity_id = ? FOR UPDATE", identityID,
+		)
+		if err != nil {
+			return err
+		}
+		if current.IsNil() {
+			return repo.ErrIdentityMissing
+		}
+		currentHandle := current.String()
+		if currentHandle != in.Handle {
+			if currentHandle != "" {
+				if _, err := tx.Exec(
+					"UPDATE user_handle_history SET state = 'retired', retired_at = now() WHERE handle = ? AND identity_id = ?",
+					currentHandle, identityID,
+				); err != nil {
+					return err
+				}
+			}
+			if in.Handle != "" {
+				var owner struct {
+					IdentityID string `orm:"identity_id"`
+				}
+				if err := tx.Model("user_handle_history").Ctx(ctx).
+					Where("handle", in.Handle).LockUpdate().Scan(&owner); err != nil {
+					return err
+				}
+				switch {
+				case owner.IdentityID == "":
+					if _, err := tx.Model("user_handle_history").Ctx(ctx).Data(g.Map{
+						"handle": in.Handle, "identity_id": identityID, "state": "current",
+					}).Insert(); err != nil {
+						if isUniqueViolation(err) {
+							return repo.ErrHandleUnavailable
+						}
+						return err
+					}
+				case owner.IdentityID == identityID:
+					if _, err := tx.Model("user_handle_history").Ctx(ctx).Where("handle", in.Handle).
+						Data(g.Map{"state": "current", "retired_at": nil}).Update(); err != nil {
+						return err
+					}
+				default:
+					return repo.ErrHandleUnavailable
+				}
+			}
+		}
+		res, err := tx.Model("user_profiles").Ctx(ctx).Where("identity_id", identityID).Data(g.Map{
+			"handle": nilIfEmpty(in.Handle), "display_name": in.DisplayName,
+			"bio": in.Bio, "locale": orDefault(in.Locale, "zh-CN"),
+		}).Update()
+		if err != nil {
+			if isUniqueViolation(err) {
+				return repo.ErrHandleUnavailable
+			}
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return repo.ErrIdentityMissing
+		}
+		return nil
+	})
+}
+
+func (p *PG) GetPublicUserByKey(ctx context.Context, userKey string) (model.PublicUser, error) {
+	var out model.PublicUser
+	err := p.db.Model("identities i").Ctx(ctx).
+		InnerJoin("user_profiles p", "p.identity_id = i.id").
+		Fields("i.user_key, p.handle, p.display_name, p.avatar_media_key, p.cover_media_key, p.bio, p.social_links").
+		Where("i.user_key", userKey).Where("i.status", string(model.StatusActive)).Scan(&out)
 	if err != nil {
-		return err
+		return model.PublicUser{}, err
 	}
-	res, err := p.db.Model("user_profiles").Ctx(ctx).Where("identity_id", identityID).Data(g.Map{
-		"username":     in.Username,
-		"display_name": in.DisplayName,
-		"avatar_url":   in.AvatarURL,
-		"cover_url":    in.CoverURL,
-		"bio":          in.Bio,
-		"social_links": string(linksJSON),
-		"locale":       in.Locale,
-	}).Update()
+	if out.UserKey == "" {
+		return model.PublicUser{}, repo.ErrIdentityMissing
+	}
+	return out, nil
+}
+
+func (p *PG) GetPublicUserByHandle(ctx context.Context, handle string) (model.PublicUser, error) {
+	var out model.PublicUser
+	err := p.db.Model("user_handle_history h").Ctx(ctx).
+		InnerJoin("identities i", "i.id = h.identity_id").
+		InnerJoin("user_profiles p", "p.identity_id = i.id").
+		Fields("i.user_key, p.handle, p.display_name, p.avatar_media_key, p.cover_media_key, p.bio, p.social_links").
+		Where("h.handle", handle).Where("i.status", string(model.StatusActive)).Scan(&out)
 	if err != nil {
-		return err
+		return model.PublicUser{}, err
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return repo.ErrIdentityMissing
+	if out.UserKey == "" {
+		return model.PublicUser{}, repo.ErrIdentityMissing
+	}
+	return out, nil
+}
+
+func (p *PG) GetPublicUsersByKeys(ctx context.Context, userKeys []string) ([]model.PublicUser, error) {
+	if len(userKeys) == 0 {
+		return []model.PublicUser{}, nil
+	}
+	var rows []model.PublicUser
+	err := p.db.Model("identities i").Ctx(ctx).
+		InnerJoin("user_profiles p", "p.identity_id = i.id").
+		Fields("i.user_key, p.handle, p.display_name, p.avatar_media_key, p.cover_media_key, p.bio, p.social_links").
+		WhereIn("i.user_key", userKeys).Where("i.status", string(model.StatusActive)).Scan(&rows)
+	if err != nil {
+		return nil, err
+	}
+	byKey := make(map[string]model.PublicUser, len(rows))
+	for _, row := range rows {
+		byKey[row.UserKey] = row
+	}
+	out := make([]model.PublicUser, 0, len(rows))
+	for _, key := range userKeys {
+		if row, ok := byKey[key]; ok {
+			out = append(out, row)
+		}
+	}
+	return out, nil
+}
+
+func validateRoles(ctx context.Context, tx gdb.TX, roles []string) error {
+	seen := make(map[string]struct{}, len(roles))
+	for _, role := range roles {
+		if _, duplicate := seen[role]; duplicate {
+			continue
+		}
+		seen[role] = struct{}{}
+		exists, err := tx.Model("roles").Ctx(ctx).Where("slug", role).Exist()
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return repo.UnknownRoleError{Slug: role}
+		}
+	}
+	return nil
+}
+
+func insertRoles(ctx context.Context, tx gdb.TX, identityID string, roles []string) error {
+	seen := make(map[string]struct{}, len(roles))
+	for _, role := range roles {
+		if _, duplicate := seen[role]; duplicate {
+			continue
+		}
+		seen[role] = struct{}{}
+		if _, err := tx.Exec(
+			"INSERT INTO identity_roles (identity_id, role_slug) VALUES (?, ?)", identityID, role,
+		); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -149,13 +426,13 @@ func (p *PG) UpdateProfile(ctx context.Context, identityID string, in repo.Profi
 // SetProfileImage updates one image's url + asset-id columns (kind "avatar" |
 // "cover") without touching the other editable fields — used by the avatar/cover
 // upload proxy, which commits the image immediately after a successful upload.
-func (p *PG) SetProfileImage(ctx context.Context, identityID, kind, url, assetID string) error {
-	urlCol, idCol := "avatar_url", "avatar_asset_id"
+func (p *PG) SetProfileImage(ctx context.Context, identityID, kind, mediaKey, assetID string) error {
+	mediaKeyCol, idCol := "avatar_media_key", "avatar_asset_id"
 	if kind == "cover" {
-		urlCol, idCol = "cover_url", "cover_asset_id"
+		mediaKeyCol, idCol = "cover_media_key", "cover_asset_id"
 	}
 	res, err := p.db.Model("user_profiles").Ctx(ctx).Where("identity_id", identityID).
-		Data(g.Map{urlCol: url, idCol: assetID}).Update()
+		Data(g.Map{mediaKeyCol: mediaKey, idCol: assetID}).Update()
 	if err != nil {
 		return err
 	}

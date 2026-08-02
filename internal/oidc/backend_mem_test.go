@@ -73,7 +73,7 @@ func TestMemBackendRefreshRotateRevoke(t *testing.T) {
 	}
 
 	put("rt6", "req-E", "sess-3", "sub-9")
-	if err := be.RevokeRefreshByIdentity(ctx, "sub-9"); err != nil {
+	if err := be.RevokeRefreshBySubject(ctx, "sub-9"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := be.GetRefresh(ctx, "rt6"); err == nil {

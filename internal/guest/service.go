@@ -35,8 +35,11 @@ type Config struct {
 type Service struct {
 	store   repo.GuestSessionStore
 	clients repo.ClientRepo
-	keys    *oidc.Manager
-	cfg     Config
+	users   interface {
+		GetByUserKey(context.Context, string) (model.Identity, error)
+	}
+	keys *oidc.Manager
+	cfg  Config
 }
 
 type Created struct {
@@ -53,12 +56,14 @@ type Issued struct {
 
 type Claim struct {
 	SubjectID  string
-	UserID     string
+	UserKey    string
 	ClaimedAt  time.Time
 	ClaimToken string
 }
 
-func New(store repo.GuestSessionStore, clients repo.ClientRepo, keys *oidc.Manager, cfg Config) *Service {
+func New(store repo.GuestSessionStore, clients repo.ClientRepo, users interface {
+	GetByUserKey(context.Context, string) (model.Identity, error)
+}, keys *oidc.Manager, cfg Config) *Service {
 	if cfg.MaxSessionTTL <= 0 {
 		cfg.MaxSessionTTL = 30 * 24 * time.Hour
 	}
@@ -68,7 +73,7 @@ func New(store repo.GuestSessionStore, clients repo.ClientRepo, keys *oidc.Manag
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
-	return &Service{store: store, clients: clients, keys: keys, cfg: cfg}
+	return &Service{store: store, clients: clients, users: users, keys: keys, cfg: cfg}
 }
 
 func (s *Service) Create(ctx context.Context, clientID string, requestedTTL time.Duration) (Created, error) {
@@ -112,36 +117,37 @@ func (s *Service) Token(ctx context.Context, clientID, sessionToken, audience st
 	return Issued{AccessToken: raw, ExpiresIn: s.cfg.AccessTokenTTL}, nil
 }
 
-func (s *Service) Claim(ctx context.Context, clientID, sessionToken, identityID string) (Claim, error) {
-	identityID = strings.TrimSpace(identityID)
-	if _, err := uuid.Parse(identityID); err != nil {
+func (s *Service) Claim(ctx context.Context, clientID, sessionToken, userKey string) (Claim, error) {
+	userKey = strings.TrimSpace(userKey)
+	identity, err := s.users.GetByUserKey(ctx, userKey)
+	if err != nil || identity.Status != model.StatusActive {
 		return Claim{}, ErrInvalidRequest
 	}
 	session, err := s.session(ctx, strings.TrimSpace(clientID), sessionToken, true)
 	if err != nil {
 		return Claim{}, err
 	}
-	claimed, err := s.store.ClaimGuestSession(ctx, tokenHash(sessionToken), identityID, s.cfg.Now().UTC())
+	claimed, err := s.store.ClaimGuestSession(ctx, tokenHash(sessionToken), identity.ID, s.cfg.Now().UTC())
 	if errors.Is(err, repo.ErrGuestClaimConflict) {
 		return Claim{}, ErrClaimConflict
 	}
 	if err != nil {
 		return Claim{}, err
 	}
-	return Claim{SubjectID: session.ID, UserID: claimed.ClaimedIdentityID, ClaimedAt: *claimed.ClaimedAt}, nil
+	return Claim{SubjectID: session.ID, UserKey: identity.UserKey, ClaimedAt: *claimed.ClaimedAt}, nil
 }
 
-func (s *Service) ClaimForAudience(ctx context.Context, clientID, sessionToken, identityID, audience string) (Claim, error) {
+func (s *Service) ClaimForAudience(ctx context.Context, clientID, sessionToken, userKey, audience string) (Claim, error) {
 	client, err := s.clients.GetClient(ctx, strings.TrimSpace(clientID))
 	if err != nil || !slices.Contains(client.Audiences, strings.TrimSpace(audience)) {
 		return Claim{}, ErrInvalidAudience
 	}
-	claimed, err := s.Claim(ctx, client.ID, sessionToken, identityID)
+	claimed, err := s.Claim(ctx, client.ID, sessionToken, userKey)
 	if err != nil {
 		return Claim{}, err
 	}
 	claimed.ClaimToken, err = s.keys.MintGuestClaimToken(
-		s.cfg.Issuer, claimed.UserID, claimed.SubjectID, client.ID, audience, s.cfg.AccessTokenTTL, s.cfg.Now().UTC(),
+		s.cfg.Issuer, claimed.UserKey, claimed.SubjectID, client.ID, audience, s.cfg.AccessTokenTTL, s.cfg.Now().UTC(),
 	)
 	return claimed, err
 }

@@ -67,7 +67,12 @@ func (proxy *PlatformCapabilityProxy) Forward(request *ghttp.Request) {
 		request.Response.WriteStatus(404)
 		return
 	}
-	bearer, err := proxy.mgr.MintServiceToken(proxy.issuer, adminID, target.Audience, scope, 2*time.Minute, time.Now())
+	admin, err := proxy.base.svc.GetByID(request.Context(), adminID)
+	if err != nil {
+		request.SetError(err)
+		return
+	}
+	bearer, err := proxy.mgr.MintDelegatedUserToken(proxy.issuer, admin.UserKey, target.Audience, scope, 2*time.Minute, time.Now())
 	if err != nil {
 		request.SetError(err)
 		return

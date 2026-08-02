@@ -109,9 +109,9 @@ export function useAdminStepUp() {
 }
 
 export const adminStepUpResource = {
-  role: (identityId: string, role: string) => `identity:${identityId}:role:${role.trim()}`,
-  status: (identityId: string, status: string) => `identity:${identityId}:status:${status.trim()}`,
-  identity: (identityId: string) => `identity:${identityId}`,
+  role: (userKey: string, role: string) => `identity:${userKey}:role:${role.trim()}`,
+  status: (userKey: string, status: string) => `identity:${userKey}:status:${status.trim()}`,
+  identity: (userKey: string) => `identity:${userKey}`,
   create: (email: string, roles: string[]) =>
     `identity:new:${email.trim().toLowerCase()}:roles:${[...roles].sort().join(',')}`,
 }

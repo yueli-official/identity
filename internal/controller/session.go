@@ -21,13 +21,13 @@ func (c *Controller) Me(ctx context.Context, _ *v1.MeReq) (*v1.MeRes, error) {
 		roles = []string{}
 	}
 	return &v1.MeRes{
-		ID:            id.ID,
+		UserKey:       id.UserKey,
 		Email:         id.Email,
 		EmailVerified: id.EmailVerified,
 		DisplayName:   p.DisplayName,
-		Username:      p.Username,
-		AvatarURL:     p.AvatarURL,
-		CoverURL:      p.CoverURL,
+		Handle:        p.Handle,
+		Avatar:        mediaRef(p.AvatarMediaKey),
+		Cover:         mediaRef(p.CoverMediaKey),
 		Bio:           p.Bio,
 		SocialLinks:   socialToDTO(p.SocialLinks),
 		Roles:         roles,

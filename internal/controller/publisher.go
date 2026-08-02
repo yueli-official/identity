@@ -54,11 +54,11 @@ func (controller *PublisherController) IssuePublisherAttestation(
 		return nil, err
 	}
 	if err := controller.service.AdmitPublisherAttestation(
-		ctx, req.IdempotencyKey, request.GetClientIp(), identity.ID,
+		ctx, req.IdempotencyKey, request.GetClientIp(), identity.UserKey,
 	); err != nil {
 		return nil, err
 	}
-	issued, err := controller.module.Issue(ctx, identity.ID, publisher.IssueCommand{
+	issued, err := controller.module.Issue(ctx, identity.UserKey, publisher.IssueCommand{
 		IdempotencyKey: req.IdempotencyKey,
 		Audience:       req.Audience, ConsumerInstance: req.ConsumerInstance,
 		Namespace: req.Namespace,

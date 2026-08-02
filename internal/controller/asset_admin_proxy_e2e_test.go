@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
@@ -35,7 +36,7 @@ func TestAssetAdminProxyAcceptsVerifiedAdminBearerAndAdminCookie(t *testing.T) {
 	service := logic.New(store, logic.DefaultConfig())
 	baseController := controller.New(service, false)
 
-	newIdentity := func(email string, admin bool) (string, string) {
+	newIdentity := func(email string, admin bool) (string, string, string) {
 		identity, err := service.Register(ctx, logic.RegisterInput{
 			Email: email, Password: "correct horse battery", DisplayName: email,
 		})
@@ -51,11 +52,11 @@ func TestAssetAdminProxyAcceptsVerifiedAdminBearerAndAdminCookie(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		return identity.ID, login.SessionID
+		return identity.ID, identity.UserKey, login.SessionID
 	}
 
-	adminID, adminSession := newIdentity("asset-admin@example.test", true)
-	userID, userSession := newIdentity("asset-user@example.test", false)
+	_, adminKey, adminSession := newIdentity("asset-admin@example.test", true)
+	_, userKey, userSession := newIdentity("asset-user@example.test", false)
 
 	manager, err := oidc.NewManager(ctx, store)
 	if err != nil {
@@ -79,7 +80,7 @@ func TestAssetAdminProxyAcceptsVerifiedAdminBearerAndAdminCookie(t *testing.T) {
 			http.Error(writer, verifyErr.Error(), http.StatusUnauthorized)
 			return
 		}
-		if principal.Subject != adminID || !principal.HasScope("asset:admin") {
+		if principal.Subject != adminKey || !principal.HasScope("asset:admin") {
 			http.Error(writer, "unexpected delegated principal", http.StatusForbidden)
 			return
 		}
@@ -93,15 +94,31 @@ func TestAssetAdminProxyAcceptsVerifiedAdminBearerAndAdminCookie(t *testing.T) {
 	defer upstream.Close()
 
 	proxy := controller.NewAssetAdminProxy(baseController, manager, issuer, upstream.URL, audience)
-	verifier := assetProxyVerifierFunc(func(_ context.Context, raw string) (*coreauth.Principal, error) {
+	adminToken, err := manager.MintDelegatedUserToken(issuer, adminKey, audience, "", time.Minute, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	userToken, err := manager.MintDelegatedUserToken(issuer, userKey, audience, "", time.Minute, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	verifier := assetProxyVerifierFunc(func(ctx context.Context, raw string) (*coreauth.Principal, error) {
+		var token string
+		var roles []string
 		switch raw {
 		case "admin-token":
-			return &coreauth.Principal{Subject: adminID, Roles: []string{logic.AdminRole}}, nil
+			token, roles = adminToken, []string{logic.AdminRole}
 		case "user-token":
-			return &coreauth.Principal{Subject: userID, Roles: []string{logic.DefaultRole}}, nil
+			token, roles = userToken, []string{logic.DefaultRole}
 		default:
 			return nil, errors.New("invalid test token")
 		}
+		principal, verifyErr := serviceTokenVerifier.Verify(ctx, token)
+		if verifyErr != nil {
+			return nil, verifyErr
+		}
+		principal.Roles = roles
+		return principal, nil
 	})
 
 	server := g.Server(t.Name())

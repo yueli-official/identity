@@ -24,6 +24,7 @@ func TestCodesDeclareExpectedStatus(t *testing.T) {
 		iderr.CodeResetThrottled:           429,
 		iderr.CodeVerifyThrottled:          429,
 		iderr.CodeSelfAdminActionForbidden: 403,
+		iderr.CodeHandleUnavailable:        409,
 	}
 	for code, want := range cases {
 		descriptor, ok := iderr.DescriptorForCode(code)
@@ -39,8 +40,8 @@ func TestCodesDeclareExpectedStatus(t *testing.T) {
 
 func TestCatalogContainsEveryDescriptorInStableOrder(t *testing.T) {
 	catalog := iderr.Catalog()
-	if len(catalog) != 72 {
-		t.Fatalf("catalog length = %d, want 72", len(catalog))
+	if len(catalog) != 73 {
+		t.Fatalf("catalog length = %d, want 73", len(catalog))
 	}
 	codes := make([]string, 0, len(catalog))
 	for _, entry := range catalog {

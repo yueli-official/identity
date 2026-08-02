@@ -72,19 +72,19 @@ func TestE2E_RBAC(t *testing.T) {
 
 		// --- seed an admin (granted via the service seam, mirroring main.go's
 		//     bootstrap) and a target user; both registered + logged-in. ---------
-		mkUser := func(email string) (id, sid string) {
+		mkUser := func(email string) (id, userKey, sid string) {
 			out, err := svc.Register(ctx, logic.RegisterInput{
 				Email: email, Password: "correct horse battery", DisplayName: email,
 			})
 			t.AssertNil(err)
 			lo, err := svc.Login(ctx, logic.LoginInput{Email: email, Password: "correct horse battery", IP: "127.0.0.1"})
 			t.AssertNil(err)
-			return out.ID, lo.SessionID
+			return out.ID, out.UserKey, lo.SessionID
 		}
 
-		adminID, adminSID := mkUser("admin@e.com")
+		adminID, _, adminSID := mkUser("admin@e.com")
 		t.AssertNil(svc.GrantRole(ctx, adminID, logic.AdminRole))
-		targetID, targetSID := mkUser("target@e.com")
+		_, targetKey, targetSID := mkUser("target@e.com")
 
 		// --- pick a free port so the issuer URL exists before the server starts.
 		ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -104,7 +104,7 @@ func TestE2E_RBAC(t *testing.T) {
 			IDTTL:        10 * time.Minute,
 		}, mgr.KeyGetter)
 		oidcCtl := controller.NewOIDC(
-			provider, mgr, svc, r, base, base+"/login", false,
+			provider, mgr, svc, r, base, base+"/login", base+"/media", false,
 			[]byte("0123456789abcdef0123456789abcdef"),
 		)
 
@@ -140,7 +140,7 @@ func TestE2E_RBAC(t *testing.T) {
 		// 2. Grant "admin" to the target via the REAL admin HTTP endpoint using
 		//    the admin session (exercises requireAdmin -> GrantRole end-to-end).
 		// =====================================================================
-		grantPath := base + "/api/v1/admin/identities/" + targetID + "/roles?role=admin"
+		grantPath := base + "/api/v1/admin/users/" + targetKey + "/roles?role=admin"
 		grantReq, err := http.NewRequestWithContext(ctx, http.MethodPost, grantPath, nil)
 		t.AssertNil(err)
 		grantReq.Header.Set("Cookie", "id_session="+adminSID)

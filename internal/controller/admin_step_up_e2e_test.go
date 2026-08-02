@@ -50,7 +50,7 @@ func TestAdminMutationRequiresActionBoundOneTimeProof(t *testing.T) {
 		defer server.Shutdown()
 		base := fmt.Sprintf("http://127.0.0.1:%d", server.GetListenedPort())
 
-		makeUser := func(email string) (string, string) {
+		makeUser := func(email string) (string, string, string) {
 			identity, createErr := svc.Register(ctx, logic.RegisterInput{
 				Email: email, Password: "correct horse battery", DisplayName: email,
 			})
@@ -59,12 +59,12 @@ func TestAdminMutationRequiresActionBoundOneTimeProof(t *testing.T) {
 				Email: email, Password: "correct horse battery",
 			})
 			t.AssertNil(loginErr)
-			return identity.ID, "id_session=" + login.SessionID
+			return identity.ID, identity.UserKey, "id_session=" + login.SessionID
 		}
-		adminID, adminCookie := makeUser("step-up-admin@example.test")
+		adminID, _, adminCookie := makeUser("step-up-admin@example.test")
 		t.AssertNil(svc.GrantRole(ctx, adminID, logic.AdminRole))
-		targetID, _ := makeUser("step-up-target@example.test")
-		path := "/api/v1/admin/identities/" + targetID + "/roles?role=admin"
+		_, targetKey, _ := makeUser("step-up-target@example.test")
+		path := "/api/v1/admin/users/" + targetKey + "/roles?role=admin"
 
 		request := func(proof string) (int, string) {
 			req, requestErr := http.NewRequestWithContext(ctx, http.MethodPost, base+path, nil)
@@ -105,7 +105,7 @@ func TestAdminMutationRequiresActionBoundOneTimeProof(t *testing.T) {
 		t.Assert(status, http.StatusUnauthorized)
 		t.Assert(gjson.New(body).Get("code").String(), "identity.step_up_proof_invalid")
 
-		proof := mint("identity:" + targetID + ":role:admin")
+		proof := mint("identity:" + targetKey + ":role:admin")
 		status, _ = request(proof)
 		t.Assert(status, http.StatusOK)
 		status, body = request(proof)

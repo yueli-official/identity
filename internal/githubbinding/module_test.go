@@ -43,6 +43,7 @@ func newTestModule(t *testing.T, store Store, provider Provider, now time.Time) 
 		Store: store, Provider: provider,
 		CipherSecret: []byte("0123456789abcdef0123456789abcdef"),
 		AttemptTTL:   time.Minute, Now: func() time.Time { return now },
+		ResolvePublisherSubject: func(_ context.Context, identityID string) (string, error) { return identityID, nil },
 	})
 	if err != nil {
 		t.Fatal(err)

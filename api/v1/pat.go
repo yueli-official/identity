@@ -45,7 +45,7 @@ type VerifyPATReq struct {
 	// token comes from the Authorization: Bearer header, not the body
 }
 type VerifyPATRes struct {
-	IdentityID string   `json:"identityId"`
-	Scopes     []string `json:"scopes"`
-	ExpiresAt  string   `json:"expiresAt,omitempty"`
+	UserKey   string   `json:"userKey"`
+	Scopes    []string `json:"scopes"`
+	ExpiresAt string   `json:"expiresAt,omitempty"`
 }

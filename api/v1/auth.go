@@ -13,8 +13,8 @@ type RegisterReq struct {
 	ChallengeProof string `json:"challengeProof,omitempty"`
 }
 type RegisterRes struct {
-	ID    string `json:"id"`
-	Email string `json:"email"`
+	UserKey string `json:"userKey"`
+	Email   string `json:"email"`
 }
 
 type LoginReq struct {
@@ -25,7 +25,7 @@ type LoginReq struct {
 	ChallengeProof string `json:"challengeProof,omitempty"`
 }
 type LoginRes struct {
-	ID             string   `json:"id"`
+	UserKey        string   `json:"userKey"`
 	Email          string   `json:"email"`
 	MFARequired    bool     `json:"mfaRequired"`
 	MFATransaction string   `json:"mfaTransaction,omitempty"`

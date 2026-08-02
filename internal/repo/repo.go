@@ -22,7 +22,15 @@ var (
 	ErrGuestSessionMissing = errors.New("guest session not found")
 	ErrGuestClaimConflict  = errors.New("guest session already claimed")
 	ErrLastCredential      = errors.New("cannot remove the last login credential")
+	ErrHandleUnavailable   = errors.New("handle unavailable")
 )
+
+type UnknownRoleError struct {
+	Slug string
+}
+
+func (err UnknownRoleError) Error() string { return "unknown role slug: " + err.Slug }
+func (err UnknownRoleError) Unwrap() error { return ErrUnknownRole }
 
 // Verification purpose scopes (a token issued for one purpose must not work for
 // another — 登录码 ≠ 找回码).
@@ -34,20 +42,19 @@ const (
 // NewIdentityInput is an atomic identity+profile+password-credential creation.
 type NewIdentityInput struct {
 	ID           string // optional trusted seed/bootstrap sub; empty → generated
+	UserKey      string // optional trusted seed; empty → generated opaque public key
 	Email        string // canonical
 	DisplayName  string
 	Locale       string
 	PasswordHash string
+	Roles        []string // granted in the same transaction as user creation
 }
 
 // ProfileUpdate carries the user-editable display fields for a profile.
 type ProfileUpdate struct {
 	DisplayName string
-	Username    string
-	AvatarURL   string
-	CoverURL    string
+	Handle      string
 	Bio         string
-	SocialLinks []model.SocialLink
 	Locale      string
 }
 
@@ -66,29 +73,39 @@ type AdminUserFilter struct {
 // AdminUserRow is one identity as surfaced to the admin user-management list:
 // the identity row joined with its profile display fields and its role slugs.
 type AdminUserRow struct {
-	ID            string
-	Email         string
-	EmailVerified bool
-	Status        model.Status
-	CreatedAt     time.Time
-	DisplayName   string
-	Username      string
-	AvatarURL     string
-	Roles         []string
+	InternalID     string
+	UserKey        string
+	Email          string
+	EmailVerified  bool
+	Status         model.Status
+	CreatedAt      time.Time
+	DisplayName    string
+	Handle         string
+	AvatarMediaKey string
+	Roles          []string
 }
 
 type IdentityRepo interface {
 	CreateIdentityWithProfile(ctx context.Context, in NewIdentityInput) (model.Identity, error)
-	GetByEmail(ctx context.Context, email string) (model.Identity, error) // ErrIdentityMissing
-	GetByID(ctx context.Context, id string) (model.Identity, error)       // ErrIdentityMissing
+	GetByEmail(ctx context.Context, email string) (model.Identity, error)     // ErrIdentityMissing
+	GetByID(ctx context.Context, id string) (model.Identity, error)           // ErrIdentityMissing
+	GetByUserKey(ctx context.Context, userKey string) (model.Identity, error) // ErrIdentityMissing
+	GetUserKeysByIDs(ctx context.Context, identityIDs []string) (map[string]string, error)
+	GetByOIDCSubject(ctx context.Context, subject string) (model.Identity, error) // ErrIdentityMissing
+	ResolveOIDCSubject(ctx context.Context, identityID, subjectType, sector string) (string, error)
+	ListOIDCSubjects(ctx context.Context, identityID string) ([]string, error)
 	GetPasswordHash(ctx context.Context, identityID string) (string, error)
 	GetProfile(ctx context.Context, identityID string) (model.Profile, error) // ErrIdentityMissing
+	GetPublicUserByKey(ctx context.Context, userKey string) (model.PublicUser, error)
+	GetPublicUserByHandle(ctx context.Context, handle string) (model.PublicUser, error)
+	GetPublicUsersByKeys(ctx context.Context, userKeys []string) ([]model.PublicUser, error)
 	// UpdateProfile replaces the user-editable display fields of an identity's
 	// profile. Returns ErrIdentityMissing if the profile row does not exist.
 	UpdateProfile(ctx context.Context, identityID string, in ProfileUpdate) error
-	// SetProfileImage updates one image's url + asset-id columns (kind "avatar" |
+	SetProfileSocialLinks(ctx context.Context, identityID string, links []model.SocialLink) error
+	// SetProfileImage updates one image's media-key + asset-id columns (kind "avatar" |
 	// "cover") without touching the other editable fields. ErrIdentityMissing if absent.
-	SetProfileImage(ctx context.Context, identityID, kind, url, assetID string) error
+	SetProfileImage(ctx context.Context, identityID, kind, mediaKey, assetID string) error
 	// SetEmailVerified flips the identity's email_verified flag.
 	SetEmailVerified(ctx context.Context, identityID string, verified bool) error
 	// UpdatePasswordHash replaces the identity's stored bcrypt password hash.
@@ -137,12 +154,14 @@ type VerificationRepo interface {
 // NewOAuthIdentityInput atomically creates identity + profile + an OAuth credential
 // (no password credential — OAuth-only accounts have no local password until they set one).
 type NewOAuthIdentityInput struct {
+	UserKey       string
 	Email         string // canonical; may be "" only if the provider returned none
 	EmailVerified bool
 	DisplayName   string
 	Locale        string
 	Provider      string // e.g. "google"
 	ProviderUID   string // provider's stable user id (Google "sub")
+	Roles         []string
 }
 
 // OAuthCredential is one external-provider credential bound to an identity.

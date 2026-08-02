@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/gogf/gf/v2/encoding/gjson"
@@ -21,6 +22,8 @@ import (
 )
 
 type Client struct{ base string }
+
+var mediaKeyPattern = regexp.MustCompile(`^[0-9A-Za-z]{20,32}$`)
 
 // New builds a client rooted at the asset service base URL (e.g. http://localhost:8082).
 func New(baseURL string) *Client { return &Client{base: strings.TrimRight(baseURL, "/")} }
@@ -41,8 +44,8 @@ type initOutput struct {
 }
 
 type View struct {
-	ID     string
-	CdnURL string
+	ID       string
+	MediaKey string
 }
 
 func (c *Client) post(ctx context.Context, bearer, path string, body g.Map) (*gjson.Json, error) {
@@ -97,10 +100,14 @@ func (c *Client) finalize(ctx context.Context, bearer, token string) (View, erro
 	if err != nil {
 		return View{}, err
 	}
-	return View{
-		ID:     j.Get("asset.id").String(),
-		CdnURL: j.Get("asset.cdnUrl").String(),
-	}, nil
+	view := View{
+		ID:       j.Get("asset.id").String(),
+		MediaKey: j.Get("asset.mediaKey").String(),
+	}
+	if view.ID == "" || !mediaKeyPattern.MatchString(view.MediaKey) {
+		return View{}, fmt.Errorf("asset finalize returned an invalid media reference")
+	}
+	return view, nil
 }
 
 // putBlob streams the bytes to the presigned, token-validated blob URL. The blob

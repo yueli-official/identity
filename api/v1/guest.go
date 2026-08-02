@@ -40,7 +40,7 @@ type GuestSessionClaimReq struct {
 
 type GuestSessionClaimRes struct {
 	SubjectID  string    `json:"subjectId"`
-	UserID     string    `json:"userId"`
+	UserKey    string    `json:"userKey"`
 	ClaimedAt  time.Time `json:"claimedAt"`
 	ClaimToken string    `json:"claimToken"`
 }

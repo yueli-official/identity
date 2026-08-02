@@ -66,6 +66,32 @@ func (s *Service) GetByID(ctx context.Context, id string) (model.Identity, error
 	return s.store.GetByID(ctx, id)
 }
 
+// GetByUserKey resolves the stable public user identifier to its internal identity.
+func (s *Service) GetByUserKey(ctx context.Context, userKey string) (model.Identity, error) {
+	return s.store.GetByUserKey(ctx, userKey)
+}
+
+// GetUserKeysByIDs batch-resolves internal identity IDs for trusted presentation layers.
+func (s *Service) GetUserKeysByIDs(ctx context.Context, identityIDs []string) (map[string]string, error) {
+	return s.store.GetUserKeysByIDs(ctx, identityIDs)
+}
+
+func (s *Service) GetByOIDCSubject(ctx context.Context, subject string) (model.Identity, error) {
+	return s.store.GetByOIDCSubject(ctx, subject)
+}
+
+func (s *Service) OIDCSubject(ctx context.Context, identityID string, client model.OIDCClient) (string, error) {
+	subjectType := client.SubjectType
+	if subjectType == "" {
+		subjectType = "public"
+	}
+	sector := client.SubjectSector
+	if subjectType == "pairwise" && sector == "" {
+		sector = client.ID
+	}
+	return s.store.ResolveOIDCSubject(ctx, identityID, subjectType, sector)
+}
+
 // GetByEmail fetches a single identity by email (canonicalized first, matching
 // the login/register path). Returns repo.ErrIdentityMissing if none exists. Used
 // by the startup bootstrap-admin grant.
@@ -140,10 +166,8 @@ func (s *Service) RevokeSession(ctx context.Context, identityID, sessionID strin
 
 // LogoutAll clears all of an identity's sessions and revokes all its refresh tokens.
 func (s *Service) LogoutAll(ctx context.Context, identityID string) error {
-	if s.revoker != nil {
-		if err := s.revoker.RevokeRefreshByIdentity(ctx, identityID); err != nil {
-			return err
-		}
+	if err := s.revokeRefreshByIdentity(ctx, identityID); err != nil {
+		return err
 	}
 	if err := s.store.DeleteSessionsByIdentity(ctx, identityID); err != nil {
 		return err

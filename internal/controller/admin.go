@@ -30,11 +30,15 @@ import (
 // purely on the caller's own roles, before any target lookup or mutation.
 func (c *Controller) requireAdmin(ctx context.Context) (string, error) {
 	if principal, ok := foundationauth.FromContext(ctx); ok && principal != nil {
-		identityID := strings.TrimSpace(principal.Subject)
-		if identityID == "" || !principal.HasRole(logic.AdminRole) {
+		subjectKind, _ := principal.Claim("subject_kind")
+		if strings.TrimSpace(principal.Subject) == "" || subjectKind != "user" || !principal.HasRole(logic.AdminRole) {
 			return "", iderr.Forbidden()
 		}
-		return identityID, nil
+		identity, err := c.svc.GetByOIDCSubject(ctx, principal.Subject)
+		if err != nil || identity.Status != model.StatusActive {
+			return "", iderr.Forbidden()
+		}
+		return identity.ID, nil
 	}
 
 	r := ghttp.RequestFromCtx(ctx)
@@ -60,20 +64,24 @@ func (c *Controller) requireAdmin(ctx context.Context) (string, error) {
 // attributes the mutation to the correct actor.
 func (c *Controller) AdminGrantRole(ctx context.Context, req *v1.AdminGrantRoleReq) (*v1.AdminGrantRoleRes, error) {
 	adminID, err := c.requireAdminAction(
-		ctx, "identity.admin.role.grant", adminRoleResource(req.IdentityID, req.Role),
+		ctx, "identity.admin.role.grant", adminRoleResource(req.UserKey, req.Role),
 	)
 	if err != nil {
 		return nil, err
 	}
+	target, err := c.adminTarget(ctx, req.UserKey)
+	if err != nil {
+		return nil, err
+	}
 	ctx = actor.WithIdentity(ctx, adminID)
-	if err := c.svc.GrantRole(ctx, req.IdentityID, req.Role); err != nil {
+	if err := c.svc.GrantRole(ctx, target.ID, req.Role); err != nil {
 		// Map the unknown-role sentinel to a 400; otherwise it leaks as a 500.
 		if errors.Is(err, repo.ErrUnknownRole) {
 			return nil, iderr.UnknownRole(req.Role)
 		}
 		return nil, err
 	}
-	roles, err := c.svc.GetRoles(ctx, req.IdentityID)
+	roles, err := c.svc.GetRoles(ctx, target.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -84,19 +92,23 @@ func (c *Controller) AdminGrantRole(ctx context.Context, req *v1.AdminGrantRoleR
 // actor injection as AdminGrantRole.
 func (c *Controller) AdminRevokeRole(ctx context.Context, req *v1.AdminRevokeRoleReq) (*v1.AdminRevokeRoleRes, error) {
 	adminID, err := c.requireAdminAction(
-		ctx, "identity.admin.role.revoke", adminRoleResource(req.IdentityID, req.Role),
+		ctx, "identity.admin.role.revoke", adminRoleResource(req.UserKey, req.Role),
 	)
 	if err != nil {
 		return nil, err
 	}
+	target, err := c.adminTarget(ctx, req.UserKey)
+	if err != nil {
+		return nil, err
+	}
 	ctx = actor.WithIdentity(ctx, adminID)
-	if err := c.svc.RevokeRole(ctx, req.IdentityID, req.Role); err != nil {
+	if err := c.svc.RevokeRole(ctx, target.ID, req.Role); err != nil {
 		if errors.Is(err, repo.ErrUnknownRole) {
 			return nil, iderr.UnknownRole(req.Role)
 		}
 		return nil, err
 	}
-	roles, err := c.svc.GetRoles(ctx, req.IdentityID)
+	roles, err := c.svc.GetRoles(ctx, target.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -109,8 +121,16 @@ func (c *Controller) AdminListAudit(ctx context.Context, req *v1.AdminListAuditR
 	if _, err := c.requireAdmin(ctx); err != nil {
 		return nil, err
 	}
+	identityID := ""
+	if req.UserKey != "" {
+		target, err := c.adminTarget(ctx, req.UserKey)
+		if err != nil {
+			return nil, err
+		}
+		identityID = target.ID
+	}
 	rows, err := c.svc.QueryAudit(ctx, repo.AuditFilter{
-		IdentityID: req.IdentityID,
+		IdentityID: identityID,
 		Event:      req.Event,
 		Limit:      req.Limit,
 		Offset:     req.Offset,
@@ -118,9 +138,22 @@ func (c *Controller) AdminListAudit(ctx context.Context, req *v1.AdminListAuditR
 	if err != nil {
 		return nil, err
 	}
+	identityIDs := make([]string, 0, len(rows)*2)
+	for _, r := range rows {
+		if r.ActorID != "" {
+			identityIDs = append(identityIDs, r.ActorID)
+		}
+		if r.TargetID != "" {
+			identityIDs = append(identityIDs, r.TargetID)
+		}
+	}
+	userKeys, err := c.svc.GetUserKeysByIDs(ctx, identityIDs)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]v1.AuditEntry, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, toAuditEntry(r))
+		out = append(out, toAuditEntry(r, userKeys))
 	}
 	return &v1.AdminListAuditRes{Entries: out}, nil
 }
@@ -179,7 +212,11 @@ func (c *Controller) AdminGetUser(ctx context.Context, req *v1.AdminGetUserReq) 
 	if _, err := c.requireAdmin(ctx); err != nil {
 		return nil, err
 	}
-	row, err := c.svc.AdminGetUser(ctx, req.ID)
+	target, err := c.adminTarget(ctx, req.UserKey)
+	if err != nil {
+		return nil, err
+	}
+	row, err := c.svc.AdminGetUser(ctx, target.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -189,16 +226,20 @@ func (c *Controller) AdminGetUser(ctx context.Context, req *v1.AdminGetUserReq) 
 // AdminUpdateStatus sets a user's lifecycle status (ban / unban).
 func (c *Controller) AdminUpdateStatus(ctx context.Context, req *v1.AdminUpdateStatusReq) (*v1.AdminUpdateStatusRes, error) {
 	adminID, err := c.requireAdminAction(
-		ctx, "identity.admin.status.update", adminStatusResource(req.ID, req.Status),
+		ctx, "identity.admin.status.update", adminStatusResource(req.UserKey, req.Status),
 	)
 	if err != nil {
 		return nil, err
 	}
-	ctx = actor.WithIdentity(ctx, adminID)
-	if err := c.svc.AdminSetUserStatus(ctx, req.ID, model.Status(req.Status)); err != nil {
+	target, err := c.adminTarget(ctx, req.UserKey)
+	if err != nil {
 		return nil, err
 	}
-	row, err := c.svc.AdminGetUser(ctx, req.ID)
+	ctx = actor.WithIdentity(ctx, adminID)
+	if err := c.svc.AdminSetUserStatus(ctx, target.ID, model.Status(req.Status)); err != nil {
+		return nil, err
+	}
+	row, err := c.svc.AdminGetUser(ctx, target.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -208,13 +249,17 @@ func (c *Controller) AdminUpdateStatus(ctx context.Context, req *v1.AdminUpdateS
 // AdminDeleteUser soft-deletes a user.
 func (c *Controller) AdminDeleteUser(ctx context.Context, req *v1.AdminDeleteUserReq) (*v1.AdminDeleteUserRes, error) {
 	adminID, err := c.requireAdminAction(
-		ctx, "identity.admin.user.delete", adminIdentityResource(req.ID),
+		ctx, "identity.admin.user.delete", adminIdentityResource(req.UserKey),
 	)
 	if err != nil {
 		return nil, err
 	}
+	target, err := c.adminTarget(ctx, req.UserKey)
+	if err != nil {
+		return nil, err
+	}
 	ctx = actor.WithIdentity(ctx, adminID)
-	if err := c.svc.AdminDeleteUser(ctx, req.ID); err != nil {
+	if err := c.svc.AdminDeleteUser(ctx, target.ID); err != nil {
 		return nil, err
 	}
 	return &v1.AdminDeleteUserRes{}, nil
@@ -223,13 +268,17 @@ func (c *Controller) AdminDeleteUser(ctx context.Context, req *v1.AdminDeleteUse
 // AdminResetPassword overrides a user's password.
 func (c *Controller) AdminResetPassword(ctx context.Context, req *v1.AdminResetPasswordReq) (*v1.AdminResetPasswordRes, error) {
 	adminID, err := c.requireAdminAction(
-		ctx, "identity.admin.password.reset", adminIdentityResource(req.ID),
+		ctx, "identity.admin.password.reset", adminIdentityResource(req.UserKey),
 	)
 	if err != nil {
 		return nil, err
 	}
+	target, err := c.adminTarget(ctx, req.UserKey)
+	if err != nil {
+		return nil, err
+	}
 	ctx = actor.WithIdentity(ctx, adminID)
-	if err := c.svc.AdminResetPassword(ctx, req.ID, req.NewPassword); err != nil {
+	if err := c.svc.AdminResetPassword(ctx, target.ID, req.NewPassword); err != nil {
 		return nil, err
 	}
 	return &v1.AdminResetPasswordRes{}, nil
@@ -266,32 +315,40 @@ func toAdminUserDTO(r repo.AdminUserRow) v1.AdminUserDTO {
 		roles = []string{}
 	}
 	return v1.AdminUserDTO{
-		ID:            r.ID,
+		UserKey:       r.UserKey,
 		Email:         r.Email,
 		EmailVerified: r.EmailVerified,
 		Status:        string(r.Status),
 		CreatedAt:     r.CreatedAt.Format(time.RFC3339),
 		DisplayName:   r.DisplayName,
-		Username:      r.Username,
-		AvatarURL:     r.AvatarURL,
+		Handle:        r.Handle,
+		Avatar:        mediaRef(r.AvatarMediaKey),
 		Roles:         roles,
 	}
 }
 
+func (c *Controller) adminTarget(ctx context.Context, userKey string) (model.Identity, error) {
+	identity, err := c.svc.GetByUserKey(ctx, userKey)
+	if errors.Is(err, repo.ErrIdentityMissing) {
+		return model.Identity{}, iderr.IdentityNotFound()
+	}
+	return identity, err
+}
+
 // toAuditEntry maps a repo.AuditRow to the API wire type.
-func toAuditEntry(r repo.AuditRow) v1.AuditEntry {
+func toAuditEntry(r repo.AuditRow, userKeys map[string]string) v1.AuditEntry {
 	return v1.AuditEntry{
-		ID:         r.ID,
-		Event:      r.Event,
-		ActorID:    r.ActorID,
-		TargetID:   r.TargetID,
-		ActorEmail: r.ActorEmail,
-		IP:         r.IP,
-		UserAgent:  r.UserAgent,
-		ClientID:   r.ClientID,
-		RequestID:  r.RequestID,
-		Result:     r.Result,
-		Detail:     r.Detail,
-		OccurredAt: r.OccurredAt.Format(time.RFC3339),
+		ID:            r.ID,
+		Event:         r.Event,
+		ActorUserKey:  userKeys[r.ActorID],
+		TargetUserKey: userKeys[r.TargetID],
+		ActorEmail:    r.ActorEmail,
+		IP:            r.IP,
+		UserAgent:     r.UserAgent,
+		ClientID:      r.ClientID,
+		RequestID:     r.RequestID,
+		Result:        r.Result,
+		Detail:        r.Detail,
+		OccurredAt:    r.OccurredAt.Format(time.RFC3339),
 	}
 }

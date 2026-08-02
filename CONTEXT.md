@@ -5,8 +5,28 @@ Identity 是平台的身份与凭证颁发上下文。它管理 User、Guest Sub
 ## Language
 
 **User（用户）**:
-已经完成账户登录、拥有稳定 Identity ID 的人类主体。
+已经完成账户登录、拥有稳定内部 User ID 与 Public User Key 的人类主体。
 _Avoid_: Guest、浏览器、OIDC Client
+
+**Internal User ID（内部用户 ID）**:
+Identity 数据边界内用于关系和事务的一致、不可变主键，不作为面向用户的地址或跨服务公开合同。
+_Avoid_: Public User Key、OIDC Subject、User Handle
+
+**Public User Key（公开用户键）**:
+平台 API、公开用户地址和跨服务用户引用使用的稳定 opaque 标识；一经分配不可变、不可复用。
+_Avoid_: 数据库 UUID、邮箱、User Handle、Display Name
+
+**OIDC Subject（OIDC 主体标识）**:
+由 issuer 在明确 client 或 sector 范围内分配的稳定主体值，身份只能由 `(iss, sub)` 联合确定。
+_Avoid_: Public User Key、Internal User ID、邮箱、User Handle
+
+**User Handle（用户句柄）**:
+规范化后唯一、可修改的人类可读别名，用于 `/@handle` 一类可发现地址，不承担所有权或外键职责。
+_Avoid_: username、Display Name、Public User Key
+
+**Display Name（显示名）**:
+允许重复和修改、用于界面展示的 Unicode 文本，不参与登录、解析或授权。
+_Avoid_: User Handle、登录名、所有权键
 
 **Guest Subject（游客主体）**:
 Identity 为登录前业务连续性创建的稳定临时主体 ID。它可以拥有资源，但不等于注册账户。
@@ -59,6 +79,9 @@ _Avoid_: Publisher Attestation、Identity 凭证、远程撤销开关
 ## Invariants
 
 - Identity 颁发凭证但不决定 Gallery 等产品的审核、公开或业务生命周期。
+- Internal User ID 不进入公开用户合同；Public User Key 不可复用，邮箱、handle 和 display name 都不能充当所有权键。
+- OIDC 身份始终以 `(iss, sub)` 判断；public 与 pairwise subject 的适用范围必须显式，不能从 User ID 或 handle 临时推导。
+- User、Guest 和 machine client 的主体种类必须可区分，不能只靠一个无类型的 `sub` 字符串猜测。
 - Guest Session TTL 与 access/claim token TTL 独立；长 session 只能换短 token。
 - Guest handle 是秘密且只存 hash；Guest Subject ID 不是秘密，但不能单独证明所有权。
 - client 必须已注册，token audience 必须属于该 client 的允许列表。
@@ -68,3 +91,15 @@ _Avoid_: Publisher Attestation、Identity 凭证、远程撤销开关
 - Publisher Attestation 只证明 User 的精确投稿声明；Registry 仍拥有 namespace、审核、上架和下架决策。
 - Publisher signing key 与 OIDC、step-up 和 Registry publication key 必须按用途隔离；`kid` 只是验签 key 查找提示。
 - External Identity Binding 使用 Provider 稳定账号 ID，不能由 login、email、Profile 链接或浏览器自报字段建立。
+- 公开 User 读取合同从 `/api/v1/users*` 开始；未发布的 `/api/v1/profiles*` 不提供兼容或 fallback。
+- User Handle 规范化为小写 ASCII 3–30 位且历史值不重新分配；Display Name 不参与地址、解析、登录或授权。
+- User 的 avatar/cover 只保存 Asset `mediaKey`；公开响应与 OIDC claim 不保存或信任任意外部图片 URL。
+- 业务 API 使用 `/api/v1` 等版本路径；OIDC discovery、authorize、token、userinfo 等标准端点保持标准路径。
+- 产品服务的用户所有权、管理员配置和用户审计 actor 使用 Public User Key；只在 Identity 内部关系中使用 UUID。
+
+## Durable review
+
+- User 标识分层、主流实现调研、缺陷审计、消费者迁移和验收结果统一保存在
+  [2026-08-02 User 合同 Work](flightdeck/work/2026-08-02-user-identity-contract-review/index.md)。
+- 后续先复读该 Work 的 55 项一手引用、当前合同审计和实施结果；只有标准、合同前提或外部产品行为实质变化时
+  才重新调研。

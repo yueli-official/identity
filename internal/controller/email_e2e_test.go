@@ -107,7 +107,7 @@ func TestE2E_Email(t *testing.T) {
 	postJSON(t, client, base+"/api/v1/auth/login", map[string]any{
 		"email": email, "password": oldPass,
 	})
-	identityID := getMeID(t, client, base, email, false)
+	userKey := getMeUserKey(t, client, base, email, false)
 	oldSession := emailSessionCookie(jar, base)
 	if oldSession == "" {
 		t.Fatalf("login: no id_session in jar")
@@ -122,11 +122,11 @@ func TestE2E_Email(t *testing.T) {
 		"token": tokenFromLink(cm.verifyLink),
 	})
 	// /session/me now reports emailVerified=true.
-	getMeID(t, client, base, email, true)
+	getMeUserKey(t, client, base, email, true)
 	// And the repo agrees.
-	got, err := r.GetByID(context.Background(), identityID)
+	got, err := r.GetByUserKey(context.Background(), userKey)
 	if err != nil {
-		t.Fatalf("GetByID: %v", err)
+		t.Fatalf("GetByUserKey: %v", err)
 	}
 	if !got.EmailVerified {
 		t.Fatal("repo: email_verified should be true after verify")
@@ -199,8 +199,9 @@ func postJSON(t *testing.T, client *http.Client, url string, payload map[string]
 	return body
 }
 
-// getMeID calls /session/me, asserts email + emailVerified, and returns id.
-func getMeID(t *testing.T, client *http.Client, base, wantEmail string, wantVerified bool) string {
+// getMeUserKey calls /session/me, asserts email + emailVerified, and returns the
+// stable public user key without exposing the internal UUID.
+func getMeUserKey(t *testing.T, client *http.Client, base, wantEmail string, wantVerified bool) string {
 	t.Helper()
 	resp, err := client.Get(base + "/api/v1/session/me")
 	if err != nil {
@@ -215,7 +216,7 @@ func getMeID(t *testing.T, client *http.Client, base, wantEmail string, wantVeri
 	if v := j.Get("emailVerified").Bool(); v != wantVerified {
 		t.Fatalf("me: emailVerified=%v want %v (body=%s)", v, wantVerified, body)
 	}
-	return j.Get("id").String()
+	return j.Get("userKey").String()
 }
 
 // emailSessionCookie extracts the id_session value the jar holds for base.

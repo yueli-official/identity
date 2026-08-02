@@ -249,6 +249,6 @@ func (s *Store) RevokeRefreshBySession(ctx context.Context, sessionID string) er
 	return s.be.RevokeRefreshBySession(ctx, sessionID)
 }
 
-func (s *Store) RevokeRefreshByIdentity(ctx context.Context, subject string) error {
-	return s.be.RevokeRefreshByIdentity(ctx, subject)
+func (s *Store) RevokeRefreshBySubject(ctx context.Context, subject string) error {
+	return s.be.RevokeRefreshBySubject(ctx, subject)
 }

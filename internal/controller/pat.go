@@ -106,8 +106,8 @@ func (c *Controller) VerifyPAT(ctx context.Context, _ *v1.VerifyPATReq) (*v1.Ver
 	}
 
 	return &v1.VerifyPATRes{
-		IdentityID: res.IdentityID,
-		Scopes:     res.Scopes,
-		ExpiresAt:  patRFC3339(res.ExpiresAt),
+		UserKey:   res.UserKey,
+		Scopes:    res.Scopes,
+		ExpiresAt: patRFC3339(res.ExpiresAt),
 	}, nil
 }

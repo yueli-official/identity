@@ -15,7 +15,7 @@ type UploadAvatarReq struct {
 }
 
 type UploadAvatarRes struct {
-	AvatarURL string `json:"avatarUrl"`
+	Avatar MediaRef `json:"avatar"`
 }
 
 type UploadCoverReq struct {
@@ -24,5 +24,5 @@ type UploadCoverReq struct {
 }
 
 type UploadCoverRes struct {
-	CoverURL string `json:"coverUrl"`
+	Cover MediaRef `json:"cover"`
 }

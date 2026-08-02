@@ -8,6 +8,7 @@ import (
 
 	"github.com/yueli-official/identity/internal/model"
 	"github.com/yueli-official/identity/internal/repo"
+	"github.com/yueli-official/identity/internal/user"
 )
 
 // GetByProviderUID resolves the identity linked to (provider, providerUID) by
@@ -32,15 +33,28 @@ func (p *PG) GetByProviderUID(ctx context.Context, provider, providerUID string)
 // credential). Maps a UNIQUE violation on identities.email to repo.ErrEmailTaken
 // and on the credentials_oauth PK to repo.ErrProviderUIDTaken.
 func (p *PG) CreateOAuthIdentity(ctx context.Context, in repo.NewOAuthIdentityInput) (model.Identity, error) {
+	userKey := in.UserKey
+	if userKey == "" {
+		generated, err := user.NewPublicKey()
+		if err != nil {
+			return model.Identity{}, err
+		}
+		userKey = string(generated)
+	} else if _, err := user.ParsePublicKey(userKey); err != nil {
+		return model.Identity{}, err
+	}
 	var out model.Identity
 	err := p.db.Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
 		// Set context on the transaction so that subsequent Model calls inherit it.
 		tx = tx.Ctx(ctx)
 
 		// Insert identity row (with email_verified); capture the DB-generated UUID.
+		if err := validateRoles(ctx, tx, in.Roles); err != nil {
+			return err
+		}
 		val, err := tx.GetValue(
-			"INSERT INTO identities (email, email_verified) VALUES (?, ?) RETURNING id",
-			in.Email, in.EmailVerified,
+			"INSERT INTO identities (user_key, email, email_verified) VALUES (?, ?, ?) RETURNING id",
+			userKey, in.Email, in.EmailVerified,
 		)
 		if err != nil {
 			if isUniqueViolation(err) {
@@ -49,6 +63,11 @@ func (p *PG) CreateOAuthIdentity(ctx context.Context, in repo.NewOAuthIdentityIn
 			return err
 		}
 		id := val.String()
+		if _, err := tx.Model("oidc_subjects").Ctx(ctx).Data(g.Map{
+			"identity_id": id, "sector_key": "public", "subject": userKey, "subject_type": "public",
+		}).Insert(); err != nil {
+			return err
+		}
 
 		if _, err := tx.Model("user_profiles").Ctx(ctx).Data(g.Map{
 			"identity_id":  id,
@@ -67,6 +86,9 @@ func (p *PG) CreateOAuthIdentity(ctx context.Context, in repo.NewOAuthIdentityIn
 			if isUniqueViolation(err) {
 				return repo.ErrProviderUIDTaken
 			}
+			return err
+		}
+		if err := insertRoles(ctx, tx, id, in.Roles); err != nil {
 			return err
 		}
 

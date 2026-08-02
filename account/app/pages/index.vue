@@ -44,12 +44,12 @@ async function onResendVerification() {
 // saves the text fields + social links.
 const profileSchema = z.object({
   displayName: z.string().min(1, '请输入昵称'),
-  username: z.string().max(50, '用户名最多 50 字').optional(),
+  handle: z.string().regex(/^[a-z0-9][a-z0-9_]{1,28}[a-z0-9]$/, 'Handle 需为 3–30 位小写字母、数字或下划线').or(z.literal('')).optional(),
   bio: z.string().max(500, '简介最多 500 字').optional(),
   locale: z.string().optional()
 })
 type ProfileSchema = z.output<typeof profileSchema>
-const profileState = reactive<ProfileSchema>({ displayName: '', username: '', bio: '', locale: '' })
+const profileState = reactive<ProfileSchema>({ displayName: '', handle: '', bio: '', locale: '' })
 const avatarUrl = ref('')
 const coverUrl = ref('')
 
@@ -62,7 +62,7 @@ const socialRows = ref<SocialRow[]>([])
 watchEffect(() => {
   if (!me.value) return
   profileState.displayName = me.value.displayName
-  profileState.username = me.value.username
+  profileState.handle = me.value.handle
   profileState.bio = me.value.bio
   avatarUrl.value = me.value.avatarUrl
   coverUrl.value = me.value.coverUrl
@@ -83,9 +83,8 @@ async function onSaveProfile(e: FormSubmitEvent<ProfileSchema>) {
     const socialLinks: SocialLink[] = socialRows.value
       .filter(r => r.url.trim())
       .map(r => ({ label: plat(r.key).label, url: r.url.trim() }))
-    await call('/api/v1/session/profile', { method: 'PUT', body: {
-      ...e.data, avatarUrl: avatarUrl.value, coverUrl: coverUrl.value, socialLinks
-    } })
+    await call('/api/v1/session/profile', { method: 'PUT', body: e.data })
+    await call('/api/v1/session/profile/social-links', { method: 'PUT', body: { socialLinks } })
     await refresh()
     markProfileSaved()
   } catch (err: any) {
@@ -311,8 +310,8 @@ const cardHeaderClass = 'flex items-center gap-2 font-semibold text-highlighted'
         <UFormField name="displayName" label="昵称">
           <UInput v-model="profileState.displayName" class="w-full" placeholder="你的昵称" />
         </UFormField>
-        <UFormField name="username" label="用户名" hint="可选,用于个性化地址">
-          <UInput v-model="profileState.username" class="w-full" placeholder="li" />
+        <UFormField name="handle" label="Handle" hint="可选，用于公开主页地址；仅小写字母、数字和下划线">
+          <UInput v-model="profileState.handle" class="w-full" placeholder="yueli" />
         </UFormField>
         <UFormField name="bio" label="简介" hint="可选">
           <UTextarea v-model="profileState.bio" :rows="3" class="w-full" placeholder="一句话介绍自己" />

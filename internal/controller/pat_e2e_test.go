@@ -10,7 +10,7 @@ package controller_test
 //     Plaintext is recorded for later verification assertions.
 //  3. ListPAT: exactly one entry; raw response body does NOT contain the
 //     plaintext token or any "token"/"tokenHash" key (security assertion).
-//  4. VerifyPAT (public, no cookie): identityId == user A, scopes match.
+//  4. VerifyPAT (public, no cookie): userKey == user A, scopes match.
 //  5. RevokePAT then VerifyPAT → 401 identity.pat_invalid.
 //  6. Verify garbage token → 401 identity.pat_invalid;
 //     Verify empty Authorization → 401 identity.pat_invalid.
@@ -126,8 +126,9 @@ func TestE2E_PAT(t *testing.T) {
 		}
 
 		// registerAndLogin registers a user over HTTP and logs them in, returning
-		// their identity ID (resolved via service seam) and their session cookie.
-		registerAndLogin := func(email, password, displayName string) (identityID, sid string) {
+		// their internal test ID, public user key, and session cookie. Only the
+		// public key is asserted on the HTTP wire; the ID is used for audit storage.
+		registerAndLogin := func(email, password, displayName string) (identityID, userKey, sid string) {
 			_, _, _ = doPost("/api/v1/auth/register",
 				fmt.Sprintf(`{"email":%q,"password":%q,"displayName":%q}`, email, password, displayName),
 				nil,
@@ -142,14 +143,14 @@ func TestE2E_PAT(t *testing.T) {
 			)
 			sessionID := extractSessionCookie(loginHdr)
 			t.AssertNE(sessionID, "")
-			return ident.ID, sessionID
+			return ident.ID, ident.UserKey, sessionID
 		}
 
 		// =====================================================================
 		// Step 1: Register + login user A
 		// =====================================================================
-		userAID, userASID := registerAndLogin("usera@pat.test", "correct horse battery", "UserA")
-		t.AssertNE(userAID, "")
+		userAID, userAKey, userASID := registerAndLogin("usera@pat.test", "correct horse battery", "UserA")
+		t.AssertNE(userAKey, "")
 		t.AssertNE(userASID, "")
 
 		// =====================================================================
@@ -224,7 +225,7 @@ func TestE2E_PAT(t *testing.T) {
 		)
 		t.Assert(verifyStatus, 200)
 		vj := gjson.New(verifyBody)
-		t.Assert(vj.Get("identityId").String(), userAID)
+		t.Assert(vj.Get("userKey").String(), userAKey)
 		verifyScopes := vj.Get("scopes").Strings()
 		verifyScopeSet := map[string]bool{}
 		for _, sc := range verifyScopes {
@@ -266,7 +267,7 @@ func TestE2E_PAT(t *testing.T) {
 		// Step 7: Cross-user isolation — user B cannot revoke user A's token
 		// =====================================================================
 		// Create user B.
-		_, userBSID := registerAndLogin("userb@pat.test", "correct horse battery", "UserB")
+		_, _, userBSID := registerAndLogin("userb@pat.test", "correct horse battery", "UserB")
 
 		// Create a fresh PAT for user A so there is a live id for B to attempt.
 		freshCreateBody, _, freshCreateStatus := doPost("/api/v1/pat",

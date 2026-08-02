@@ -94,6 +94,10 @@
       "status": 401
     },
     {
+      "code": "identity.handle_unavailable",
+      "status": 409
+    },
+    {
       "code": "identity.invalid_credentials",
       "status": 401
     },

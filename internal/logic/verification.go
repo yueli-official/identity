@@ -182,10 +182,8 @@ func (s *Service) ResetPassword(ctx context.Context, token, newPassword string) 
 	if err := s.store.DeleteSessionsByIdentity(ctx, rec.IdentityID); err != nil {
 		return err
 	}
-	if s.revoker != nil {
-		if err := s.revoker.RevokeRefreshByIdentity(ctx, rec.IdentityID); err != nil {
-			return err
-		}
+	if err := s.revokeRefreshByIdentity(ctx, rec.IdentityID); err != nil {
+		return err
 	}
 	s.audit(ctx, AuditEvent{
 		Event:    EvPwReset,

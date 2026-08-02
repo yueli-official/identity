@@ -14,6 +14,7 @@ import { PageHeader } from '@yueli/ui/dashboard/pattern'
 import { useMinimumLoading } from '@yueli/ui/feedback'
 import { abs } from '~/utils/date'
 import { createAccountNotifier } from '~/utils/feedback'
+import type { MediaRef } from '~/utils/media'
 import {
   adminStepUpFailureMessage,
   isAdminStepUpInterruptedError
@@ -31,14 +32,15 @@ const toast = createAccountNotifier(useToast())
 const router = useRouter()
 
 interface AdminUser {
-  id: string
+  userKey: string
   email: string
   emailVerified: boolean
   status: 'active' | 'disabled' | 'deleted'
   createdAt: string
   displayName: string
-  username: string
-  avatarUrl: string
+  handle: string
+  avatar?: MediaRef
+  avatarUrl?: string
   roles: string[]
 }
 interface UserListData {
@@ -89,7 +91,7 @@ const sync = createVueRouterCollectionQuerySync({
 })
 
 function isSelf(user: AdminUser) {
-  return user.id === me.value?.id
+  return user.userKey === me.value?.userKey
 }
 async function load(nextQuery: Readonly<UserCollectionQuery>, activeWorkflow: CollectionWorkflow<AdminUser, string, UserCollectionQuery>) {
   const token = activeWorkflow.beginLoad()
@@ -110,7 +112,13 @@ async function load(nextQuery: Readonly<UserCollectionQuery>, activeWorkflow: Co
       activeWorkflow.setQuery({ ...nextQuery, page: lastPage })
       return
     }
-    activeWorkflow.resolveLoad(token, { items: data.list ?? [], total: data.total ?? 0 })
+    activeWorkflow.resolveLoad(token, {
+      items: (data.list ?? []).map(user => ({
+        ...user,
+        avatarUrl: userMediaUrl(user.avatar, 'thumbnail')
+      })),
+      total: data.total ?? 0
+    })
   } catch {
     activeWorkflow.rejectLoad(token, { key: 'account.users.collection.load_failed' })
   }
@@ -123,7 +131,7 @@ const {
 } = useVueCollectionWorkflow({
   initialQuery: defaultQuery,
   queryPolicy,
-  keyOf: (user: AdminUser) => user.id,
+  keyOf: (user: AdminUser) => user.userKey,
   isSelectable: (user: AdminUser) => !isSelf(user),
   querySync: sync,
   dataQueryKey: (query) => JSON.stringify(query),
@@ -161,9 +169,9 @@ onMounted(() => {
   fetchStats()
 })
 watch(
-  () => me.value?.id,
-  (id, previousId) => {
-    if (mounted.value && id && id !== previousId) void reload()
+  () => me.value?.userKey,
+  (userKey, previousUserKey) => {
+    if (mounted.value && userKey && userKey !== previousUserKey) void reload()
   }
 )
 onScopeDispose(() => {
@@ -208,17 +216,17 @@ function replaceSelection(ids: readonly string[]) {
 const busy = ref('') // id currently mutating
 
 async function setStatus(u: AdminUser, next: AdminUser['status']) {
-  busy.value = u.id
+  busy.value = u.userKey
   try {
     await adminStepUp.run(
       'identity.admin.status.update',
-      adminStepUpResource.status(u.id, next),
-      (proof) => call(`/api/v1/admin/users/${u.id}/status`, {
+      adminStepUpResource.status(u.userKey, next),
+      (proof) => call(`/api/v1/admin/users/${u.userKey}/status`, {
         method: 'PUT', body: { status: next },
         headers: { 'X-Step-Up-Proof': proof },
       }),
     )
-    if (workflow.isSelected(u.id)) workflow.toggleKey(u.id)
+    if (workflow.isSelected(u.userKey)) workflow.toggleKey(u.userKey)
     await reloadAll()
   } catch (e) {
     notifyStepUpFailure(e, '操作失败', '暂时无法更新账户状态。')
@@ -270,7 +278,7 @@ watch([q, status, role, sort, direction, page, size], () => {
 })
 async function applyBatch() {
   if (!batchAction.value || !selectedIds.value.length || batchRunning.value) return
-  const ids = selectedIds.value.filter((id) => id !== me.value?.id)
+  const ids = selectedIds.value.filter((id) => id !== me.value?.userKey)
   batchRunning.value = true
   try {
     const results: PromiseSettledResult<unknown>[] = []
@@ -328,12 +336,12 @@ async function toggleAdminRole() {
   togglingRole.value = true
   try {
     const action = has ? 'identity.admin.role.revoke' : 'identity.admin.role.grant'
-    await adminStepUp.run(action, adminStepUpResource.role(u.id, 'admin'), (proof) =>
-      has
-        ? call(`/api/v1/admin/identities/${u.id}/roles/admin`, {
-            method: 'DELETE', headers: { 'X-Step-Up-Proof': proof },
-          })
-        : call(`/api/v1/admin/identities/${u.id}/roles`, {
+    await adminStepUp.run(action, adminStepUpResource.role(u.userKey, 'admin'), (proof) =>
+	  has
+		? call(`/api/v1/admin/users/${u.userKey}/roles/admin`, {
+			method: 'DELETE', headers: { 'X-Step-Up-Proof': proof },
+		  })
+		: call(`/api/v1/admin/users/${u.userKey}/roles`, {
             method: 'POST', body: { role: 'admin' },
             headers: { 'X-Step-Up-Proof': proof },
           }),
@@ -364,8 +372,8 @@ async function confirmReset() {
     const target = resetTarget.value
     await adminStepUp.run(
       'identity.admin.password.reset',
-      adminStepUpResource.identity(target.id),
-      (proof) => call(`/api/v1/admin/users/${target.id}/password`, {
+      adminStepUpResource.identity(target.userKey),
+      (proof) => call(`/api/v1/admin/users/${target.userKey}/password`, {
         method: 'POST', body: { newPassword: newPw.value },
         headers: { 'X-Step-Up-Proof': proof },
       }),
@@ -394,8 +402,8 @@ async function confirmDelete() {
     const target = deleteTarget.value
     await adminStepUp.run(
       'identity.admin.user.delete',
-      adminStepUpResource.identity(target.id),
-      (proof) => call(`/api/v1/admin/users/${target.id}`, {
+      adminStepUpResource.identity(target.userKey),
+      (proof) => call(`/api/v1/admin/users/${target.userKey}`, {
         method: 'DELETE', headers: { 'X-Step-Up-Proof': proof },
       }),
     )
@@ -520,7 +528,7 @@ const statusBadge: Record<AdminUser['status'], { label: string; color: 'success'
 function initialOf(u: AdminUser) {
   return (u.displayName || u.email || '?').charAt(0).toUpperCase()
 }
-const userKey = (user: AdminUser) => user.id
+const userKey = (user: AdminUser) => user.userKey
 const userLabel = (user: AdminUser) => user.displayName || user.email
 </script>
 
@@ -618,7 +626,7 @@ const userLabel = (user: AdminUser) => user.displayName || user.email
                 <span v-if="isSelf(u)" class="shrink-0 rounded bg-primary/10 px-1.5 text-xs text-primary">你</span>
               </div>
               <div class="line-clamp-1 text-xs text-muted">
-                {{ u.email }}<span v-if="u.username"> · @{{ u.username }}</span>
+                {{ u.email }}<span v-if="u.handle"> · @{{ u.handle }}</span>
               </div>
               <div class="mt-0.5 text-xs text-dimmed">
                 注册于 <ClientOnly fallback="—">{{ abs(u.createdAt) }}</ClientOnly>
@@ -638,7 +646,7 @@ const userLabel = (user: AdminUser) => user.displayName || user.email
                 square
                 size="xs"
                 class="min-h-11 min-w-11 touch-manipulation sm:min-h-0 sm:min-w-0"
-                :loading="busy === u.id"
+                :loading="busy === u.userKey"
                 :aria-label="`管理 ${u.displayName || u.email}`"
               />
             </UDropdownMenu>
@@ -672,7 +680,7 @@ const userLabel = (user: AdminUser) => user.displayName || user.email
           </div>
           <dl class="grid grid-cols-3 gap-y-2 text-sm">
             <dt class="text-muted">用户名</dt>
-            <dd class="col-span-2 text-default">{{ detailUser.username || '—' }}</dd>
+            <dd class="col-span-2 text-default">{{ detailUser.handle || '—' }}</dd>
             <dt class="text-muted">状态</dt>
             <dd class="col-span-2"><UBadge :label="statusBadge[detailUser.status].label" :color="statusBadge[detailUser.status].color" variant="soft" size="sm" /></dd>
             <dt class="text-muted">邮箱验证</dt>
@@ -682,7 +690,7 @@ const userLabel = (user: AdminUser) => user.displayName || user.email
               <ClientOnly fallback="—">{{ abs(detailUser.createdAt) }}</ClientOnly>
             </dd>
             <dt class="text-muted">用户 ID</dt>
-            <dd class="col-span-2 truncate font-mono text-xs text-dimmed">{{ detailUser.id }}</dd>
+            <dd class="col-span-2 truncate font-mono text-xs text-dimmed">{{ detailUser.userKey }}</dd>
           </dl>
           <div class="flex items-center justify-between gap-4 border-t border-default pt-4">
             <div>

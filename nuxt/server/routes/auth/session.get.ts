@@ -1,15 +1,15 @@
 // Returns the current user (display claims only — never the tokens).
 import {
-  createCachedProfileFetcher,
-  resolveLatestDisplayUser,
-  type PublicProfileResponse,
+	createCachedProfileFetcher,
+	resolveLatestDisplayUser,
+	type PublicUserResponse,
 } from "../../utils/profile";
 
 const fetchLatestProfile = createCachedProfileFetcher(
-  (url) => $fetch<PublicProfileResponse>(url, { timeout: 500 }),
+  (url) => $fetch<PublicUserResponse>(url, { timeout: 500 }),
   {
     ttlMs: 30_000,
-    shouldCache: (response) => response.code === "ok",
+	shouldCache: (response) => Boolean(response.user),
   },
 );
 

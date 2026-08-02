@@ -165,14 +165,17 @@ func (m *Manager) PublicKey(_ context.Context, kid string) (any, error) {
 // KeyGetter is fosite's key getter: returns the active private key.
 func (m *Manager) KeyGetter(context.Context) (interface{}, error) { return m.activeKey, nil }
 
-// MintServiceToken self-signs a short-lived RS256 access token (kid in JWKS) for
+// MintDelegatedUserToken self-signs a short-lived RS256 access token (kid in JWKS) for
 // the given subject. Used for first-party server-to-server calls where the IdP
 // acts on behalf of a logged-in user (e.g. proxying an avatar upload to the
 // asset service): the user authenticates to the IdP by session cookie, and the
 // IdP mints a user-scoped bearer the resource server verifies via JWKS. audience
 // is mandatory and identifies that resource server; scope is space-delimited
 // and may be empty.
-func (m *Manager) MintServiceToken(issuer, subject, audience, scope string, ttl time.Duration, now time.Time) (string, error) {
+func (m *Manager) MintDelegatedUserToken(issuer, subject, audience, scope string, ttl time.Duration, now time.Time) (string, error) {
+	if strings.TrimSpace(subject) == "" {
+		return "", fmt.Errorf("delegated user token subject is required")
+	}
 	if strings.TrimSpace(audience) == "" {
 		return "", fmt.Errorf("service token audience is required")
 	}
@@ -192,7 +195,7 @@ func (m *Manager) MintServiceToken(issuer, subject, audience, scope string, ttl 
 		Expiry:    jwt.NewNumericDate(now.Add(ttl)),
 	}
 	builder := jwt.Signed(sig).Claims(claims)
-	extra := map[string]interface{}{"client_id": "identity-svc"}
+	extra := map[string]interface{}{"client_id": "identity-svc", "subject_kind": "user"}
 	if scope != "" {
 		extra["scope"] = scope
 	}

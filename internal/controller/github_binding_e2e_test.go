@@ -58,6 +58,10 @@ func TestGitHubBindingHTTPJourneyAndRevocationWebhook(t *testing.T) {
 	module, err := githubbinding.New(githubbinding.Config{
 		Store: bindingStore, Provider: provider,
 		CipherSecret: []byte("0123456789abcdef0123456789abcdef"),
+		ResolvePublisherSubject: func(ctx context.Context, identityID string) (string, error) {
+			identity, err := service.GetByID(ctx, identityID)
+			return identity.UserKey, err
+		},
 	})
 	if err != nil {
 		t.Fatal(err)

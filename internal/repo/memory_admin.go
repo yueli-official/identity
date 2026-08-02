@@ -27,7 +27,7 @@ func (m *Memory) AdminListUsers(_ context.Context, f AdminUserFilter) ([]AdminUs
 		}
 		prof := m.profiles[id]
 		if kw != "" {
-			hay := strings.ToLower(idn.Email + " " + prof.DisplayName + " " + prof.Username)
+			hay := strings.ToLower(idn.Email + " " + prof.DisplayName + " " + prof.Handle)
 			if !strings.Contains(hay, kw) {
 				continue
 			}
@@ -37,15 +37,16 @@ func (m *Memory) AdminListUsers(_ context.Context, f AdminUserFilter) ([]AdminUs
 			continue
 		}
 		matched = append(matched, AdminUserRow{
-			ID:            idn.ID,
-			Email:         idn.Email,
-			EmailVerified: idn.EmailVerified,
-			Status:        idn.Status,
-			CreatedAt:     idn.CreatedAt,
-			DisplayName:   prof.DisplayName,
-			Username:      prof.Username,
-			AvatarURL:     prof.AvatarURL,
-			Roles:         roles,
+			InternalID:     idn.ID,
+			UserKey:        idn.UserKey,
+			Email:          idn.Email,
+			EmailVerified:  idn.EmailVerified,
+			Status:         idn.Status,
+			CreatedAt:      idn.CreatedAt,
+			DisplayName:    prof.DisplayName,
+			Handle:         prof.Handle,
+			AvatarMediaKey: prof.AvatarMediaKey,
+			Roles:          roles,
 		})
 	}
 
@@ -125,5 +126,11 @@ func (m *Memory) SetIdentityStatus(_ context.Context, identityID string, status 
 	idn.Status = status
 	idn.UpdatedAt = m.now()
 	m.byID[identityID] = idn
+	if status == model.StatusDeleted {
+		delete(m.byEmail, idn.Email)
+		profile := m.profiles[identityID]
+		profile.Handle = ""
+		m.profiles[identityID] = profile
+	}
 	return nil
 }

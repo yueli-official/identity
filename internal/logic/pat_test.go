@@ -281,7 +281,7 @@ func TestVerifyPAT_Success(t *testing.T) {
 	m := repo.NewMemory()
 	svc, _ := newPATSvcClk(m)
 	ctx := context.Background()
-	seedPATIdentity(t, m, "id-1")
+	userKey := seedPATIdentity(t, m, "id-1")
 
 	plaintext, _, err := svc.CreatePAT(ctx, "id-1", "tok", []string{"read", "write"}, 0)
 	if err != nil {
@@ -292,8 +292,8 @@ func TestVerifyPAT_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("VerifyPAT: %v", err)
 	}
-	if result.IdentityID != "id-1" {
-		t.Errorf("IdentityID: want id-1, got %q", result.IdentityID)
+	if result.UserKey != userKey {
+		t.Errorf("UserKey: want %q, got %q", userKey, result.UserKey)
 	}
 	if len(result.Scopes) != 2 || result.Scopes[0] != "read" || result.Scopes[1] != "write" {
 		t.Errorf("Scopes: want [read write], got %v", result.Scopes)
@@ -400,13 +400,15 @@ func TestVerifyPAT_RejectsDisabledIdentity(t *testing.T) {
 	}
 }
 
-func seedPATIdentity(t *testing.T, store *repo.Memory, identityID string) {
+func seedPATIdentity(t *testing.T, store *repo.Memory, identityID string) string {
 	t.Helper()
-	if _, err := store.CreateIdentityWithProfile(context.Background(), repo.NewIdentityInput{
+	identity, err := store.CreateIdentityWithProfile(context.Background(), repo.NewIdentityInput{
 		ID: identityID, Email: identityID + "@example.test", PasswordHash: "test-hash",
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatal(err)
 	}
+	return identity.UserKey
 }
 
 // ---------------------------------------------------------------------------

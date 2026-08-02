@@ -18,18 +18,29 @@ func (c *Controller) UpdateProfile(ctx context.Context, req *v1.UpdateProfileReq
 		return nil, err
 	}
 	p, err := c.svc.UpdateProfile(ctx, id.ID, logic.ProfileUpdate{
-		DisplayName: req.DisplayName, Username: req.Username, AvatarURL: req.AvatarURL,
-		CoverURL: req.CoverURL, Bio: req.Bio, SocialLinks: socialFromDTO(req.SocialLinks),
-		Locale: req.Locale,
+		DisplayName: req.DisplayName, Handle: req.Handle, Bio: req.Bio, Locale: req.Locale,
 	})
 	if err != nil {
 		return nil, err
 	}
 	return &v1.UpdateProfileRes{
-		DisplayName: p.DisplayName, Username: p.Username, AvatarURL: p.AvatarURL,
-		CoverURL: p.CoverURL, Bio: p.Bio, SocialLinks: socialToDTO(p.SocialLinks),
+		DisplayName: p.DisplayName, Handle: p.Handle, Avatar: mediaRef(p.AvatarMediaKey),
+		Cover: mediaRef(p.CoverMediaKey), Bio: p.Bio, SocialLinks: socialToDTO(p.SocialLinks),
 		Locale: p.Locale,
 	}, nil
+}
+
+func (c *Controller) UpdateSocialLinks(ctx context.Context, req *v1.UpdateSocialLinksReq) (*v1.UpdateSocialLinksRes, error) {
+	r := ghttp.RequestFromCtx(ctx)
+	id, err := c.svc.Me(ctx, r.Cookie.Get(sessionCookie, "").String())
+	if err != nil {
+		return nil, err
+	}
+	links, err := c.svc.UpdateSocialLinks(ctx, id.ID, socialFromDTO(req.SocialLinks))
+	if err != nil {
+		return nil, err
+	}
+	return &v1.UpdateSocialLinksRes{SocialLinks: socialToDTO(links)}, nil
 }
 
 // ChangePassword changes the caller's password (verifying the current one) and

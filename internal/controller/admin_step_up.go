@@ -44,16 +44,16 @@ func (c *Controller) requireAdminAction(
 	return adminID, nil
 }
 
-func adminRoleResource(identityID, role string) string {
-	return "identity:" + identityID + ":role:" + strings.TrimSpace(role)
+func adminRoleResource(userKey, role string) string {
+	return "identity:" + userKey + ":role:" + strings.TrimSpace(role)
 }
 
-func adminStatusResource(identityID, status string) string {
-	return "identity:" + identityID + ":status:" + strings.TrimSpace(status)
+func adminStatusResource(userKey, status string) string {
+	return "identity:" + userKey + ":status:" + strings.TrimSpace(status)
 }
 
-func adminIdentityResource(identityID string) string {
-	return "identity:" + identityID
+func adminIdentityResource(userKey string) string {
+	return "identity:" + userKey
 }
 
 func adminCreateResource(email string, roles []string) string {

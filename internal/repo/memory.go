@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"errors"
 	"sort"
 	"strings"
 	"sync"
@@ -10,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/yueli-official/identity/internal/model"
+	"github.com/yueli-official/identity/internal/user"
 )
 
 // memRoleCatalog is the fixed role catalog the in-memory store validates grants
@@ -21,6 +23,10 @@ type Memory struct {
 	mu            sync.Mutex
 	byID          map[string]model.Identity
 	byEmail       map[string]string // email -> id
+	byUserKey     map[string]string // public user key -> id
+	handleOwners  map[string]string // current and retired handles -> id
+	oidcSubjects  map[string]string // identity id + sector -> subject
+	subjectOwners map[string]string // OIDC subject -> identity id
 	pwHash        map[string]string // id -> hash
 	profiles      map[string]model.Profile
 	sessions      map[string]model.Session
@@ -51,6 +57,8 @@ type memVerification struct {
 func NewMemory() *Memory {
 	return &Memory{
 		byID: map[string]model.Identity{}, byEmail: map[string]string{},
+		byUserKey: map[string]string{}, handleOwners: map[string]string{},
+		oidcSubjects: map[string]string{}, subjectOwners: map[string]string{},
 		pwHash: map[string]string{}, profiles: map[string]model.Profile{},
 		sessions: map[string]model.Session{}, guestSessions: map[string]model.GuestSession{},
 		failCount: map[string]int{}, lockUntil: map[string]time.Time{},
@@ -106,6 +114,11 @@ func (m *Memory) ClaimGuestSession(_ context.Context, tokenHash, identityID stri
 func (m *Memory) CreateIdentityWithProfile(_ context.Context, in NewIdentityInput) (model.Identity, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	for _, role := range in.Roles {
+		if !memRoleCatalog[role] {
+			return model.Identity{}, UnknownRoleError{Slug: role}
+		}
+	}
 	if _, ok := m.byEmail[in.Email]; ok {
 		return model.Identity{}, ErrEmailTaken
 	}
@@ -113,14 +126,38 @@ func (m *Memory) CreateIdentityWithProfile(_ context.Context, in NewIdentityInpu
 	if newID == "" {
 		newID = uuid.NewString()
 	}
+	userKey := in.UserKey
+	if userKey == "" {
+		generated, err := user.NewPublicKey()
+		if err != nil {
+			return model.Identity{}, err
+		}
+		userKey = string(generated)
+	} else if _, err := user.ParsePublicKey(userKey); err != nil {
+		return model.Identity{}, err
+	}
+	if _, exists := m.byUserKey[userKey]; exists {
+		return model.Identity{}, errors.New("public user key collision")
+	}
+	locale := strings.TrimSpace(in.Locale)
+	if locale == "" {
+		locale = "zh-CN"
+	}
 	id := model.Identity{
-		ID: newID, Email: in.Email, Status: model.StatusActive,
+		ID: newID, UserKey: userKey, Email: in.Email, Status: model.StatusActive,
 		CreatedAt: m.now(), UpdatedAt: m.now(),
 	}
 	m.byID[id.ID] = id
 	m.byEmail[in.Email] = id.ID
+	m.byUserKey[userKey] = id.ID
+	m.oidcSubjects[oidcSubjectKey(id.ID, "public")] = userKey
+	m.subjectOwners[userKey] = id.ID
 	m.pwHash[id.ID] = in.PasswordHash
-	m.profiles[id.ID] = model.Profile{IdentityID: id.ID, DisplayName: in.DisplayName, Locale: in.Locale}
+	m.profiles[id.ID] = model.Profile{IdentityID: id.ID, DisplayName: in.DisplayName, Locale: locale}
+	m.roles[id.ID] = map[string]bool{}
+	for _, role := range in.Roles {
+		m.roles[id.ID][role] = true
+	}
 	return id, nil
 }
 
@@ -142,6 +179,90 @@ func (m *Memory) GetByID(_ context.Context, id string) (model.Identity, error) {
 		return model.Identity{}, ErrIdentityMissing
 	}
 	return v, nil
+}
+
+func (m *Memory) GetByUserKey(_ context.Context, userKey string) (model.Identity, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	id, ok := m.byUserKey[userKey]
+	if !ok {
+		return model.Identity{}, ErrIdentityMissing
+	}
+	return m.byID[id], nil
+}
+
+func (m *Memory) GetUserKeysByIDs(_ context.Context, identityIDs []string) (map[string]string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := make(map[string]string, len(identityIDs))
+	for _, identityID := range identityIDs {
+		if identity, ok := m.byID[identityID]; ok {
+			out[identityID] = identity.UserKey
+		}
+	}
+	return out, nil
+}
+
+func oidcSubjectKey(identityID, sector string) string { return identityID + "\x00" + sector }
+
+func (m *Memory) GetByOIDCSubject(_ context.Context, subject string) (model.Identity, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	id, ok := m.subjectOwners[subject]
+	if !ok {
+		return model.Identity{}, ErrIdentityMissing
+	}
+	return m.byID[id], nil
+}
+
+func (m *Memory) ResolveOIDCSubject(_ context.Context, identityID, subjectType, sector string) (string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	identity, ok := m.byID[identityID]
+	if !ok {
+		return "", ErrIdentityMissing
+	}
+	if subjectType == "" || subjectType == "public" {
+		return identity.UserKey, nil
+	}
+	if subjectType != "pairwise" || strings.TrimSpace(sector) == "" {
+		return "", errors.New("invalid OIDC subject policy")
+	}
+	sectorKey := "pairwise:" + strings.TrimSpace(sector)
+	key := oidcSubjectKey(identityID, sectorKey)
+	if existing := m.oidcSubjects[key]; existing != "" {
+		return existing, nil
+	}
+	for range 3 {
+		subject, err := user.NewPairwiseSubject()
+		if err != nil {
+			return "", err
+		}
+		if _, collision := m.subjectOwners[subject]; collision {
+			continue
+		}
+		m.oidcSubjects[key] = subject
+		m.subjectOwners[subject] = identityID
+		return subject, nil
+	}
+	return "", errors.New("pairwise subject collision")
+}
+
+func (m *Memory) ListOIDCSubjects(_ context.Context, identityID string) ([]string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.byID[identityID]; !ok {
+		return nil, ErrIdentityMissing
+	}
+	prefix := identityID + "\x00"
+	out := make([]string, 0)
+	for key, subject := range m.oidcSubjects {
+		if strings.HasPrefix(key, prefix) {
+			out = append(out, subject)
+		}
+	}
+	sort.Strings(out)
+	return out, nil
 }
 
 func (m *Memory) GetPasswordHash(_ context.Context, identityID string) (string, error) {
@@ -172,6 +293,11 @@ func (m *Memory) GetByProviderUID(_ context.Context, provider, providerUID strin
 func (m *Memory) CreateOAuthIdentity(_ context.Context, in NewOAuthIdentityInput) (model.Identity, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	for _, role := range in.Roles {
+		if !memRoleCatalog[role] {
+			return model.Identity{}, UnknownRoleError{Slug: role}
+		}
+	}
 	if _, ok := m.oauthLinks[oauthKey(in.Provider, in.ProviderUID)]; ok {
 		return model.Identity{}, ErrProviderUIDTaken
 	}
@@ -180,16 +306,40 @@ func (m *Memory) CreateOAuthIdentity(_ context.Context, in NewOAuthIdentityInput
 			return model.Identity{}, ErrEmailTaken
 		}
 	}
+	userKey := in.UserKey
+	if userKey == "" {
+		generated, err := user.NewPublicKey()
+		if err != nil {
+			return model.Identity{}, err
+		}
+		userKey = string(generated)
+	} else if _, err := user.ParsePublicKey(userKey); err != nil {
+		return model.Identity{}, err
+	}
+	if _, exists := m.byUserKey[userKey]; exists {
+		return model.Identity{}, errors.New("public user key collision")
+	}
+	locale := strings.TrimSpace(in.Locale)
+	if locale == "" {
+		locale = "zh-CN"
+	}
 	id := model.Identity{
-		ID: uuid.NewString(), Email: in.Email, EmailVerified: in.EmailVerified,
+		ID: uuid.NewString(), UserKey: userKey, Email: in.Email, EmailVerified: in.EmailVerified,
 		Status: model.StatusActive, CreatedAt: m.now(), UpdatedAt: m.now(),
 	}
 	m.byID[id.ID] = id
+	m.byUserKey[userKey] = id.ID
+	m.oidcSubjects[oidcSubjectKey(id.ID, "public")] = userKey
+	m.subjectOwners[userKey] = id.ID
 	if in.Email != "" {
 		m.byEmail[in.Email] = id.ID
 	}
-	m.profiles[id.ID] = model.Profile{IdentityID: id.ID, DisplayName: in.DisplayName, Locale: in.Locale}
+	m.profiles[id.ID] = model.Profile{IdentityID: id.ID, DisplayName: in.DisplayName, Locale: locale}
 	m.oauthLinks[oauthKey(in.Provider, in.ProviderUID)] = id.ID
+	m.roles[id.ID] = map[string]bool{}
+	for _, role := range in.Roles {
+		m.roles[id.ID][role] = true
+	}
 	return id, nil
 }
 
@@ -445,19 +595,80 @@ func (m *Memory) UpdateProfile(_ context.Context, identityID string, in ProfileU
 	if !ok {
 		return ErrIdentityMissing
 	}
+	if in.Handle != p.Handle && in.Handle != "" {
+		if owner, claimed := m.handleOwners[in.Handle]; claimed && owner != identityID {
+			return ErrHandleUnavailable
+		}
+	}
+	if in.Handle != "" {
+		m.handleOwners[in.Handle] = identityID
+	}
 	p.DisplayName = in.DisplayName
-	p.Username = in.Username
-	p.AvatarURL = in.AvatarURL
-	p.CoverURL = in.CoverURL
+	p.Handle = in.Handle
 	p.Bio = in.Bio
-	p.SocialLinks = in.SocialLinks
 	p.Locale = in.Locale
 	m.profiles[identityID] = p
 	return nil
 }
 
-// SetProfileImage updates one image's url + asset-id (kind "avatar" | "cover").
-func (m *Memory) SetProfileImage(_ context.Context, identityID, kind, url, assetID string) error {
+func (m *Memory) SetProfileSocialLinks(_ context.Context, identityID string, links []model.SocialLink) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	profile, ok := m.profiles[identityID]
+	if !ok {
+		return ErrIdentityMissing
+	}
+	profile.SocialLinks = append([]model.SocialLink(nil), links...)
+	m.profiles[identityID] = profile
+	return nil
+}
+
+func (m *Memory) GetPublicUserByKey(_ context.Context, userKey string) (model.PublicUser, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	id, ok := m.byUserKey[userKey]
+	if !ok || m.byID[id].Status != model.StatusActive {
+		return model.PublicUser{}, ErrIdentityMissing
+	}
+	return publicUserFromMemory(m.byID[id], m.profiles[id]), nil
+}
+
+func (m *Memory) GetPublicUserByHandle(_ context.Context, handle string) (model.PublicUser, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	id, ok := m.handleOwners[handle]
+	if !ok || m.byID[id].Status != model.StatusActive {
+		return model.PublicUser{}, ErrIdentityMissing
+	}
+	return publicUserFromMemory(m.byID[id], m.profiles[id]), nil
+}
+
+func (m *Memory) GetPublicUsersByKeys(_ context.Context, userKeys []string) ([]model.PublicUser, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := make([]model.PublicUser, 0, len(userKeys))
+	for _, userKey := range userKeys {
+		id, ok := m.byUserKey[userKey]
+		if !ok || m.byID[id].Status != model.StatusActive {
+			continue
+		}
+		out = append(out, publicUserFromMemory(m.byID[id], m.profiles[id]))
+	}
+	return out, nil
+}
+
+func publicUserFromMemory(identity model.Identity, profile model.Profile) model.PublicUser {
+	links := make([]model.SocialLink, len(profile.SocialLinks))
+	copy(links, profile.SocialLinks)
+	return model.PublicUser{
+		UserKey: identity.UserKey, Handle: profile.Handle, DisplayName: profile.DisplayName,
+		AvatarMediaKey: profile.AvatarMediaKey, CoverMediaKey: profile.CoverMediaKey,
+		Bio: profile.Bio, SocialLinks: links,
+	}
+}
+
+// SetProfileImage updates one image's media-key + asset-id (kind "avatar" | "cover").
+func (m *Memory) SetProfileImage(_ context.Context, identityID, kind, mediaKey, assetID string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	p, ok := m.profiles[identityID]
@@ -465,10 +676,10 @@ func (m *Memory) SetProfileImage(_ context.Context, identityID, kind, url, asset
 		return ErrIdentityMissing
 	}
 	if kind == "cover" {
-		p.CoverURL = url
+		p.CoverMediaKey = mediaKey
 		p.CoverAssetID = assetID
 	} else {
-		p.AvatarURL = url
+		p.AvatarMediaKey = mediaKey
 		p.AvatarAssetID = assetID
 	}
 	m.profiles[identityID] = p

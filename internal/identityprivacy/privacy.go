@@ -89,11 +89,11 @@ func NewPostgres(ctx context.Context, options Options) (*Service, error) {
 func (service *Service) OwnerHost() privacy.OwnerHost { return service.host }
 
 func (service *Service) OpenErasure(
-	ctx context.Context, userID, email string, commandKey privacy.IdempotencyKey,
+	ctx context.Context, internalUserID, publicUserKey, email string, commandKey privacy.IdempotencyKey,
 	statusToken string, requestedAt time.Time, verification privacy.VerificationEvidence,
 ) (privacy.RightsRequestView, error) {
 	current := privacy.SubjectRef{
-		Owner: identitycatalog.IdentityOwner, Kind: identitycatalog.UserSubject, Value: userID,
+		Owner: identitycatalog.IdentityOwner, Kind: identitycatalog.UserSubject, Value: internalUserID,
 	}
 	aliases := make([]privacy.SubjectRef, 0, len(service.owners)*2)
 	for _, owner := range service.owners {
@@ -103,7 +103,7 @@ func (service *Service) OpenErasure(
 		for _, kind := range owner.SubjectKinds {
 			switch kind {
 			case identitycatalog.UserSubject:
-				aliases = append(aliases, privacy.SubjectRef{Owner: owner.Ref.Key, Kind: kind, Value: userID})
+				aliases = append(aliases, privacy.SubjectRef{Owner: owner.Ref.Key, Kind: kind, Value: publicUserKey})
 			case identitycatalog.SubscriberSubject:
 				aliases = append(aliases, privacy.SubjectRef{Owner: owner.Ref.Key, Kind: kind, Value: email})
 			}
@@ -128,7 +128,7 @@ ON CONFLICT (request_id) DO UPDATE
 SET status_token_hash=EXCLUDED.status_token_hash
 WHERE identity_privacy_requests.identity_id=EXCLUDED.identity_id
   AND identity_privacy_requests.status_token_hash=EXCLUDED.status_token_hash`,
-		view.ID, userID, tokenDigest(statusToken))
+		view.ID, internalUserID, tokenDigest(statusToken))
 	if err != nil {
 		return privacy.RightsRequestView{}, err
 	}
@@ -253,12 +253,30 @@ func (executor *executor) execute(ctx context.Context, instruction privacy.Owner
 			var count int64
 			for _, userID := range userIDs {
 				// Fosite token rows intentionally have no FK to identities.
+				subjectRows, err := tx.QueryContext(ctx, `SELECT subject FROM oidc_subjects WHERE identity_id=$1::uuid`, userID)
+				if err != nil {
+					return privacy.OwnerOutcome{}, err
+				}
+				var subjects []string
+				for subjectRows.Next() {
+					var subject string
+					if err := subjectRows.Scan(&subject); err != nil {
+						_ = subjectRows.Close()
+						return privacy.OwnerOutcome{}, err
+					}
+					subjects = append(subjects, subject)
+				}
+				if err := subjectRows.Close(); err != nil {
+					return privacy.OwnerOutcome{}, err
+				}
 				for _, query := range []string{
 					`DELETE FROM oidc_oauth_requests WHERE subject=$1`,
 					`DELETE FROM oidc_refresh_tokens WHERE subject=$1`,
 				} {
-					if _, err := tx.ExecContext(ctx, query, userID); err != nil {
-						return privacy.OwnerOutcome{}, err
+					for _, subject := range subjects {
+						if _, err := tx.ExecContext(ctx, query, subject); err != nil {
+							return privacy.OwnerOutcome{}, err
+						}
 					}
 				}
 				// Publisher subjects and already-issued proofs remain stable, but

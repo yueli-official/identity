@@ -35,7 +35,7 @@ func (c *Controller) OpenErasure(ctx context.Context, req *v1.OpenErasureReq) (*
 		return nil, err
 	}
 	view, err := c.privacy.OpenErasure(
-		ctx, identity.ID, identity.Email, privacy.IdempotencyKey(req.IdempotencyKey), req.StatusToken, requestedAt,
+		ctx, identity.ID, identity.UserKey, identity.Email, privacy.IdempotencyKey(req.IdempotencyKey), req.StatusToken, requestedAt,
 		privacy.VerificationEvidence{
 			VerifiedAt:      session.Authentication.AuthenticatedAt,
 			Method:          strings.Join(authentication.MethodStrings(session.Authentication.Methods), "+"),

@@ -157,7 +157,7 @@ func (registry *Registry) rebuildLocked(generatedAt time.Time) (*capability.Snap
 		Service: registry.service, GeneratedAt: generatedAt,
 		Redaction:    capability.RedactionMetadata{Policy: "presence-only", Version: "1"},
 		Capabilities: capabilities, Providers: providers,
-		Links: []capability.Link{{Rel: "health", Href: "/healthz"}, {Rel: "ready", Href: "/readyz"}, {Rel: "users", Href: "/api/v1/admin/identities"}},
+		Links: []capability.Link{{Rel: "health", Href: "/healthz"}, {Rel: "ready", Href: "/readyz"}, {Rel: "users", Href: "/api/v1/admin/users"}},
 	})
 	if err != nil {
 		return nil, err

@@ -1,6 +1,7 @@
 package oidc
 
 import (
+	"strings"
 	"time"
 
 	"github.com/yueli-official/identity/internal/authentication"
@@ -23,7 +24,7 @@ func scopeSet(scopes []string) map[string]bool {
 // surface in BOTH the ID token and access-token JWT only when the "roles" scope
 // was granted. now is injected for tests.
 func BuildSession(
-	issuer, clientID, kid, sessionID string,
+	issuer, publicMediaBaseURL, clientID, kid, sessionID, subject string,
 	id model.Identity,
 	p model.Profile,
 	scopes []string,
@@ -51,15 +52,17 @@ func BuildSession(
 	}
 	if has["profile"] {
 		idExtra["name"] = p.DisplayName
-		idExtra["preferred_username"] = p.Username
-		idExtra["picture"] = p.AvatarURL
+		idExtra["preferred_username"] = p.Handle
+		if picture := profilePictureURL(publicMediaBaseURL, p.AvatarMediaKey); picture != "" {
+			idExtra["picture"] = picture
+		}
 		idExtra["locale"] = p.Locale
 	}
 	if has["email"] {
 		idExtra["email"] = id.Email
 		idExtra["email_verified"] = id.EmailVerified
 	}
-	s := NewAuthenticatedSession(issuer, id.ID, clientID, kid, idExtra, accessExtra, auth, issuedAt)
+	s := NewAuthenticatedSession(issuer, subject, clientID, kid, idExtra, accessExtra, auth, issuedAt)
 	s.IdPSessionID = sessionID
 	return s
 }
@@ -67,13 +70,15 @@ func BuildSession(
 // Userinfo returns the /userinfo response body for the granted scopes. roles are
 // the identity's granted role slugs, emitted only when the "roles" scope was
 // granted.
-func Userinfo(id model.Identity, p model.Profile, scopes []string, roles []string) map[string]interface{} {
+func Userinfo(publicMediaBaseURL, subject string, id model.Identity, p model.Profile, scopes []string, roles []string) map[string]interface{} {
 	has := scopeSet(scopes)
-	out := map[string]interface{}{"sub": id.ID}
+	out := map[string]interface{}{"sub": subject}
 	if has["profile"] {
 		out["name"] = p.DisplayName
-		out["preferred_username"] = p.Username
-		out["picture"] = p.AvatarURL
+		out["preferred_username"] = p.Handle
+		if picture := profilePictureURL(publicMediaBaseURL, p.AvatarMediaKey); picture != "" {
+			out["picture"] = picture
+		}
 		out["locale"] = p.Locale
 	}
 	if has["email"] {
@@ -87,4 +92,11 @@ func Userinfo(id model.Identity, p model.Profile, scopes []string, roles []strin
 		out["roles"] = roles
 	}
 	return out
+}
+
+func profilePictureURL(publicMediaBaseURL, mediaKey string) string {
+	if mediaKey == "" {
+		return ""
+	}
+	return strings.TrimRight(publicMediaBaseURL, "/") + "/" + mediaKey + "?format=webp&name=thumbnail"
 }

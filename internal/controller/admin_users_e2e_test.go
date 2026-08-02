@@ -65,20 +65,20 @@ func TestAdminUserManagement(t *testing.T) {
 			return buf.String(), resp.StatusCode
 		}
 
-		mkUser := func(email string) (string, map[string]string) {
+		mkUser := func(email string) (string, string, map[string]string) {
 			id, err := svc.Register(ctx, logic.RegisterInput{
 				Email: email, Password: "correct horse battery", DisplayName: email,
 			})
 			t.AssertNil(err)
 			out, err := svc.Login(ctx, logic.LoginInput{Email: email, Password: "correct horse battery"})
 			t.AssertNil(err)
-			return id.ID, map[string]string{"Cookie": "id_session=" + out.SessionID}
+			return id.ID, id.UserKey, map[string]string{"Cookie": "id_session=" + out.SessionID}
 		}
 
-		adminID, adminHdr := mkUser("admin@b.com")
+		adminID, adminKey, adminHdr := mkUser("admin@b.com")
 		t.AssertNil(svc.GrantRole(ctx, adminID, logic.AdminRole))
-		_, userHdr := mkUser("user@b.com")
-		targetID, _ := mkUser("target@b.com")
+		_, _, userHdr := mkUser("user@b.com")
+		_, targetKey, _ := mkUser("target@b.com")
 
 		// 1. Non-admin list → 403.
 		{
@@ -114,7 +114,7 @@ func TestAdminUserManagement(t *testing.T) {
 
 		// 5. Self-ban → 403 (self-lockout guard).
 		{
-			path := "/api/v1/admin/users/" + adminID + "/status"
+			path := "/api/v1/admin/users/" + adminKey + "/status"
 			body, status := do(http.MethodPut, path, `{"status":"disabled"}`, adminHdr)
 			t.Assert(status, 403)
 			t.Assert(gjson.New(body).Get("code").String(), "identity.self_admin_action_forbidden")
@@ -122,7 +122,7 @@ func TestAdminUserManagement(t *testing.T) {
 
 		// 6. Invalid status value → 400.
 		{
-			path := "/api/v1/admin/users/" + targetID + "/status"
+			path := "/api/v1/admin/users/" + targetKey + "/status"
 			body, status := do(http.MethodPut, path, `{"status":"nonsense"}`, adminHdr)
 			t.Assert(status, 400)
 			t.Assert(gjson.New(body).Get("code").String(), "identity.invalid_status")
@@ -130,7 +130,7 @@ func TestAdminUserManagement(t *testing.T) {
 
 		// 7. Ban target → 200, status disabled; login now barred.
 		{
-			path := "/api/v1/admin/users/" + targetID + "/status"
+			path := "/api/v1/admin/users/" + targetKey + "/status"
 			body, status := do(http.MethodPut, path, `{"status":"disabled"}`, adminHdr)
 			t.Assert(status, 200)
 			t.Assert(gjson.New(body).Get("user.status").String(), "disabled")
@@ -149,11 +149,11 @@ func TestAdminUserManagement(t *testing.T) {
 
 		// 9. Admin reset target's password → 200; new password works after unban.
 		{
-			path := "/api/v1/admin/users/" + targetID + "/password"
+			path := "/api/v1/admin/users/" + targetKey + "/password"
 			_, status := do(http.MethodPost, path, `{"newPassword":"admin reset password phrase"}`, adminHdr)
 			t.Assert(status, 200)
 			// unban so login can proceed, then verify the new password.
-			unban := "/api/v1/admin/users/" + targetID + "/status"
+			unban := "/api/v1/admin/users/" + targetKey + "/status"
 			_, st := do(http.MethodPut, unban, `{"status":"active"}`, adminHdr)
 			t.Assert(st, 200)
 			_, err := svc.Login(ctx, logic.LoginInput{Email: "target@b.com", Password: "admin reset password phrase"})
@@ -175,7 +175,7 @@ func TestAdminUserManagement(t *testing.T) {
 
 		// 11. Soft-delete target → 200; gone from default list, login barred.
 		{
-			path := "/api/v1/admin/users/" + targetID
+			path := "/api/v1/admin/users/" + targetKey
 			_, status := do(http.MethodDelete, path, "", adminHdr)
 			t.Assert(status, 200)
 			body, _ := do(http.MethodGet, "/api/v1/admin/users?keyword=target", "", adminHdr)
@@ -183,7 +183,7 @@ func TestAdminUserManagement(t *testing.T) {
 			_, err := svc.Login(ctx, logic.LoginInput{Email: "target@b.com", Password: "admin reset password phrase"})
 			t.AssertNE(err, nil)
 
-			statusPath := "/api/v1/admin/users/" + targetID + "/status"
+			statusPath := "/api/v1/admin/users/" + targetKey + "/status"
 			body, status = do(http.MethodPut, statusPath, `{"status":"active"}`, adminHdr)
 			t.Assert(status, 400)
 			t.Assert(gjson.New(body).Get("code").String(), "identity.invalid_status")

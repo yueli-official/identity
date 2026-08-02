@@ -121,7 +121,11 @@ func (module *Module) AuthorizeSubmission(
 	if err != nil {
 		return AuthorizedSubmission{}, ErrInvalidSubmission
 	}
-	if verified.PublisherSubject != binding.IdentityID {
+	publisherSubject, err := module.resolvePublisherSubject(ctx, binding.IdentityID)
+	if err != nil {
+		return AuthorizedSubmission{}, ErrBindingInactive
+	}
+	if verified.PublisherSubject != publisherSubject {
 		return AuthorizedSubmission{}, ErrSubjectMismatch
 	}
 	encoded, err := json.Marshal(manifest)
