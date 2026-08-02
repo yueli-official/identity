@@ -7,6 +7,12 @@
 
 Identity 是站群唯一身份提供方，负责账户、凭据、公开资料、登录会话、角色、个人访问令牌、OAuth2/OIDC 客户端与签名密钥。产品服务拥有领域权限和内容；它们消费 Identity subject 与 scope，不能复制用户记录或自行实现登录。
 
+## 消费者接入
+
+新网站、App 和后端服务先阅读[消费者接入文档](docs/consumer-integration.md)。其中说明 OIDC client 类型、
+Authorization Code + PKCE、Nuxt BFF、Public `userKey`、machine token、公开/内部 URL 与 CLI Playwright
+验收；字段级合同仍以 discovery、OpenAPI、错误目录和正式 package 为准。
+
 本仓从 Platform 切换提交 `a8ace88f1f5042b8d260c0cc4924deaa1ba579c3` 保留历史提取。后端历史重排到
 仓库根，Account 历史重排到 `account/`，两条过滤历史通过普通 merge 合并，没有 squash 或复制替代历史。
 
