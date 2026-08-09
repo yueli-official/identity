@@ -62,7 +62,7 @@ func (m *Manager) MintStepUpProof(input StepUpProofInput) (string, error) {
 		ID:        input.ID,
 	}
 	return jwt.Signed(signer).Claims(claims).Claims(map[string]any{
-		"token_use": "step_up", "sid": input.SessionID,
+		"token_use": "step_up", "subject_kind": "user", "sid": input.SessionID,
 		"action":        input.Action,
 		"resource_hash": base64.RawURLEncoding.EncodeToString(input.ResourceDigest),
 		"auth_time":     input.Authentication.AuthenticatedAt.Unix(),

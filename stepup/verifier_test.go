@@ -42,7 +42,7 @@ func TestVerifierBindsActionResourceAndConsumesJTI(t *testing.T) {
 		IssuedAt: jwt.NewNumericDate(now), NotBefore: jwt.NewNumericDate(now),
 		Expiry: jwt.NewNumericDate(now.Add(2 * time.Minute)),
 	}).Claims(map[string]any{
-		"token_use": "step_up", "sid": "session-1",
+		"token_use": "step_up", "subject_kind": "user", "sid": "session-1",
 		"action":        "order.refund",
 		"resource_hash": base64.RawURLEncoding.EncodeToString(resourceDigest[:]),
 		"auth_time":     now.Unix(), "amr": []string{"pwd", "otp"},

@@ -81,6 +81,9 @@ func (verifier *Verifier) VerifyAndConsume(
 	if err != nil {
 		return Evidence{}, fmt.Errorf("%w: %v", ErrInvalidProof, err)
 	}
+	if !principal.IsUser() {
+		return Evidence{}, ErrInvalidProof
+	}
 	tokenUse, _ := stringClaim(principal, "token_use")
 	jti, _ := stringClaim(principal, "jti")
 	sessionID, _ := stringClaim(principal, "sid")

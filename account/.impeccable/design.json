@@ -1,0 +1,184 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-09T05:53:42.6510951Z",
+  "title": "Design System: Yueli Account",
+  "extensions": {
+    "colorMeta": {
+      "primary-teal": {
+        "role": "primary",
+        "displayName": "Trust Teal",
+        "canonical": "var(--ui-primary)",
+        "tonalRamp": [
+          "oklch(27.7% 0.046 192.524)",
+          "oklch(38.6% 0.063 188.416)",
+          "oklch(43.7% 0.078 188.216)",
+          "oklch(51.1% 0.096 186.391)",
+          "oklch(60% 0.118 184.704)",
+          "oklch(77.7% 0.152 181.912)",
+          "oklch(91% 0.096 180.426)",
+          "oklch(98.4% 0.014 180.72)"
+        ]
+      },
+      "page-canvas": {
+        "role": "neutral",
+        "displayName": "Page Canvas",
+        "canonical": "var(--yueli-surface-page)",
+        "tonalRamp": ["oklch(15% 0.01 78)", "oklch(27% 0.01 78)", "oklch(39% 0.01 78)", "oklch(52% 0.01 78)", "oklch(66% 0.01 78)", "oklch(79% 0.009 78)", "oklch(90% 0.008 78)", "oklch(98.4% 0.006 78)"]
+      },
+      "card-surface": {
+        "role": "neutral",
+        "displayName": "Credential Card",
+        "canonical": "var(--yueli-surface-card)",
+        "tonalRamp": ["oklch(15% 0.01 78)", "oklch(27% 0.01 78)", "oklch(39% 0.01 78)", "oklch(52% 0.01 78)", "oklch(66% 0.01 78)", "oklch(79% 0.009 78)", "oklch(90% 0.008 78)", "oklch(99.4% 0.003 78)"]
+      },
+      "elevated-surface": {
+        "role": "neutral",
+        "displayName": "Raised Inset",
+        "canonical": "var(--ui-bg-elevated)",
+        "tonalRamp": ["oklch(14.7% 0.004 49.25)", "oklch(21.6% 0.006 56.043)", "oklch(26.8% 0.007 34.298)", "oklch(37.4% 0.01 67.558)", "oklch(55.3% 0.013 58.071)", "oklch(70.9% 0.01 56.259)", "oklch(92.3% 0.003 48.717)", "oklch(97% 0.001 106.424)"]
+      },
+      "text-default": {
+        "role": "neutral",
+        "displayName": "Reading Ink",
+        "canonical": "var(--ui-text)",
+        "tonalRamp": ["oklch(14.7% 0.004 49.25)", "oklch(21.6% 0.006 56.043)", "oklch(26.8% 0.007 34.298)", "oklch(37.4% 0.01 67.558)", "oklch(55.3% 0.013 58.071)", "oklch(70.9% 0.01 56.259)", "oklch(86.9% 0.005 56.366)", "oklch(98.5% 0.001 106.423)"]
+      },
+      "text-highlighted": {
+        "role": "neutral",
+        "displayName": "Identity Ink",
+        "canonical": "var(--ui-text-highlighted)",
+        "tonalRamp": ["oklch(14.7% 0.004 49.25)", "oklch(21.6% 0.006 56.043)", "oklch(26.8% 0.007 34.298)", "oklch(37.4% 0.01 67.558)", "oklch(55.3% 0.013 58.071)", "oklch(70.9% 0.01 56.259)", "oklch(86.9% 0.005 56.366)", "oklch(98.5% 0.001 106.423)"]
+      },
+      "text-muted": {
+        "role": "neutral",
+        "displayName": "Supporting Ink",
+        "canonical": "var(--ui-text-muted)",
+        "tonalRamp": ["oklch(14.7% 0.004 49.25)", "oklch(21.6% 0.006 56.043)", "oklch(26.8% 0.007 34.298)", "oklch(37.4% 0.01 67.558)", "oklch(55.3% 0.013 58.071)", "oklch(70.9% 0.01 56.259)", "oklch(86.9% 0.005 56.366)", "oklch(98.5% 0.001 106.423)"]
+      },
+      "text-inverted": {
+        "role": "neutral",
+        "displayName": "Inverted Action Ink",
+        "canonical": "var(--ui-text-inverted)",
+        "tonalRamp": ["oklch(14.7% 0.004 49.25)", "oklch(21.6% 0.006 56.043)", "oklch(26.8% 0.007 34.298)", "oklch(37.4% 0.01 67.558)", "oklch(55.3% 0.013 58.071)", "oklch(70.9% 0.01 56.259)", "oklch(86.9% 0.005 56.366)", "oklch(98.5% 0.001 106.423)"]
+      },
+      "border-default": {
+        "role": "neutral",
+        "displayName": "Quiet Boundary",
+        "canonical": "var(--ui-border)",
+        "tonalRamp": ["oklch(14.7% 0.004 49.25)", "oklch(21.6% 0.006 56.043)", "oklch(26.8% 0.007 34.298)", "oklch(37.4% 0.01 67.558)", "oklch(55.3% 0.013 58.071)", "oklch(70.9% 0.01 56.259)", "oklch(92.3% 0.003 48.717)", "oklch(98.5% 0.001 106.423)"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Identity Display", "purpose": "Public names and primary identity headings." },
+      "title": { "displayName": "Section Title", "purpose": "Compact section headings." },
+      "body": { "displayName": "Reading Body", "purpose": "Biography, forms, and explanatory content." },
+      "label": { "displayName": "Supporting Label", "purpose": "Hints, metadata, and compact labels." },
+      "data": { "displayName": "Stable Data", "purpose": "Permanent identifiers and character-sensitive values." }
+    },
+    "shadows": [
+      { "name": "soft-lift", "value": "0 6px 18px rgb(40 30 60 / 0.06)", "purpose": "Gentle light-mode lift for shared cards and prominent circular media." },
+      { "name": "card-edge", "value": "0 1px 2px rgb(15 23 42 / 0.04)", "purpose": "Minimal structural separation on Foundation cards." },
+      { "name": "dark-card-lift", "value": "inset 0 1px 0 rgb(255 255 255 / 0.03), 0 14px 34px rgb(0 0 0 / 0.18)", "purpose": "Raised cards and overlays in dark mode." }
+    ],
+    "motion": [
+      { "name": "fast", "value": "140ms", "purpose": "Immediate control feedback." },
+      { "name": "standard", "value": "200ms", "purpose": "Default color, border, transform, and shadow transitions." },
+      { "name": "reveal", "value": "420ms", "purpose": "Deliberate content reveal motion." },
+      { "name": "ease-out", "value": "cubic-bezier(0.2, 0, 0, 1)", "purpose": "Standard interaction easing." },
+      { "name": "ease-reveal", "value": "cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "Soft deceleration for reveals." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The principal action in an account form or authentication flow.",
+      "html": "<button class=\"ds-btn-primary\">保存资料</button>",
+      "css": ".ds-btn-primary { display:inline-flex; align-items:center; justify-content:center; gap:.5rem; border:0; border-radius:.5rem; background:var(--ui-primary); color:var(--ui-text-inverted); padding:.5rem .75rem; font:500 .875rem/1.25rem 'DM Sans',system-ui,sans-serif; transition:background-color 140ms cubic-bezier(.2,0,0,1); cursor:pointer; } .ds-btn-primary:hover,.ds-btn-primary:active { background:color-mix(in oklab,var(--ui-primary) 75%,transparent); } .ds-btn-primary:focus-visible { outline:3px solid color-mix(in oklab,var(--ui-primary) 25%,transparent); outline-offset:2px; }"
+    },
+    {
+      "name": "Neutral Outline Button",
+      "kind": "button",
+      "refersTo": "button-neutral-outline",
+      "description": "Secondary actions and public links that should remain structurally visible.",
+      "html": "<a class=\"ds-btn-outline\" href=\"#\"><span>个人网站</span><svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"M15 3h6v6\"/><path d=\"M10 14 21 3\"/><path d=\"M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6\"/></svg></a>",
+      "css": ".ds-btn-outline { display:flex; min-height:3rem; width:100%; align-items:center; justify-content:space-between; gap:.5rem; box-sizing:border-box; border-radius:.5rem; background:var(--yueli-surface-card); color:var(--ui-text); padding:.5rem .75rem; font:500 .875rem/1.25rem 'DM Sans',system-ui,sans-serif; text-decoration:none; box-shadow:inset 0 0 0 1px var(--ui-border-accented); transition:background-color 140ms cubic-bezier(.2,0,0,1),box-shadow 140ms cubic-bezier(.2,0,0,1); } .ds-btn-outline:hover,.ds-btn-outline:active { background:var(--ui-bg-elevated); } .ds-btn-outline:focus-visible { outline:3px solid color-mix(in oklab,var(--ui-primary) 25%,transparent); outline-offset:2px; box-shadow:inset 0 0 0 1px var(--ui-bg-inverted); }"
+    },
+    {
+      "name": "Outline Field",
+      "kind": "input",
+      "refersTo": "field-outline",
+      "description": "The default editable account field.",
+      "html": "<label class=\"ds-field-label\" for=\"ds-handle\">Handle</label><input class=\"ds-field\" id=\"ds-handle\" value=\"yueli\" />",
+      "css": ".ds-field-label { display:block; margin-bottom:.375rem; color:var(--ui-text); font:500 .875rem/1.25rem 'DM Sans',system-ui,sans-serif; } .ds-field { width:100%; box-sizing:border-box; border:0; border-radius:.5rem; background:var(--yueli-surface-card); color:var(--ui-text-highlighted); padding:.375rem .625rem; font:400 1rem/1.25rem 'DM Sans',system-ui,sans-serif; box-shadow:inset 0 0 0 1px var(--ui-border-accented); transition:box-shadow 140ms cubic-bezier(.2,0,0,1); } .ds-field:hover { box-shadow:inset 0 0 0 1px var(--ui-border); } .ds-field:focus-visible { outline:3px solid color-mix(in oklab,var(--ui-primary) 25%,transparent); outline-offset:2px; box-shadow:inset 0 0 0 1px var(--ui-primary); }"
+    },
+    {
+      "name": "Account Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The shared container for settings and authentication content.",
+      "html": "<section class=\"ds-card\"><h3>个人资料</h3><p>管理公开显示的身份信息。</p></section>",
+      "css": ".ds-card { overflow:hidden; border-radius:1rem; background:var(--yueli-surface-card); color:var(--ui-text); padding:1rem; box-shadow:inset 0 0 0 1px var(--ui-border),var(--shadow-soft); font-family:'DM Sans',system-ui,sans-serif; } .ds-card h3 { margin:0; color:var(--ui-text-highlighted); font:600 1.125rem/1.5 'Space Grotesk','DM Sans',system-ui,sans-serif; } .ds-card p { margin:.5rem 0 0; color:var(--ui-text-muted); font-size:.875rem; } .ds-card:focus-within { box-shadow:inset 0 0 0 1px var(--ui-primary),var(--shadow-soft); }"
+    },
+    {
+      "name": "Account Brand Navigation",
+      "kind": "nav",
+      "description": "The sticky Account header lockup and utility boundary.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-brand\" href=\"#\"><span class=\"ds-brand-icon\"><svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z\"/><path d=\"m9 12 2 2 4-4\"/></svg></span>账户中心</a></nav>",
+      "css": ".ds-nav { display:flex; min-height:4rem; align-items:center; border-bottom:1px solid var(--ui-border); background:color-mix(in oklab,var(--yueli-surface-card) 75%,transparent); padding:0 1rem; backdrop-filter:blur(12px); } .ds-brand { display:inline-flex; align-items:center; gap:.5rem; border-radius:.5rem; color:var(--ui-text-highlighted); font:600 1rem/1.5 'Space Grotesk','DM Sans',system-ui,sans-serif; text-decoration:none; } .ds-brand-icon { display:grid; width:2rem; height:2rem; place-items:center; border-radius:.75rem; background:color-mix(in oklab,var(--ui-primary) 10%,transparent); color:var(--ui-primary); } .ds-brand:hover { color:var(--ui-primary); } .ds-brand:focus-visible { outline:2px solid var(--ui-primary); outline-offset:2px; }"
+    },
+    {
+      "name": "Public Identity Header",
+      "kind": "custom",
+      "refersTo": "profile-card",
+      "description": "The cover-over-avatar signature that opens every public identity credential.",
+      "html": "<section class=\"ds-profile\"><div class=\"ds-cover\"></div><div class=\"ds-profile-body\"><div class=\"ds-avatar\">月</div><h2>月离</h2><p>@yueli</p></div></section>",
+      "css": ".ds-profile { overflow:hidden; border-radius:1rem; background:var(--yueli-surface-card); box-shadow:inset 0 0 0 1px var(--ui-border); font-family:'DM Sans',system-ui,sans-serif; } .ds-cover { height:9rem; background:color-mix(in oklab,var(--ui-primary) 10%,transparent); } .ds-profile-body { padding:0 1.25rem 1.5rem; } .ds-avatar { display:grid; width:6rem; height:6rem; margin-top:-3rem; place-items:center; border:4px solid var(--yueli-surface-card); border-radius:9999px; background:var(--ui-primary); color:#fff; font:600 1.75rem/1 'Space Grotesk','DM Sans',system-ui,sans-serif; box-shadow:var(--shadow-soft); } .ds-profile h2 { margin:1rem 0 0; color:var(--ui-text-highlighted); font:600 1.5rem/1.2 'Space Grotesk','DM Sans',system-ui,sans-serif; } .ds-profile p { margin:.25rem 0 0; color:var(--ui-text-muted); }"
+    },
+    {
+      "name": "Permanent User Key",
+      "kind": "custom",
+      "refersTo": "stable-key-panel",
+      "description": "A visually isolated stable identity reference, distinct from the mutable Handle.",
+      "html": "<aside class=\"ds-key-panel\"><span class=\"ds-key-label\">永久用户号</span><a class=\"ds-key\" href=\"#\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71\"/><path d=\"M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71\"/></svg><span>4ERv9o2K</span></a></aside>",
+      "css": ".ds-key-panel { width:13rem; box-sizing:border-box; border-radius:.75rem; background:var(--ui-bg-elevated); padding:.75rem 1rem; font-family:'DM Sans',system-ui,sans-serif; } .ds-key-label { display:block; color:var(--ui-text-muted); font-size:.75rem; font-weight:500; } .ds-key { display:flex; min-height:1.75rem; align-items:center; gap:.5rem; margin-top:.25rem; border-radius:.5rem; color:var(--ui-text-highlighted); font:600 .875rem/1.5 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; text-decoration:none; } .ds-key svg { flex:none; color:var(--ui-primary); } .ds-key:hover { color:var(--ui-primary); } .ds-key:focus-visible { outline:2px solid var(--ui-primary); outline-offset:2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Public Identity Credential",
+    "overview": "Yueli Account treats identity as calm, verifiable infrastructure. Its warm-neutral surfaces, precise teal accents, soft corners, and cover-over-avatar composition make the interface personal without turning it into a social dashboard. Information density stays moderate and the strongest emphasis belongs to names, security actions, and stable identity references.\n\nThe public profile is the clearest expression of this system: visitors confirm the display name and mutable Handle first, read the biography second, then use the permanent user number as the durable reference. The permanent key is deliberately isolated in a compact elevated panel and set in data typography so it cannot be mistaken for the Handle.",
+    "keyCharacteristics": [
+      "Teal is a sparse trust and action signal, never ambient decoration.",
+      "Warm light surfaces and cool dark surfaces preserve clear tonal layering in both modes.",
+      "Space Grotesk gives identity headings structure; DM Sans keeps prose approachable.",
+      "Rounded cards, circular avatars, fine rings, and restrained shadows create soft but precise boundaries.",
+      "Cover, avatar, identity copy, permanent key, and public links form a deliberate verification sequence."
+    ],
+    "rules": [
+      { "name": "The Trust Signal Rule", "body": "Teal marks trust, action, focus, or current state; it does not flood large reading surfaces.", "section": "colors" },
+      { "name": "The Semantic Surface Rule", "body": "Use the shared page, card, elevated, text, and border roles so light and dark modes remain equivalent rather than styling either mode independently.", "section": "colors" },
+      { "name": "The Exact Characters Rule", "body": "Use monospace only when a string is a stable identifier, recovery value, or other character-sensitive datum; Handle and prose remain in the body face.", "section": "typography" },
+      { "name": "The Credential Sequence Rule", "body": "In public identity views, preserve the cover-to-avatar anchor and keep the stable key adjacent to—yet visibly separate from—the mutable name and Handle.", "section": "layout" },
+      { "name": "The Tonal-First Rule", "body": "Establish hierarchy with semantic surface steps and quiet rings before adding shadow.", "section": "elevation" },
+      { "name": "The One Soft Geometry Rule", "body": "Combine rounded rectangles and circles consistently; avoid sharp containers, ornamental blobs, and mixed corner personalities.", "section": "shapes" }
+    ],
+    "dos": [
+      "Do preserve semantic color roles and test every surface in light and dark modes.",
+      "Do keep display name and Handle visually grouped while isolating the permanent user key in data typography.",
+      "Do retain the cover-over-avatar composition for identity headers and keep biography lines near the established readable measure.",
+      "Do provide visible keyboard focus and a logical mobile reading order for every interactive identity element.",
+      "Do render only user-supplied public fields and links."
+    ],
+    "donts": [
+      "Don't turn a public profile into a social analytics dashboard or invent counts, badges, or endorsement signals.",
+      "Don't present Handle and permanent user key with equal styling or imply that both are immutable.",
+      "Don't expose email, role, internal UUID, account state, or security information on public surfaces.",
+      "Don't use teal as a large decorative wash when a neutral semantic surface communicates the hierarchy.",
+      "Don't introduce sharp cards, heavy shadows, or a second icon family into the Account visual world."
+    ]
+  }
+}

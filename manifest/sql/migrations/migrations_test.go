@@ -127,11 +127,14 @@ func TestAuthenticationContextMigrationPreservesServerObservedFacts(t *testing.T
 		"phishing_resistant",
 		"recovery",
 		"authentication_event_id",
-		"ARRAY['legacy']",
+		"there are no historical sessions",
 	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("0020 up missing %q", want)
 		}
+	}
+	if strings.Contains(s, "gen_random_uuid") {
+		t.Error("0020 must not create identifiers inside SQL")
 	}
 	if _, err := os.Stat("0020_authentication_context.down.sql"); err != nil {
 		t.Errorf("0020 down migration missing: %v", err)

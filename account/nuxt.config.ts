@@ -16,6 +16,12 @@ export default defineNuxtConfig({
       include: ["zod"],
     },
   },
+  // The local dev server does not publish Nuxt's generated app-manifest at
+  // /_nuxt/builds/meta/dev.json. Disable the client poller so the first OIDC
+  // visit is deterministic and does not report a framework-only 404.
+  experimental: {
+    appManifest: false,
+  },
   devServer: {
     port: Number(process.env.NUXT_DEV_PORT || "3000"),
   },
@@ -68,5 +74,8 @@ export default defineNuxtConfig({
       fontshare: false,
     },
   },
-  devtools: { enabled: true },
+  // Acceptance and public-profile renders must never include Nuxt's timing
+  // overlay. Developers can still use browser devtools without shipping
+  // framework diagnostics inside the product surface.
+  devtools: { enabled: false },
 });
