@@ -1,5 +1,6 @@
 export interface AuthUser {
   sub: string
+  userKey?: string
   email?: string
   name?: string
   avatar?: string
@@ -45,6 +46,6 @@ export function useAuth() {
 			.map((sub) => sub.trim())
 			.filter(Boolean)
 	)
-	const isAdmin = computed(() => !!user.value && operatorSubs.value.includes(user.value.sub))
+	const isAdmin = computed(() => !!user.value && operatorSubs.value.includes(user.value.userKey || user.value.sub))
   return { user, loggedIn, isAdmin, refresh, login, logout }
 }

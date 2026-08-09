@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/gogf/gf/v2/net/ghttp"
-	"github.com/google/uuid"
+	"github.com/yueli-official/foundation/go/identifier"
 	"github.com/yueli-official/foundation/go/privacy"
 
 	v1 "github.com/yueli-official/identity/api/v1"
@@ -64,7 +64,7 @@ func (c *Controller) Register(ctx context.Context, req *v1.RegisterReq) (*v1.Reg
 	r := ghttp.RequestFromCtx(ctx)
 	attemptID := req.AbuseAttemptID
 	if attemptID == "" {
-		attemptID = uuid.NewString()
+		attemptID = identifier.MustNew().String()
 	}
 	id, err := c.svc.Register(ctx, logic.RegisterInput{
 		Email: req.Email, Password: req.Password, DisplayName: req.DisplayName,
@@ -80,7 +80,7 @@ func (c *Controller) Login(ctx context.Context, req *v1.LoginReq) (*v1.LoginRes,
 	r := ghttp.RequestFromCtx(ctx)
 	attemptID := req.AbuseAttemptID
 	if attemptID == "" {
-		attemptID = uuid.NewString()
+		attemptID = identifier.MustNew().String()
 	}
 	out, err := c.svc.Login(ctx, logic.LoginInput{
 		Email: req.Email, Password: req.Password,

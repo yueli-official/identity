@@ -2,13 +2,12 @@ package authentication
 
 import (
 	"context"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/yueli-official/foundation/go/identifier"
 )
 
 var (
@@ -176,10 +175,11 @@ func (module *Module) BeginPasskeyRegistration(
 	ctx context.Context,
 	request BeginPasskeyRegistrationRequest,
 ) (BeginCeremonyResult, error) {
-	handleCandidate := make([]byte, 64)
-	if _, err := rand.Read(handleCandidate); err != nil {
+	handleIdentifier, err := identifier.New()
+	if err != nil {
 		return BeginCeremonyResult{}, err
 	}
+	handleCandidate := append([]byte(nil), handleIdentifier[:]...)
 	handle, err := module.store.GetOrCreatePasskeyUser(ctx, request.IdentityID, handleCandidate)
 	if err != nil {
 		return BeginCeremonyResult{}, err
@@ -197,7 +197,7 @@ func (module *Module) BeginPasskeyRegistration(
 	}
 	now := module.now().UTC()
 	ceremony := Ceremony{
-		ID: uuid.NewString(), Kind: CeremonyPasskeyRegistration,
+		ID: identifier.MustNew().String(), Kind: CeremonyPasskeyRegistration,
 		IdentityID: request.IdentityID, SessionID: request.SessionID,
 		ChallengeDigest: material.ChallengeDigest, LibraryState: material.LibraryState,
 		ExpiresAt: now.Add(module.cfg.CeremonyTTL), CreatedAt: now,
@@ -240,7 +240,7 @@ func (module *Module) FinishPasskeyRegistration(
 		return PasskeyCredential{}, ErrCeremonyInvalid
 	}
 	now := module.now().UTC()
-	credential.ID = uuid.NewString()
+	credential.ID = identifier.MustNew().String()
 	credential.IdentityID = ceremony.IdentityID
 	credential.Label = request.Label
 	credential.Status = "active"
@@ -268,7 +268,7 @@ func (module *Module) BeginPasskeyAuthentication(ctx context.Context) (BeginCere
 	}
 	now := module.now().UTC()
 	ceremony := Ceremony{
-		ID: uuid.NewString(), Kind: CeremonyPasskeyAuthentication,
+		ID: identifier.MustNew().String(), Kind: CeremonyPasskeyAuthentication,
 		ChallengeDigest: material.ChallengeDigest, LibraryState: material.LibraryState,
 		ExpiresAt: now.Add(module.cfg.CeremonyTTL), CreatedAt: now,
 	}
@@ -315,9 +315,9 @@ func (module *Module) FinishPasskeyAuthentication(
 		return AuthenticationResult{}, ErrCeremonyInvalid
 	}
 	now := module.now().UTC()
-	auth := Passkey(uuid.NewString(), now, credential.ID, credential.UserVerified)
+	auth := Passkey(identifier.MustNew().String(), now, credential.ID, credential.UserVerified)
 	session := Session{
-		ID: uuid.NewString(), IdentityID: user.IdentityID,
+		ID: identifier.MustNew().String(), IdentityID: user.IdentityID,
 		CreatedAt: now, LastSeen: now, UserAgent: request.UserAgent, IP: request.IP,
 		ExpiresAt: now.Add(module.cfg.SessionTTL), Authentication: auth,
 	}

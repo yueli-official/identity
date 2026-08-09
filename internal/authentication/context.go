@@ -6,7 +6,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/yueli-official/foundation/go/identifier"
 )
 
 type Method string
@@ -157,7 +157,7 @@ func NormalizeLegacy(value Context, fallbackAt time.Time) Context {
 
 func normalize(value Context, fallbackAt time.Time) Context {
 	if value.EventID == "" {
-		value.EventID = uuid.NewString()
+		value.EventID = identifier.MustNew().String()
 	}
 	if value.AuthenticatedAt.IsZero() {
 		value.AuthenticatedAt = fallbackAt

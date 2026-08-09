@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	_ "github.com/lib/pq"
+	"github.com/yueli-official/foundation/go/identifier"
 )
 
 func TestPostgreSQLReplayStoreAtomicallyConsumesJTI(t *testing.T) {
@@ -25,7 +25,7 @@ func TestPostgreSQLReplayStoreAtomicallyConsumesJTI(t *testing.T) {
 	}
 	defer db.Close()
 	store := PostgreSQLReplayStore{DB: db}
-	jti := uuid.NewString()
+	jti := identifier.MustNew().String()
 	t.Cleanup(func() {
 		_, _ = db.Exec("DELETE FROM step_up_proof_uses WHERE jti = $1", jti)
 	})
@@ -50,7 +50,7 @@ func TestPostgreSQLReplayStoreAllowsExactlyOneConcurrentConsumer(t *testing.T) {
 	}
 	defer db.Close()
 	store := PostgreSQLReplayStore{DB: db}
-	jti := uuid.NewString()
+	jti := identifier.MustNew().String()
 	t.Cleanup(func() {
 		_, _ = db.Exec("DELETE FROM step_up_proof_uses WHERE jti = $1", jti)
 	})

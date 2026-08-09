@@ -1,6 +1,6 @@
 CREATE TABLE webauthn_users (
     identity_id UUID PRIMARY KEY REFERENCES identities(id) ON DELETE CASCADE,
-    user_handle BYTEA NOT NULL UNIQUE CHECK (octet_length(user_handle) BETWEEN 32 AND 64),
+    user_handle BYTEA NOT NULL UNIQUE CHECK (octet_length(user_handle) BETWEEN 16 AND 64),
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

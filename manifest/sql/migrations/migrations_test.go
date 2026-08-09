@@ -243,3 +243,23 @@ func TestGitHubBindingMigrationSeparatesOneTimeAttemptsAndHistory(t *testing.T) 
 		t.Errorf("0025 down migration missing: %v", err)
 	}
 }
+
+func TestPublicUserContractUsesCompactFoundationKeyWithoutSQLGeneration(t *testing.T) {
+	up, err := os.ReadFile("0026_user_identity_contract.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(up)
+	for _, want := range []string{
+		"ADD COLUMN user_key TEXT NOT NULL",
+		"uq_identities_user_key",
+		"CHECK (user_key ~ '^[1-9A-HJ-NP-Za-km-z]{8}$')",
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("0026 up missing %q", want)
+		}
+	}
+	if strings.Contains(s, "gen_random") {
+		t.Error("0026 must not generate identifiers inside SQL")
+	}
+}

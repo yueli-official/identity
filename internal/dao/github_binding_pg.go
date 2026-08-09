@@ -6,8 +6,8 @@ import (
 
 	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/frame/g"
-	"github.com/google/uuid"
 
+	"github.com/yueli-official/foundation/go/identifier"
 	"github.com/yueli-official/identity/internal/githubbinding"
 )
 
@@ -91,7 +91,7 @@ func (p *PG) Bind(
 		return p.refreshGitHubBinding(ctx, existing, identityID, account, now)
 	}
 
-	id := uuid.NewString()
+	id := identifier.MustNew().String()
 	_, err := p.db.Exec(ctx, `
 INSERT INTO github_identity_bindings (
     id, identity_id, provider, provider_account_id, provider_node_id,

@@ -5,8 +5,8 @@ import (
 	"errors"
 
 	"github.com/gogf/gf/v2/net/ghttp"
-	"github.com/google/uuid"
 	"github.com/yueli-official/foundation/go/abuse"
+	"github.com/yueli-official/foundation/go/identifier"
 
 	"github.com/yueli-official/identity/internal/authentication"
 	"github.com/yueli-official/identity/internal/logic"
@@ -19,7 +19,7 @@ func admitMFAVerification(
 ) (abuse.Receipt, error) {
 	request := ghttp.RequestFromCtx(ctx)
 	return service.AdmitMFAVerification(
-		ctx, uuid.NewString(), request.GetClientIp(), target,
+		ctx, identifier.MustNew().String(), request.GetClientIp(), target,
 	)
 }
 

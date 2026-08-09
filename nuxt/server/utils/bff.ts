@@ -11,9 +11,9 @@ export function identityBffTarget(base: string): BffTarget {
   ) {
     throw new TypeError("Invalid private BFF target");
   }
-  const pathPrefix =
-    url.pathname === "/" ? undefined : url.pathname.replace(/\/$/, "");
-  return { origin: url.origin, ...(pathPrefix ? { pathPrefix } : {}) };
+  const basePath =
+    url.pathname === "/" ? "" : url.pathname.replace(/\/$/, "");
+  return { origin: url.origin, pathPrefix: `${basePath}/api/v1` };
 }
 
 export function identityBffCredential(

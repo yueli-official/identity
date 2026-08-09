@@ -4,23 +4,16 @@
 package user
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"errors"
-	"fmt"
 	"regexp"
 	"strings"
-)
 
-const (
-	publicKeyPrefix = "usr_"
-	publicKeyBytes  = 16
+	"github.com/yueli-official/foundation/go/identifier"
 )
 
 var (
-	publicKeyPattern = regexp.MustCompile(`^usr_[A-Za-z0-9_-]{22}$`)
-	handlePattern    = regexp.MustCompile(`^[a-z0-9][a-z0-9_]{1,28}[a-z0-9]$`)
-	reservedHandles  = map[string]struct{}{
+	handlePattern   = regexp.MustCompile(`^[a-z0-9][a-z0-9_]{1,28}[a-z0-9]$`)
+	reservedHandles = map[string]struct{}{
 		"about": {}, "account": {}, "admin": {}, "api": {}, "assets": {},
 		"auth": {}, "blog": {}, "callback": {}, "cdn": {}, "docs": {},
 		"gallery": {}, "help": {}, "home": {}, "identity": {}, "login": {},
@@ -31,31 +24,26 @@ var (
 	}
 )
 
-// PublicKey is the stable opaque identifier exposed by public user contracts.
+// PublicKey is the immutable eight-character public locator used by OIDC,
+// cross-site references and the permanent account URL. It is not a credential.
 type PublicKey string
 
 func NewPublicKey() (PublicKey, error) {
-	value, err := newOpaqueID(publicKeyPrefix)
+	value, err := identifier.CompactURLV1.New()
 	return PublicKey(value), err
 }
 
 func NewPairwiseSubject() (string, error) {
-	return newOpaqueID("psu_")
-}
-
-func newOpaqueID(prefix string) (string, error) {
-	raw := make([]byte, publicKeyBytes)
-	if _, err := rand.Read(raw); err != nil {
-		return "", fmt.Errorf("generate opaque user identifier: %w", err)
-	}
-	return prefix + base64.RawURLEncoding.EncodeToString(raw), nil
+	value, err := identifier.OpaquePublicV1.New()
+	return value.String(), err
 }
 
 func ParsePublicKey(value string) (PublicKey, error) {
-	if !publicKeyPattern.MatchString(value) {
+	parsed, err := identifier.CompactURLV1.Parse(value)
+	if err != nil {
 		return "", errors.New("invalid public user key")
 	}
-	return PublicKey(value), nil
+	return PublicKey(parsed), nil
 }
 
 // Handle is a canonical, mutable, human-readable alias. It is never an

@@ -13,15 +13,19 @@ Identity 数据边界内用于关系和事务的一致、不可变主键，不�
 _Avoid_: Public User Key、OIDC Subject、User Handle
 
 **Public User Key（公开用户键）**:
-平台 API、公开用户地址和跨服务用户引用使用的稳定 opaque 标识；一经分配不可变、不可复用。
-_Avoid_: 数据库 UUID、邮箱、User Handle、Display Name
+平台 API、跨服务用户引用、界面用户号和永久公开资料地址共同使用的 8 位 Base58 稳定公开键；由 Foundation Identifier `compact-url-v1` 分配，一经分配不可变、不可复用。
+_Avoid_: 数据库 UUID、第二套短号、User Handle、Display Name、授权秘密
 
 **OIDC Subject（OIDC 主体标识）**:
 由 issuer 在明确 client 或 sector 范围内分配的稳定主体值，身份只能由 `(iss, sub)` 联合确定。
 _Avoid_: Public User Key、Internal User ID、邮箱、User Handle
 
+**Public User Key Claim（公开用户键声明）**:
+Identity 在用户 ID Token、用户 Access Token 和 UserInfo 中附加的 `user_key`，供平台产品建立跨服务用户引用。它不改变 `(iss, sub)` 的 OIDC 身份语义，machine client 不携带该声明。
+_Avoid_: 把 `user_key` 当成通用 OIDC 主体、把 pairwise `sub` 当成平台外键
+
 **User Handle（用户句柄）**:
-规范化后唯一、可修改的人类可读别名，用于 `/@handle` 一类可发现地址，不承担所有权或外键职责。
+规范化后唯一、可修改的人类可读别名，是 `/@handle` 公开资料地址的首选入口，不承担所有权或外键职责。
 _Avoid_: username、Display Name、Public User Key
 
 **Display Name（显示名）**:
@@ -80,7 +84,10 @@ _Avoid_: Publisher Attestation、Identity 凭证、远程撤销开关
 
 - Identity 颁发凭证但不决定 Gallery 等产品的审核、公开或业务生命周期。
 - Internal User ID 不进入公开用户合同；Public User Key 不可复用，邮箱、handle 和 display name 都不能充当所有权键。
+- Public User Key 由 Foundation Identifier `compact-url-v1` 生成，固定 8 位 Base58；数据库唯一约束负责原子占用，碰撞由统一分配器重试。
+- 公开资料以 `/@handle` 为首选地址，以 `/u/{userKey}` 为不可变兜底地址；不存在第二套公开用户短号。
 - OIDC 身份始终以 `(iss, sub)` 判断；public 与 pairwise subject 的适用范围必须显式，不能从 User ID 或 handle 临时推导。
+- 平台产品需要持久引用用户时读取已验证的 `user_key` claim；迁移期可以在确认 public subject 的第一方 client 上回退到 `sub`，但不得把该回退扩展为通用 OIDC 规则。
 - User、Guest 和 machine client 的主体种类必须可区分，不能只靠一个无类型的 `sub` 字符串猜测。
 - Guest Session TTL 与 access/claim token TTL 独立；长 session 只能换短 token。
 - Guest handle 是秘密且只存 hash；Guest Subject ID 不是秘密，但不能单独证明所有权。

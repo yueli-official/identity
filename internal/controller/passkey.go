@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/gogf/gf/v2/net/ghttp"
-	"github.com/google/uuid"
 
+	"github.com/yueli-official/foundation/go/identifier"
 	v1 "github.com/yueli-official/identity/api/v1"
 	"github.com/yueli-official/identity/internal/authentication"
 	"github.com/yueli-official/identity/internal/iderr"
@@ -25,7 +25,7 @@ func (c *Controller) PasskeyLoginBegin(
 	}
 	request := ghttp.RequestFromCtx(ctx)
 	if err := c.svc.AdmitPasskeyCeremony(
-		ctx, uuid.NewString(), request.GetClientIp(),
+		ctx, identifier.MustNew().String(), request.GetClientIp(),
 	); err != nil {
 		return nil, err
 	}

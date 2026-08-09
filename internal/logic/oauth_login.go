@@ -4,8 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/google/uuid"
-
+	"github.com/yueli-official/foundation/go/identifier"
 	"github.com/yueli-official/identity/internal/authentication"
 	"github.com/yueli-official/identity/internal/iderr"
 	"github.com/yueli-official/identity/internal/model"
@@ -51,7 +50,7 @@ func (s *Service) OAuthLogin(ctx context.Context, in OAuthLoginInput) (LoginOutp
 
 	authenticatedAt := s.now().UTC()
 	primary := authentication.Federated(
-		uuid.NewString(), authenticatedAt, in.Provider+":"+in.ProviderUID,
+		identifier.MustNew().String(), authenticatedAt, in.Provider+":"+in.ProviderUID,
 	)
 	if s.secondFactor != nil {
 		secondFactor, err := s.secondFactor.BeginSecondFactor(
@@ -70,7 +69,7 @@ func (s *Service) OAuthLogin(ctx context.Context, in OAuthLoginInput) (LoginOutp
 		}
 	}
 	sess := model.Session{
-		ID: uuid.NewString(), IdentityID: id.ID,
+		ID: identifier.MustNew().String(), IdentityID: id.ID,
 		CreatedAt: authenticatedAt, LastSeen: authenticatedAt, UserAgent: in.UserAgent, IP: in.IP,
 		Authentication: primary,
 	}

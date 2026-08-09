@@ -8,8 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
-
+	"github.com/yueli-official/foundation/go/identifier"
 	"github.com/yueli-official/identity/internal/model"
 	"github.com/yueli-official/identity/internal/user"
 )
@@ -111,7 +110,7 @@ func (m *Memory) ClaimGuestSession(_ context.Context, tokenHash, identityID stri
 	return session, nil
 }
 
-func (m *Memory) CreateIdentityWithProfile(_ context.Context, in NewIdentityInput) (model.Identity, error) {
+func (m *Memory) CreateIdentityWithProfile(ctx context.Context, in NewIdentityInput) (model.Identity, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, role := range in.Roles {
@@ -124,20 +123,15 @@ func (m *Memory) CreateIdentityWithProfile(_ context.Context, in NewIdentityInpu
 	}
 	newID := in.ID
 	if newID == "" {
-		newID = uuid.NewString()
-	}
-	userKey := in.UserKey
-	if userKey == "" {
-		generated, err := user.NewPublicKey()
+		generated, err := identifier.New()
 		if err != nil {
 			return model.Identity{}, err
 		}
-		userKey = string(generated)
-	} else if _, err := user.ParsePublicKey(userKey); err != nil {
-		return model.Identity{}, err
+		newID = generated.String()
 	}
-	if _, exists := m.byUserKey[userKey]; exists {
-		return model.Identity{}, errors.New("public user key collision")
+	userKey, err := m.allocatePublicKey(ctx, in.UserKey)
+	if err != nil {
+		return model.Identity{}, err
 	}
 	locale := strings.TrimSpace(in.Locale)
 	if locale == "" {
@@ -290,7 +284,7 @@ func (m *Memory) GetByProviderUID(_ context.Context, provider, providerUID strin
 // CreateOAuthIdentity atomically creates an identity + profile + oauth link
 // (no password credential). Returns ErrEmailTaken on email collision and
 // ErrProviderUIDTaken when the (provider, providerUID) key is already linked.
-func (m *Memory) CreateOAuthIdentity(_ context.Context, in NewOAuthIdentityInput) (model.Identity, error) {
+func (m *Memory) CreateOAuthIdentity(ctx context.Context, in NewOAuthIdentityInput) (model.Identity, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, role := range in.Roles {
@@ -306,25 +300,20 @@ func (m *Memory) CreateOAuthIdentity(_ context.Context, in NewOAuthIdentityInput
 			return model.Identity{}, ErrEmailTaken
 		}
 	}
-	userKey := in.UserKey
-	if userKey == "" {
-		generated, err := user.NewPublicKey()
-		if err != nil {
-			return model.Identity{}, err
-		}
-		userKey = string(generated)
-	} else if _, err := user.ParsePublicKey(userKey); err != nil {
+	userKey, err := m.allocatePublicKey(ctx, in.UserKey)
+	if err != nil {
 		return model.Identity{}, err
-	}
-	if _, exists := m.byUserKey[userKey]; exists {
-		return model.Identity{}, errors.New("public user key collision")
 	}
 	locale := strings.TrimSpace(in.Locale)
 	if locale == "" {
 		locale = "zh-CN"
 	}
+	identityID, err := identifier.New()
+	if err != nil {
+		return model.Identity{}, err
+	}
 	id := model.Identity{
-		ID: uuid.NewString(), UserKey: userKey, Email: in.Email, EmailVerified: in.EmailVerified,
+		ID: identityID.String(), UserKey: userKey, Email: in.Email, EmailVerified: in.EmailVerified,
 		Status: model.StatusActive, CreatedAt: m.now(), UpdatedAt: m.now(),
 	}
 	m.byID[id.ID] = id
@@ -665,6 +654,27 @@ func publicUserFromMemory(identity model.Identity, profile model.Profile) model.
 		AvatarMediaKey: profile.AvatarMediaKey, CoverMediaKey: profile.CoverMediaKey,
 		Bio: profile.Bio, SocialLinks: links,
 	}
+}
+
+func (m *Memory) allocatePublicKey(ctx context.Context, input string) (string, error) {
+	if strings.TrimSpace(input) != "" {
+		publicKey, err := user.ParsePublicKey(input)
+		if err != nil {
+			return "", err
+		}
+		if _, exists := m.byUserKey[string(publicKey)]; exists {
+			return "", errors.New("public user key collision")
+		}
+		return string(publicKey), nil
+	}
+	allocated, err := identifier.Allocate(ctx, identifier.CompactURLV1,
+		func(_ context.Context, candidate identifier.Key) (identifier.ClaimResult, error) {
+			if _, exists := m.byUserKey[candidate.String()]; exists {
+				return identifier.Collision, nil
+			}
+			return identifier.Claimed, nil
+		})
+	return allocated.String(), err
 }
 
 // SetProfileImage updates one image's media-key + asset-id (kind "avatar" | "cover").

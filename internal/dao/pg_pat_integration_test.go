@@ -7,8 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
-
+	"github.com/yueli-official/foundation/go/identifier"
 	"github.com/yueli-official/identity/internal/dao"
 	"github.com/yueli-official/identity/internal/repo"
 )
@@ -25,7 +24,7 @@ func TestPGPATRoundTrip(t *testing.T) {
 
 	// We need a real identity row because pat_tokens.identity_id is a FK.
 	// Reuse the helper from pg_integration_test.go (same package).
-	email := "pat-test-" + uuid.NewString() + "@example.com"
+	email := "pat-test-" + identifier.MustNew().String() + "@example.com"
 	identity, err := d.CreateIdentityWithProfile(ctx, repo.NewIdentityInput{
 		Email: email, DisplayName: "PAT Tester", PasswordHash: "x",
 	})
@@ -40,8 +39,8 @@ func TestPGPATRoundTrip(t *testing.T) {
 	identityID := identity.ID
 
 	// ── Insert ────────────────────────────────────────────────────────────────
-	hash1 := "hash-" + uuid.NewString()
-	hash2 := "hash-" + uuid.NewString()
+	hash1 := "hash-" + identifier.MustNew().String()
+	hash2 := "hash-" + identifier.MustNew().String()
 
 	id1, err := d.InsertPAT(ctx, repo.PATRow{
 		IdentityID:  identityID,
@@ -146,7 +145,7 @@ func TestPGPATRoundTrip(t *testing.T) {
 	}
 
 	// ── DeletePAT — wrong owner does NOT delete ───────────────────────────────
-	otherID := uuid.NewString() // fake identity, not in DB
+	otherID := identifier.MustNew().String() // fake identity, not in DB
 	deleted, err := d.DeletePAT(ctx, id1, otherID)
 	if err != nil {
 		t.Fatalf("DeletePAT(wrong owner): %v", err)
@@ -194,7 +193,7 @@ func TestPGPATNilScopesRoundTrip(t *testing.T) {
 	d := dao.NewPG(db)
 	ctx := context.Background()
 
-	email := "pat-nilscopes-" + uuid.NewString() + "@example.com"
+	email := "pat-nilscopes-" + identifier.MustNew().String() + "@example.com"
 	identity, err := d.CreateIdentityWithProfile(ctx, repo.NewIdentityInput{
 		Email: email, DisplayName: "Nil Scopes Test", PasswordHash: "x",
 	})
@@ -205,7 +204,7 @@ func TestPGPATNilScopesRoundTrip(t *testing.T) {
 		_, _ = db.Model("identities").Ctx(ctx).Where("id", identity.ID).Delete()
 	})
 
-	hash := "hash-nilscopes-" + uuid.NewString()
+	hash := "hash-nilscopes-" + identifier.MustNew().String()
 	_, err = d.InsertPAT(ctx, repo.PATRow{
 		IdentityID:  identity.ID,
 		Name:        "nil-scopes-token",
@@ -236,7 +235,7 @@ func TestPGPATNullExpiresAt(t *testing.T) {
 	d := dao.NewPG(db)
 	ctx := context.Background()
 
-	email := "pat-nullexp-" + uuid.NewString() + "@example.com"
+	email := "pat-nullexp-" + identifier.MustNew().String() + "@example.com"
 	identity, err := d.CreateIdentityWithProfile(ctx, repo.NewIdentityInput{
 		Email: email, DisplayName: "Null ExpiresAt Test", PasswordHash: "x",
 	})
@@ -248,7 +247,7 @@ func TestPGPATNullExpiresAt(t *testing.T) {
 	})
 
 	// Insert with nil ExpiresAt.
-	hashNoExp := "hash-noexp-" + uuid.NewString()
+	hashNoExp := "hash-noexp-" + identifier.MustNew().String()
 	_, err = d.InsertPAT(ctx, repo.PATRow{
 		IdentityID:  identity.ID,
 		Name:        "no-expiry",
@@ -270,7 +269,7 @@ func TestPGPATNullExpiresAt(t *testing.T) {
 	}
 
 	// Insert with non-nil ExpiresAt and verify it round-trips.
-	hashWithExp := "hash-withexp-" + uuid.NewString()
+	hashWithExp := "hash-withexp-" + identifier.MustNew().String()
 	exp := time.Now().Add(24 * time.Hour).UTC().Truncate(time.Second)
 	_, err = d.InsertPAT(ctx, repo.PATRow{
 		IdentityID:  identity.ID,

@@ -25,23 +25,8 @@ CREATE INDEX authentication_events_identity_time_idx
 ALTER TABLE identity_sessions
     ADD COLUMN authentication_event_id UUID;
 
--- Existing sessions were authenticated before the context model existed. Keep
--- their real session creation time, but mark the method as legacy and do not
--- invent MFA, user verification, or phishing resistance.
-INSERT INTO authentication_events (
-    id, identity_id, session_id, authenticated_at, methods, factor_classes,
-    assurance_level, assurance_profile, user_verified, phishing_resistant, recovery,
-    credential_refs, policy_version
-)
-SELECT
-    gen_random_uuid(), identity_id, id, created_at, ARRAY['legacy']::TEXT[], ARRAY[]::TEXT[],
-    'aal1', 'urn:yueli:assurance:baseline', FALSE, FALSE, FALSE, ARRAY[]::TEXT[], 1
-FROM identity_sessions;
-
-UPDATE identity_sessions AS sessions
-SET authentication_event_id = events.id
-FROM authentication_events AS events
-WHERE events.session_id = sessions.id;
+-- The site group is seed-owned and migrations run before seed reconciliation,
+-- so there are no historical sessions to backfill with an SQL-side ID writer.
 
 ALTER TABLE identity_sessions
     ALTER COLUMN authentication_event_id SET NOT NULL,

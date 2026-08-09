@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/google/uuid"
 	"github.com/yueli-official/foundation/go/abuse"
+	"github.com/yueli-official/foundation/go/identifier"
 	"github.com/yueli-official/identity/internal/identityabuse"
 	"github.com/yueli-official/identity/internal/iderr"
 	"github.com/yueli-official/identity/internal/model"
@@ -30,7 +30,7 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (model.Identit
 	if in.AttemptID != "" || in.IP != "" {
 		attemptID := in.AttemptID
 		if attemptID == "" {
-			attemptID = uuid.NewString()
+			attemptID = identifier.MustNew().String()
 		}
 		network, err := identityabuse.NetworkPrefix(in.IP)
 		if err != nil {

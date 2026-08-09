@@ -11,8 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
-
+	"github.com/yueli-official/foundation/go/identifier"
 	"github.com/yueli-official/identity/internal/model"
 	"github.com/yueli-official/identity/internal/oidc"
 	"github.com/yueli-official/identity/internal/repo"
@@ -92,7 +91,7 @@ func (s *Service) Create(ctx context.Context, clientID string, requestedTTL time
 	token := base64.RawURLEncoding.EncodeToString(raw)
 	now := s.cfg.Now().UTC()
 	session := model.GuestSession{
-		ID: uuid.NewString(), TokenHash: tokenHash(token), ClientID: clientID,
+		ID: identifier.MustNew().String(), TokenHash: tokenHash(token), ClientID: clientID,
 		CreatedAt: now, LastSeen: now, ExpiresAt: now.Add(effective),
 	}
 	if err := s.store.CreateGuestSession(ctx, session); err != nil {

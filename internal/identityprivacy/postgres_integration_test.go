@@ -68,11 +68,11 @@ CREATE TABLE identity_privacy_requests(
   status_token_hash text NOT NULL, created_at timestamptz NOT NULL DEFAULT now()
 );
 INSERT INTO identities(id,user_key,email,status)
-VALUES ('00000000-0000-0000-0000-000000000101','usr_0000000000000000000101','owner@example.com','active');
+VALUES ('00000000-0000-0000-0000-000000000101','TestA123','owner@example.com','active');
 INSERT INTO oidc_subjects(identity_id,subject)
-VALUES ('00000000-0000-0000-0000-000000000101','usr_0000000000000000000101');
-INSERT INTO oidc_oauth_requests(subject) VALUES ('usr_0000000000000000000101');
-INSERT INTO oidc_refresh_tokens(subject) VALUES ('usr_0000000000000000000101');
+VALUES ('00000000-0000-0000-0000-000000000101','TestA123');
+INSERT INTO oidc_oauth_requests(subject) VALUES ('TestA123');
+INSERT INTO oidc_refresh_tokens(subject) VALUES ('TestA123');
 INSERT INTO audit_logs(target_identity_id)
 VALUES ('00000000-0000-0000-0000-000000000101');
 INSERT INTO github_identity_bindings(
@@ -134,7 +134,7 @@ SELECT EXISTS(SELECT 1 FROM identities WHERE id='00000000-0000-0000-0000-0000000
 	}
 	requestedAt := time.Now().UTC().Truncate(time.Microsecond)
 	view, err := service.OpenErasure(
-		ctx, "00000000-0000-0000-0000-000000000101", "usr_0000000000000000000101", "owner@example.com",
+		ctx, "00000000-0000-0000-0000-000000000101", "TestA123", "owner@example.com",
 		"identity-erasure-command-1", strings.Repeat("s", 48), requestedAt,
 		privacy.VerificationEvidence{
 			VerifiedAt: requestedAt, Method: "active_identity_session",

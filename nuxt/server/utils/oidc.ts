@@ -34,7 +34,7 @@ export interface Session {
   access: string
   refresh?: string
   exp: number // epoch ms
-  user: { sub: string; email?: string; name?: string; avatar?: string; roles?: string[] }
+  user: { sub: string; userKey?: string; email?: string; name?: string; avatar?: string; roles?: string[] }
 }
 
 export const SESSION_COOKIE = 'rs_session'
@@ -111,6 +111,7 @@ interface JwtHeader {
 export interface VerifiedIdentityClaims {
   iss: string;
   sub: string;
+  user_key?: string;
   aud: string | string[];
   azp?: string;
   exp: number;
@@ -299,6 +300,7 @@ export function sessionFromTokens(
     exp: Date.now() + (tok.expires_in ?? 600) * 1000,
     user: prev?.user || {
       sub: claims!.sub,
+      userKey: claims!.user_key || claims!.sub,
       email: claims!.email,
       name:
         claims!.name || claims!.preferred_username || claims!.email,

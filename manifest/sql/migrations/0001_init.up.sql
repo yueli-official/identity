@@ -2,7 +2,7 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE identities (
-    id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id             UUID PRIMARY KEY,
     email          TEXT NOT NULL,            -- canonical (lowercased, trimmed)
     email_verified BOOLEAN NOT NULL DEFAULT FALSE,
     status         TEXT NOT NULL DEFAULT 'active'

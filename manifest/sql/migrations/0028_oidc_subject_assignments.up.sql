@@ -14,9 +14,9 @@ CREATE TABLE oidc_subjects (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (identity_id, sector_key),
     CHECK (
-        (subject_type = 'public' AND sector_key = 'public' AND subject ~ '^usr_[A-Za-z0-9_-]{22}$')
+        (subject_type = 'public' AND sector_key = 'public' AND subject ~ '^[1-9A-HJ-NP-Za-km-z]{8}$')
         OR
-        (subject_type = 'pairwise' AND sector_key LIKE 'pairwise:%' AND subject ~ '^psu_[A-Za-z0-9_-]{22}$')
+        (subject_type = 'pairwise' AND sector_key LIKE 'pairwise:%' AND subject ~ '^[0-9A-HJKMNP-TV-Z]{16}$')
     )
 );
 

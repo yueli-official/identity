@@ -10,6 +10,7 @@ import (
 
 	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/frame/g"
+	"github.com/yueli-official/foundation/go/identifier"
 
 	"github.com/yueli-official/identity/internal/model"
 	"github.com/yueli-official/identity/internal/repo"
@@ -44,34 +45,50 @@ func NewPG(db gdb.DB) *PG { return &PG{db: db} }
 // row, and a credentials_password row inside a single transaction.
 // It returns repo.ErrEmailTaken when a UNIQUE constraint on identities.email fires.
 func (p *PG) CreateIdentityWithProfile(ctx context.Context, in repo.NewIdentityInput) (model.Identity, error) {
-	userKey := in.UserKey
-	if userKey == "" {
-		generated, err := user.NewPublicKey()
-		if err != nil {
+	if strings.TrimSpace(in.ID) == "" {
+		in.ID = identifier.MustNew().String()
+	} else if parsed, err := identifier.Parse(in.ID); err != nil || parsed.Version() != 7 {
+		return model.Identity{}, errors.New("identity ID must be a canonical UUIDv7")
+	}
+	if strings.TrimSpace(in.UserKey) != "" {
+		if _, err := user.ParsePublicKey(in.UserKey); err != nil {
 			return model.Identity{}, err
 		}
-		userKey = string(generated)
-	} else if _, err := user.ParsePublicKey(userKey); err != nil {
-		return model.Identity{}, err
+		return p.createIdentityWithProfile(ctx, in, in.UserKey)
 	}
+	var out model.Identity
+	_, err := identifier.Allocate(ctx, identifier.CompactURLV1,
+		func(ctx context.Context, candidate identifier.Key) (identifier.ClaimResult, error) {
+			created, err := p.createIdentityWithProfile(ctx, in, candidate.String())
+			if errors.Is(err, errPublicKeyCollision) {
+				return identifier.Collision, nil
+			}
+			if err != nil {
+				return 0, err
+			}
+			out = created
+			return identifier.Claimed, nil
+		})
+	return out, err
+}
+
+func (p *PG) createIdentityWithProfile(ctx context.Context, in repo.NewIdentityInput, userKey string) (model.Identity, error) {
 	var out model.Identity
 	err := p.db.Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
 		// Set context on the transaction so that subsequent Model calls inherit it.
 		tx = tx.Ctx(ctx)
 
-		// Insert identity row; capture the DB-generated UUID via RETURNING.
-		// TX.GetValue does not accept a ctx parameter (it uses tx.ctx set above).
 		if err := validateRoles(ctx, tx, in.Roles); err != nil {
 			return err
 		}
-		query := "INSERT INTO identities (user_key, email) VALUES (?, ?) RETURNING id"
-		arguments := []any{userKey, in.Email}
-		if strings.TrimSpace(in.ID) != "" {
-			query = "INSERT INTO identities (id, user_key, email) VALUES (?, ?, ?) RETURNING id"
-			arguments = []any{in.ID, userKey, in.Email}
-		}
-		val, err := tx.GetValue(query, arguments...)
+		val, err := tx.GetValue(
+			"INSERT INTO identities (id, user_key, email) VALUES (?, ?, ?) RETURNING id",
+			in.ID, userKey, in.Email,
+		)
 		if err != nil {
+			if isPublicKeyCollision(err) {
+				return errPublicKeyCollision
+			}
 			if isUniqueViolation(err) {
 				return repo.ErrEmailTaken
 			}
@@ -464,6 +481,12 @@ func nilIfEmpty(s string) any {
 // isUniqueViolation reports whether err is a PostgreSQL unique_violation (SQLSTATE 23505).
 func isUniqueViolation(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "23505")
+}
+
+var errPublicKeyCollision = errors.New("public user key collision")
+
+func isPublicKeyCollision(err error) bool {
+	return isUniqueViolation(err) && strings.Contains(err.Error(), "uq_identities_user_key")
 }
 
 // Compile-time interface assertion.

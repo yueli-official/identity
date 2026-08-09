@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/lib/pq"
+	"github.com/yueli-official/foundation/go/identifier"
 	"github.com/yueli-official/identity/internal/user"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -78,10 +79,15 @@ func parseSeed(raw string) (seed, error) {
 		return seed{}, fmt.Errorf("decode IDENTITY_DEV_SEED: %w", err)
 	}
 	if strings.TrimSpace(declared.Account.ID) == "" ||
+		strings.TrimSpace(declared.Account.UserKey) == "" ||
 		!strings.Contains(declared.Account.Email, "@") ||
 		len(declared.Account.Password) < 12 ||
 		strings.TrimSpace(declared.Account.DisplayName) == "" {
-		return seed{}, fmt.Errorf("account id, userKey, email, handle, displayName and a password of at least 12 characters are required")
+		return seed{}, fmt.Errorf("account UUIDv7, userKey, email, handle, displayName and a password of at least 12 characters are required")
+	}
+	parsedID, err := identifier.Parse(strings.TrimSpace(declared.Account.ID))
+	if err != nil || parsedID.Version() != 7 {
+		return seed{}, fmt.Errorf("account id must be a canonical UUIDv7")
 	}
 	if _, err := user.ParsePublicKey(strings.TrimSpace(declared.Account.UserKey)); err != nil {
 		return seed{}, fmt.Errorf("account userKey: %w", err)
@@ -129,9 +135,17 @@ func reconcile(ctx context.Context, db *sql.DB, declared seed) error {
 	if _, err := tx.ExecContext(ctx, `INSERT INTO identities (id, user_key, email, email_verified, status)
 		VALUES ($1, $2, $3, TRUE, 'active')
 		ON CONFLICT (id) DO UPDATE SET
-			user_key=EXCLUDED.user_key, email=EXCLUDED.email, email_verified=TRUE, status='active'`,
+			user_key=EXCLUDED.user_key, email=EXCLUDED.email, email_verified=TRUE, status='active'
+		WHERE identities.user_key=EXCLUDED.user_key`,
 		declared.Account.ID, declared.Account.UserKey, declared.Account.Email); err != nil {
 		return fmt.Errorf("reconcile development identity: %w", err)
+	}
+	var storedUserKey string
+	if err := tx.QueryRowContext(ctx, `SELECT user_key FROM identities WHERE id=$1`, declared.Account.ID).Scan(&storedUserKey); err != nil {
+		return fmt.Errorf("verify development public key: %w", err)
+	}
+	if storedUserKey != declared.Account.UserKey {
+		return fmt.Errorf("reconcile development identity: userKey is immutable (stored=%s declared=%s)", storedUserKey, declared.Account.UserKey)
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO oidc_subjects (identity_id, sector_key, subject, subject_type)
 		VALUES ($1, 'public', $2, 'public')

@@ -11,6 +11,11 @@ const assetApiBase = (
 export default defineNuxtConfig({
   modules: ["@nuxt/ui", "@yueli/ui"],
   css: ["~/assets/css/main.css"],
+  vite: {
+    optimizeDeps: {
+      include: ["zod"],
+    },
+  },
   devServer: {
     port: Number(process.env.NUXT_DEV_PORT || "3000"),
   },

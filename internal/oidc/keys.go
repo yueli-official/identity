@@ -16,8 +16,8 @@ import (
 
 	jose "github.com/go-jose/go-jose/v3"
 	"github.com/go-jose/go-jose/v3/jwt"
-	"github.com/google/uuid"
 
+	"github.com/yueli-official/foundation/go/identifier"
 	"github.com/yueli-official/identity/internal/authentication"
 	"github.com/yueli-official/identity/internal/model"
 	"github.com/yueli-official/identity/internal/repo"
@@ -102,7 +102,7 @@ func (m *Manager) bootstrap(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	kid := uuid.NewString()
+	kid := identifier.MustNew().String()
 	privPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
 	pubBytes, err := x509.MarshalPKIXPublicKey(&priv.PublicKey)
 	if err != nil {
@@ -217,7 +217,7 @@ func (m *Manager) MintGuestToken(issuer, subject, clientID, audience string, ttl
 	claims := jwt.Claims{
 		Issuer: issuer, Subject: subject, Audience: jwt.Audience{audience},
 		IssuedAt: jwt.NewNumericDate(now), NotBefore: jwt.NewNumericDate(now), Expiry: jwt.NewNumericDate(now.Add(ttl)),
-		ID: uuid.NewString(),
+		ID: identifier.MustNew().String(),
 	}
 	return jwt.Signed(sig).Claims(claims).Claims(map[string]interface{}{
 		"client_id": clientID, "subject_kind": "guest", "scope": "guest:access",
@@ -238,7 +238,7 @@ func (m *Manager) MintGuestClaimToken(issuer, userID, guestSubject, clientID, au
 	claims := jwt.Claims{
 		Issuer: issuer, Subject: userID, Audience: jwt.Audience{audience},
 		IssuedAt: jwt.NewNumericDate(now), NotBefore: jwt.NewNumericDate(now), Expiry: jwt.NewNumericDate(now.Add(ttl)),
-		ID: uuid.NewString(),
+		ID: identifier.MustNew().String(),
 	}
 	return jwt.Signed(sig).Claims(claims).Claims(map[string]interface{}{
 		"client_id": clientID, "subject_kind": "user", "guest_subject": guestSubject, "scope": "guest:claim",

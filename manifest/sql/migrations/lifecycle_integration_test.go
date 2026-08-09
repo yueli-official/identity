@@ -15,10 +15,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 
+	"github.com/yueli-official/foundation/go/identifier"
 	"github.com/yueli-official/identity/internal/identitymaintenance"
 )
 
@@ -85,8 +85,8 @@ func TestMigrationUpDownUpLifecycle(t *testing.T) {
 func assertSecurityRetention(t *testing.T, db *sql.DB) {
 	t.Helper()
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	oldJTI := uuid.NewString()
-	freshJTI := uuid.NewString()
+	oldJTI := identifier.MustNew().String()
+	freshJTI := identifier.MustNew().String()
 	if _, err := db.Exec(`
 INSERT INTO step_up_proof_uses(jti, expires_at, consumed_at)
 VALUES ($1, $2, $3), ($4, $5, $3)
@@ -102,15 +102,15 @@ VALUES ($1, $2, $3), ($4, $5, $3)
 	if result.ProofUses != 1 {
 		t.Fatalf("deleted proof uses = %d, want 1", result.ProofUses)
 	}
-	identityID := uuid.NewString()
+	identityID := identifier.MustNew().String()
 	if _, err := db.Exec(
-		`INSERT INTO identities(id, email) VALUES ($1, $2)`,
-		identityID, "github-retention@example.test",
+		`INSERT INTO identities(id, user_key, email) VALUES ($1, $2, $3)`,
+		identityID, "TestA124", "github-retention@example.test",
 	); err != nil {
 		t.Fatal(err)
 	}
-	oldAttemptID := uuid.NewString()
-	freshAttemptID := uuid.NewString()
+	oldAttemptID := identifier.MustNew().String()
+	freshAttemptID := identifier.MustNew().String()
 	if _, err := db.Exec(`
 INSERT INTO github_binding_attempts(
     id, state_digest, identity_id, session_digest, verifier_ciphertext,

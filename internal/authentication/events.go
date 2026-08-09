@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/yueli-official/foundation/go/identifier"
 )
 
 type SecurityEventKind string
@@ -50,7 +50,7 @@ func (module *Module) recordEvent(ctx context.Context, event SecurityEvent) {
 		return
 	}
 	if event.ID == "" {
-		event.ID = uuid.NewString()
+		event.ID = identifier.MustNew().String()
 	}
 	if event.OccurredAt.IsZero() {
 		event.OccurredAt = module.now().UTC()

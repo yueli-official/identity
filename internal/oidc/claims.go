@@ -43,6 +43,10 @@ func BuildSession(
 		"acr":          string(auth.Profile),
 		"aal":          string(auth.Level),
 	}
+	if id.UserKey != "" {
+		idExtra["user_key"] = id.UserKey
+		accessExtra["user_key"] = id.UserKey
+	}
 	if has["roles"] {
 		if roles == nil {
 			roles = []string{}
@@ -73,6 +77,9 @@ func BuildSession(
 func Userinfo(publicMediaBaseURL, subject string, id model.Identity, p model.Profile, scopes []string, roles []string) map[string]interface{} {
 	has := scopeSet(scopes)
 	out := map[string]interface{}{"sub": subject}
+	if id.UserKey != "" {
+		out["user_key"] = id.UserKey
+	}
 	if has["profile"] {
 		out["name"] = p.DisplayName
 		out["preferred_username"] = p.Handle

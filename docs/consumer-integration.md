@@ -35,7 +35,7 @@ Identity 的公开 issuer 必须是稳定、外部可访问的规范 origin。�
 
 ## 3. Public User 合同
 
-- 跨服务用户主键是 `userKey`，形如 `usr_` 加 22 个 URL-safe 字符。
+- 跨服务用户主键是 8 位 Base58 `userKey`，由 Foundation Identifier `compact-url-v1` 分配。
 - 内部 Identity UUID 不进入消费者数据库、URL、日志或 webhook。
 - OIDC `sub` 是协议主体；启用 pairwise subject 时可按 client 变化，不能作为全平台外键。
 - bearer 明确包含 `subject_kind=user|client|guest`。资源服务必须先校验 kind，再解释 subject/client_id。

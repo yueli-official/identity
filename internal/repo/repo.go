@@ -42,7 +42,7 @@ const (
 // NewIdentityInput is an atomic identity+profile+password-credential creation.
 type NewIdentityInput struct {
 	ID           string // optional trusted seed/bootstrap sub; empty → generated
-	UserKey      string // optional trusted seed; empty → generated opaque public key
+	UserKey      string // optional trusted seed; empty → allocated compact public key
 	Email        string // canonical
 	DisplayName  string
 	Locale       string

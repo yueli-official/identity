@@ -8,8 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
-
+	"github.com/yueli-official/foundation/go/identifier"
 	"github.com/yueli-official/identity/internal/authentication"
 	"github.com/yueli-official/identity/internal/dao"
 	"github.com/yueli-official/identity/internal/repo"
@@ -21,7 +20,7 @@ func TestPGTOTPEnrollmentLifecycle(t *testing.T) {
 	ctx := context.Background()
 
 	identity, err := store.CreateIdentityWithProfile(ctx, repo.NewIdentityInput{
-		Email: "mfa-" + uuid.NewString() + "@pg.test", PasswordHash: "password-hash",
+		Email: "mfa-" + identifier.MustNew().String() + "@pg.test", PasswordHash: "password-hash",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -32,9 +31,9 @@ func TestPGTOTPEnrollmentLifecycle(t *testing.T) {
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	session := authentication.Session{
-		ID: uuid.NewString(), IdentityID: identity.ID,
+		ID: identifier.MustNew().String(), IdentityID: identity.ID,
 		CreatedAt: now, LastSeen: now, ExpiresAt: now.Add(time.Hour),
-		Authentication: authentication.Password(uuid.NewString(), now),
+		Authentication: authentication.Password(identifier.MustNew().String(), now),
 	}
 	if err := store.CreateSession(ctx, session, time.Hour); err != nil {
 		t.Fatal(err)
@@ -42,7 +41,7 @@ func TestPGTOTPEnrollmentLifecycle(t *testing.T) {
 
 	expiresAt := now.Add(5 * time.Minute)
 	authenticator := authentication.TOTPAuthenticator{
-		ID: uuid.NewString(), IdentityID: identity.ID, Label: "Authenticator",
+		ID: identifier.MustNew().String(), IdentityID: identity.ID, Label: "Authenticator",
 		SecretCiphertext: make([]byte, 32), KeyVersion: 1,
 		Algorithm: "SHA1", Digits: 6, PeriodSeconds: 30, Status: "pending",
 		BindingSessionID: session.ID, EnrollmentExpiresAt: &expiresAt,
@@ -62,12 +61,12 @@ func TestPGTOTPEnrollmentLifecycle(t *testing.T) {
 	codes := make([]authentication.RecoveryCode, 10)
 	for index := range codes {
 		codes[index] = authentication.RecoveryCode{
-			ID: uuid.NewString(), Digest: bytesOf(byte(index+1), 32),
+			ID: identifier.MustNew().String(), Digest: bytesOf(byte(index+1), 32),
 		}
 	}
 	if err := store.ActivateTOTP(
 		ctx, authenticator, session.ID, 123,
-		uuid.NewString(), codes, now.Add(time.Second),
+		identifier.MustNew().String(), codes, now.Add(time.Second),
 	); err != nil {
 		t.Fatalf("ActivateTOTP() error = %v", err)
 	}
@@ -80,7 +79,7 @@ func TestPGTOTPEnrollmentLifecycle(t *testing.T) {
 	}
 
 	loginTransaction := authentication.AuthenticationTransaction{
-		ID: uuid.NewString(), Kind: "mfa_login", IdentityID: identity.ID,
+		ID: identifier.MustNew().String(), Kind: "mfa_login", IdentityID: identity.ID,
 		Requirement: []byte(`{"minimumLevel":"aal2"}`), State: []byte(`{}`),
 		ExpiresAt: now.Add(5 * time.Minute), CreatedAt: now,
 	}
@@ -92,12 +91,12 @@ func TestPGTOTPEnrollmentLifecycle(t *testing.T) {
 		t.Fatalf("GetAuthenticationTransaction() = %+v, %v", loadedTransaction, err)
 	}
 	mfaSession := authentication.Session{
-		ID: uuid.NewString(), IdentityID: identity.ID,
+		ID: identifier.MustNew().String(), IdentityID: identity.ID,
 		CreatedAt: now.Add(2 * time.Second), LastSeen: now.Add(2 * time.Second),
 		ExpiresAt: now.Add(time.Hour),
 		Authentication: authentication.MultiFactor(
-			authentication.Password(uuid.NewString(), now),
-			uuid.NewString(), now.Add(2*time.Second), authenticator.ID,
+			authentication.Password(identifier.MustNew().String(), now),
+			identifier.MustNew().String(), now.Add(2*time.Second), authenticator.ID,
 		),
 	}
 	if err := store.CompleteTOTPLogin(
@@ -112,7 +111,7 @@ func TestPGTOTPEnrollmentLifecycle(t *testing.T) {
 	}
 
 	recoveryTransaction := authentication.AuthenticationTransaction{
-		ID: uuid.NewString(), Kind: "mfa_login", IdentityID: identity.ID,
+		ID: identifier.MustNew().String(), Kind: "mfa_login", IdentityID: identity.ID,
 		Requirement: []byte(`{"minimumLevel":"aal2"}`), State: []byte(`{}`),
 		ExpiresAt: now.Add(5 * time.Minute), CreatedAt: now,
 	}
@@ -120,12 +119,12 @@ func TestPGTOTPEnrollmentLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	recoverySession := authentication.Session{
-		ID: uuid.NewString(), IdentityID: identity.ID,
+		ID: identifier.MustNew().String(), IdentityID: identity.ID,
 		CreatedAt: now.Add(3 * time.Second), LastSeen: now.Add(3 * time.Second),
 		ExpiresAt: now.Add(15 * time.Minute),
 		Authentication: authentication.Recovery(
-			authentication.Password(uuid.NewString(), now),
-			uuid.NewString(), now.Add(3*time.Second),
+			authentication.Password(identifier.MustNew().String(), now),
+			identifier.MustNew().String(), now.Add(3*time.Second),
 		),
 	}
 	if err := store.CompleteRecoveryLogin(
@@ -139,7 +138,7 @@ func TestPGTOTPEnrollmentLifecycle(t *testing.T) {
 	}
 
 	stepUpTransaction := authentication.AuthenticationTransaction{
-		ID: uuid.NewString(), Kind: "step_up", IdentityID: identity.ID,
+		ID: identifier.MustNew().String(), Kind: "step_up", IdentityID: identity.ID,
 		SessionID: mfaSession.ID, Audience: "commerce-api", Action: "order.refund",
 		ResourceDigest: bytesOf(9, 32),
 		Requirement:    []byte(`{"MinimumLevel":"aal2"}`), State: []byte(`{}`),
@@ -154,8 +153,8 @@ func TestPGTOTPEnrollmentLifecycle(t *testing.T) {
 			ID: mfaSession.ID, IdentityID: identity.ID,
 			LastSeen: now.Add(4 * time.Second),
 			Authentication: authentication.MultiFactor(
-				authentication.Password(uuid.NewString(), now),
-				uuid.NewString(), now.Add(4*time.Second), authenticator.ID,
+				authentication.Password(identifier.MustNew().String(), now),
+				identifier.MustNew().String(), now.Add(4*time.Second), authenticator.ID,
 			),
 		},
 	); err != nil {
@@ -166,8 +165,8 @@ func TestPGTOTPEnrollmentLifecycle(t *testing.T) {
 		authentication.Session{
 			ID: mfaSession.ID, IdentityID: identity.ID,
 			Authentication: authentication.MultiFactor(
-				authentication.Password(uuid.NewString(), now),
-				uuid.NewString(), now.Add(5*time.Second), authenticator.ID,
+				authentication.Password(identifier.MustNew().String(), now),
+				identifier.MustNew().String(), now.Add(5*time.Second), authenticator.ID,
 			),
 		},
 	); !errors.Is(err, authentication.ErrAuthenticationTransactionInvalid) {
@@ -200,7 +199,7 @@ func TestPGPendingTOTPRequiresMatchingLiveSession(t *testing.T) {
 	ctx := context.Background()
 
 	identity, err := store.CreateIdentityWithProfile(ctx, repo.NewIdentityInput{
-		Email:        "mfa-session-" + uuid.NewString() + "@pg.test",
+		Email:        "mfa-session-" + identifier.MustNew().String() + "@pg.test",
 		PasswordHash: "password-hash",
 	})
 	if err != nil {
@@ -213,10 +212,10 @@ func TestPGPendingTOTPRequiresMatchingLiveSession(t *testing.T) {
 	now := time.Now().UTC()
 	expiresAt := now.Add(time.Minute)
 	err = store.CreatePendingTOTP(ctx, authentication.TOTPAuthenticator{
-		ID: uuid.NewString(), IdentityID: identity.ID,
+		ID: identifier.MustNew().String(), IdentityID: identity.ID,
 		SecretCiphertext: make([]byte, 32), KeyVersion: 1,
 		Algorithm: "SHA1", Digits: 6, PeriodSeconds: 30, Status: "pending",
-		BindingSessionID: uuid.NewString(), EnrollmentExpiresAt: &expiresAt,
+		BindingSessionID: identifier.MustNew().String(), EnrollmentExpiresAt: &expiresAt,
 		CreatedAt: now, UpdatedAt: now,
 	})
 	if !errors.Is(err, authentication.ErrTOTPEnrollmentInvalid) {

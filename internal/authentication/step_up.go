@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/yueli-official/foundation/go/identifier"
 )
 
 var (
@@ -63,7 +63,7 @@ func (module *Module) BeginStepUp(
 		return BeginStepUpResult{
 			Satisfied: true,
 			Proof: StepUpProofMaterial{
-				ID: uuid.NewString(), IdentityID: request.IdentityID,
+				ID: identifier.MustNew().String(), IdentityID: request.IdentityID,
 				SessionID: request.SessionID, Audience: audience, Action: action,
 				ResourceDigest: digest[:], Authentication: request.Context, IssuedAt: now,
 			},
@@ -80,7 +80,7 @@ func (module *Module) BeginStepUp(
 		return BeginStepUpResult{}, err
 	}
 	transaction := AuthenticationTransaction{
-		ID: uuid.NewString(), Kind: "step_up", IdentityID: request.IdentityID,
+		ID: identifier.MustNew().String(), Kind: "step_up", IdentityID: request.IdentityID,
 		SessionID: request.SessionID, Audience: audience, Action: action,
 		ResourceDigest: digest[:], Requirement: requirement, State: json.RawMessage(`{}`),
 		ExpiresAt: now.Add(module.cfg.TransactionTTL), CreatedAt: now,
@@ -153,7 +153,7 @@ func (module *Module) FinishTOTPAction(
 		_ = module.mfa.RecordAuthenticationTransactionFailure(ctx, transaction.ID, 5)
 		return StepUpProofMaterial{}, ErrTOTPCodeInvalid
 	}
-	elevated := MultiFactor(request.Session.Authentication, uuid.NewString(), now, matched.ID)
+	elevated := MultiFactor(request.Session.Authentication, identifier.MustNew().String(), now, matched.ID)
 	if !Evaluate(elevated, requirement, now).Satisfied {
 		return StepUpProofMaterial{}, ErrStepUpMethodUnavailable
 	}
@@ -172,7 +172,7 @@ func (module *Module) FinishTOTPAction(
 		}
 	}
 	return StepUpProofMaterial{
-		ID: uuid.NewString(), IdentityID: transaction.IdentityID,
+		ID: identifier.MustNew().String(), IdentityID: transaction.IdentityID,
 		SessionID: transaction.SessionID, Audience: transaction.Audience,
 		Action: transaction.Action, ResourceDigest: transaction.ResourceDigest,
 		Authentication: elevated, IssuedAt: now,

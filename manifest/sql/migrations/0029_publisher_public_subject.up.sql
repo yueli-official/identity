@@ -19,7 +19,7 @@ ALTER TABLE publisher_attestations RENAME COLUMN publisher_subject_key TO publis
 ALTER TABLE publisher_attestations
     ALTER COLUMN publisher_subject SET NOT NULL,
     ADD CONSTRAINT publisher_attestations_subject_format
-        CHECK (publisher_subject ~ '^usr_[A-Za-z0-9_-]{22}$'),
+        CHECK (publisher_subject ~ '^[1-9A-HJ-NP-Za-km-z]{8}$'),
     ADD CONSTRAINT publisher_attestations_idempotency_unique
         UNIQUE (issuer, publisher_subject, idempotency_key);
 CREATE INDEX publisher_attestations_subject_created_idx

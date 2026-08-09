@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/yueli-official/foundation/go/identifier"
 )
 
 type MemoryStore struct {
@@ -76,7 +76,7 @@ func (store *MemoryStore) Bind(
 		return BindResult{Binding: current, Renamed: renamed}, nil
 	}
 	binding := Binding{
-		ID: uuid.NewString(), IdentityID: identityID, Provider: ProviderGitHub,
+		ID: identifier.MustNew().String(), IdentityID: identityID, Provider: ProviderGitHub,
 		ProviderAccountID: account.AccountID, ProviderNodeID: account.NodeID,
 		Login: account.Login, AvatarURL: account.AvatarURL, Status: StatusActive,
 		VerifiedAt: now, LastVerifiedAt: now, CreatedAt: now, UpdatedAt: now,

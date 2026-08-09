@@ -14,8 +14,8 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/gogf/gf/v2/test/gtest"
-	"github.com/google/uuid"
 
+	"github.com/yueli-official/foundation/go/identifier"
 	"github.com/yueli-official/identity/internal/authentication"
 	"github.com/yueli-official/identity/internal/controller"
 	"github.com/yueli-official/identity/internal/logic"
@@ -88,13 +88,13 @@ func TestAdminMutationRequiresActionBoundOneTimeProof(t *testing.T) {
 			digest := sha256.Sum256([]byte(resource))
 			now := time.Now().UTC()
 			raw, mintErr := manager.MintStepUpProof(oidc.StepUpProofInput{
-				Issuer: "https://identity.example.test", ID: uuid.NewString(),
+				Issuer: "https://identity.example.test", ID: identifier.MustNew().String(),
 				Subject: adminID, SessionID: "session-proof",
 				Audience: "identity-api", Action: "identity.admin.role.grant",
 				ResourceDigest: digest[:],
 				Authentication: authentication.MultiFactor(
-					authentication.Password(uuid.NewString(), now),
-					uuid.NewString(), now, "totp-1",
+					authentication.Password(identifier.MustNew().String(), now),
+					identifier.MustNew().String(), now, "totp-1",
 				),
 				IssuedAt: now, TTL: 2 * time.Minute,
 			})

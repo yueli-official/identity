@@ -2,8 +2,8 @@ package v1
 
 import "github.com/gogf/gf/v2/frame/g"
 
-// PublicUser is the stable public projection. userKey is opaque and permanent;
-// handle is human-readable and may change.
+// PublicUser is the stable public projection. userKey is the immutable compact
+// public locator and handle is a mutable alias.
 type PublicUser struct {
 	UserKey     string          `json:"userKey"`
 	Handle      string          `json:"handle"`
@@ -20,7 +20,7 @@ type MediaRef struct {
 
 type GetUserReq struct {
 	g.Meta  `path:"/api/v1/users/{userKey}" method:"get" tags:"users" summary:"Public user by stable key"`
-	UserKey string `json:"userKey" in:"path" v:"required|regex:^usr_[A-Za-z0-9_-]{22}$"`
+	UserKey string `json:"userKey" in:"path" v:"required|regex:^[1-9A-HJ-NP-Za-km-z]{8}$"`
 }
 
 type GetUserRes struct {

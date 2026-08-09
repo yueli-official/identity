@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/gogf/gf/v2/database/gdb"
-	"github.com/google/uuid"
 
+	"github.com/yueli-official/foundation/go/identifier"
 	"github.com/yueli-official/identity/internal/dao"
 	"github.com/yueli-official/identity/internal/model"
 	"github.com/yueli-official/identity/internal/repo"
@@ -44,7 +44,7 @@ func TestOIDCGetClientNotFound(t *testing.T) {
 	d := newDAO(t, db)
 	ctx := context.Background()
 
-	_, err := d.GetClient(ctx, "nonexistent-client-"+uuid.NewString())
+	_, err := d.GetClient(ctx, "nonexistent-client-"+identifier.MustNew().String())
 	if err != repo.ErrClientNotFound {
 		t.Fatalf("want ErrClientNotFound, got %v", err)
 	}
@@ -56,7 +56,7 @@ func TestOIDCSigningKeys(t *testing.T) {
 	d := newDAO(t, db)
 	ctx := context.Background()
 
-	kid := "test-kid-" + uuid.NewString()
+	kid := "test-kid-" + identifier.MustNew().String()
 	k := model.SigningKey{
 		KID:        kid,
 		Alg:        "RS256",
@@ -95,7 +95,7 @@ func TestOIDCGetProfile(t *testing.T) {
 	d := newDAO(t, db)
 	ctx := context.Background()
 
-	email := "oidc-profile-test-" + uuid.NewString() + "@example.com"
+	email := "oidc-profile-test-" + identifier.MustNew().String() + "@example.com"
 	id, err := d.CreateIdentityWithProfile(ctx, repo.NewIdentityInput{
 		Email:        email,
 		DisplayName:  "OIDC Test",

@@ -1,18 +1,10 @@
--- Separate the internal UUID, public user key and mutable human handle.
--- Public keys are 128 random bits encoded as unpadded base64url.
-ALTER TABLE identities ADD COLUMN user_key TEXT;
-
-UPDATE identities
-SET user_key = 'usr_' || rtrim(
-    translate(encode(gen_random_bytes(16), 'base64'), '+/', '-_'),
-    '='
-)
-WHERE user_key IS NULL;
-
+-- Separate the internal UUIDv7, compact stable public key and mutable handle.
+-- Migrations run before the only data source (devseed), so no SQL-side ID
+-- generator or historical backfill is permitted.
 ALTER TABLE identities
-    ALTER COLUMN user_key SET NOT NULL,
+    ADD COLUMN user_key TEXT NOT NULL,
     ADD CONSTRAINT ck_identities_user_key
-        CHECK (user_key ~ '^usr_[A-Za-z0-9_-]{22}$'),
+        CHECK (user_key ~ '^[1-9A-HJ-NP-Za-km-z]{8}$'),
     ADD CONSTRAINT uq_identities_user_key UNIQUE (user_key);
 
 ALTER TABLE user_profiles ADD COLUMN handle TEXT;

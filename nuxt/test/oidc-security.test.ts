@@ -6,6 +6,7 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   safeReturnTo,
+  sessionFromTokens,
   verifyIdentityIdToken,
   type OidcCfg,
 } from "../server/utils/oidc";
@@ -108,6 +109,27 @@ describe("verifyIdentityIdToken", () => {
     await expect(
       verifyIdentityIdToken(token, cfg, "nonce-1"),
     ).rejects.toThrow("signature is invalid");
+  });
+});
+
+describe("sessionFromTokens", () => {
+  it("keeps the pairwise subject and exposes the stable public user key", () => {
+    const session = sessionFromTokens(
+      { access_token: "access", expires_in: 600 },
+      undefined,
+      {
+        iss: "https://identity.test",
+        sub: "pairwise-subject",
+        user_key: "TestA123",
+        aud: "nav-yueli-web",
+        exp: Math.floor(Date.now() / 1000) + 300,
+        nonce: "nonce",
+      },
+    );
+    expect(session.user).toMatchObject({
+      sub: "pairwise-subject",
+      userKey: "TestA123",
+    });
   });
 });
 

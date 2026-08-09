@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/yueli-official/foundation/go/identifier"
 )
 
 var (
@@ -124,7 +124,7 @@ func (module *Module) BeginTOTPEnrollment(
 	if err != nil {
 		return BeginTOTPEnrollmentResult{}, err
 	}
-	id := uuid.NewString()
+	id := identifier.MustNew().String()
 	ciphertext, err := module.secrets.Seal(
 		[]byte(seed.Secret), totpAdditionalData(request.IdentityID, id, 1),
 	)
@@ -202,9 +202,9 @@ func (module *Module) FinishTOTPEnrollment(
 	}
 	recoveryCodes := make([]RecoveryCode, len(digests))
 	for index := range digests {
-		recoveryCodes[index] = RecoveryCode{ID: uuid.NewString(), Digest: digests[index]}
+		recoveryCodes[index] = RecoveryCode{ID: identifier.MustNew().String(), Digest: digests[index]}
 	}
-	setID := uuid.NewString()
+	setID := identifier.MustNew().String()
 	if err := module.mfa.ActivateTOTP(
 		ctx, authenticator, request.SessionID, step,
 		setID, recoveryCodes, now,

@@ -8,8 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
-
+	"github.com/yueli-official/foundation/go/identifier"
 	"github.com/yueli-official/identity/internal/authentication"
 	"github.com/yueli-official/identity/internal/dao"
 	"github.com/yueli-official/identity/internal/model"
@@ -22,7 +21,7 @@ func TestPGPasskeyLifecycleAndAuthenticationSession(t *testing.T) {
 	ctx := context.Background()
 
 	identity, err := store.CreateIdentityWithProfile(ctx, repo.NewIdentityInput{
-		Email:        "passkey-" + uuid.NewString() + "@pg.test",
+		Email:        "passkey-" + identifier.MustNew().String() + "@pg.test",
 		PasswordHash: "password-hash",
 	})
 	if err != nil {
@@ -43,15 +42,15 @@ func TestPGPasskeyLifecycleAndAuthenticationSession(t *testing.T) {
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	bindingSession := authentication.Session{
-		ID: uuid.NewString(), IdentityID: identity.ID,
+		ID: identifier.MustNew().String(), IdentityID: identity.ID,
 		CreatedAt: now, LastSeen: now, ExpiresAt: now.Add(time.Hour),
-		Authentication: authentication.Password(uuid.NewString(), now),
+		Authentication: authentication.Password(identifier.MustNew().String(), now),
 	}
 	if err := store.CreateSession(ctx, bindingSession, time.Hour); err != nil {
 		t.Fatalf("CreateSession(binding) error = %v", err)
 	}
 	registration := authentication.Ceremony{
-		ID: uuid.NewString(), Kind: authentication.CeremonyPasskeyRegistration,
+		ID: identifier.MustNew().String(), Kind: authentication.CeremonyPasskeyRegistration,
 		IdentityID: identity.ID, SessionID: bindingSession.ID,
 		ChallengeDigest: make([]byte, 32), LibraryState: []byte(`{}`),
 		ExpiresAt: now.Add(5 * time.Minute), CreatedAt: now,
@@ -60,8 +59,8 @@ func TestPGPasskeyLifecycleAndAuthenticationSession(t *testing.T) {
 		t.Fatalf("CreateCeremony(registration) error = %v", err)
 	}
 	credential := authentication.PasskeyCredential{
-		ID: uuid.NewString(), IdentityID: identity.ID, RPID: "account.example.test",
-		CredentialID: []byte("credential-" + uuid.NewString()),
+		ID: identifier.MustNew().String(), IdentityID: identity.ID, RPID: "account.example.test",
+		CredentialID: []byte("credential-" + identifier.MustNew().String()),
 		PublicKey:    []byte("public-key"), PublicKeyAlgorithm: -7,
 		Transports: []string{"internal"}, Attachment: "platform",
 		Flags: 5, UserVerifiedAtRegistration: true,
@@ -79,7 +78,7 @@ func TestPGPasskeyLifecycleAndAuthenticationSession(t *testing.T) {
 	}
 
 	pendingRegistration := authentication.Ceremony{
-		ID: uuid.NewString(), Kind: authentication.CeremonyPasskeyRegistration,
+		ID: identifier.MustNew().String(), Kind: authentication.CeremonyPasskeyRegistration,
 		IdentityID: identity.ID, SessionID: bindingSession.ID,
 		ChallengeDigest: make([]byte, 32), LibraryState: []byte(`{}`),
 		ExpiresAt: now.Add(5 * time.Minute), CreatedAt: now,
@@ -91,8 +90,8 @@ func TestPGPasskeyLifecycleAndAuthenticationSession(t *testing.T) {
 		t.Fatal(err)
 	}
 	disabledCredential := credential
-	disabledCredential.ID = uuid.NewString()
-	disabledCredential.CredentialID = []byte("disabled-" + uuid.NewString())
+	disabledCredential.ID = identifier.MustNew().String()
+	disabledCredential.CredentialID = []byte("disabled-" + identifier.MustNew().String())
 	if err := store.CompletePasskeyRegistration(
 		ctx, pendingRegistration, disabledCredential,
 	); !errors.Is(err, authentication.ErrCeremonyInvalid) {
@@ -103,7 +102,7 @@ func TestPGPasskeyLifecycleAndAuthenticationSession(t *testing.T) {
 	}
 
 	login := authentication.Ceremony{
-		ID: uuid.NewString(), Kind: authentication.CeremonyPasskeyAuthentication,
+		ID: identifier.MustNew().String(), Kind: authentication.CeremonyPasskeyAuthentication,
 		ChallengeDigest: make([]byte, 32), LibraryState: []byte(`{}`),
 		ExpiresAt: now.Add(5 * time.Minute), CreatedAt: now,
 	}
@@ -111,10 +110,10 @@ func TestPGPasskeyLifecycleAndAuthenticationSession(t *testing.T) {
 		t.Fatalf("CreateCeremony(authentication) error = %v", err)
 	}
 	session := authentication.Session{
-		ID: uuid.NewString(), IdentityID: identity.ID,
+		ID: identifier.MustNew().String(), IdentityID: identity.ID,
 		CreatedAt: now, LastSeen: now, ExpiresAt: now.Add(time.Hour),
 		Authentication: authentication.Passkey(
-			uuid.NewString(), now, credential.ID, true,
+			identifier.MustNew().String(), now, credential.ID, true,
 		),
 	}
 	credential.UserVerified = true
@@ -157,8 +156,8 @@ func TestPGCredentialRemovalCannotStrandOAuthOnlyAccount(t *testing.T) {
 	ctx := context.Background()
 
 	identity, err := store.CreateOAuthIdentity(ctx, repo.NewOAuthIdentityInput{
-		Email:         "passkey-last-" + uuid.NewString() + "@pg.test",
-		EmailVerified: true, Provider: "google", ProviderUID: uuid.NewString(),
+		Email:         "passkey-last-" + identifier.MustNew().String() + "@pg.test",
+		EmailVerified: true, Provider: "google", ProviderUID: identifier.MustNew().String(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -169,9 +168,9 @@ func TestPGCredentialRemovalCannotStrandOAuthOnlyAccount(t *testing.T) {
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	bindingSession := authentication.Session{
-		ID: uuid.NewString(), IdentityID: identity.ID,
+		ID: identifier.MustNew().String(), IdentityID: identity.ID,
 		CreatedAt: now, LastSeen: now, ExpiresAt: now.Add(time.Hour),
-		Authentication: authentication.Federated(uuid.NewString(), now, "google"),
+		Authentication: authentication.Federated(identifier.MustNew().String(), now, "google"),
 	}
 	if err := store.CreateSession(ctx, bindingSession, time.Hour); err != nil {
 		t.Fatal(err)
@@ -181,7 +180,7 @@ func TestPGCredentialRemovalCannotStrandOAuthOnlyAccount(t *testing.T) {
 		t.Fatal(err)
 	}
 	ceremony := authentication.Ceremony{
-		ID: uuid.NewString(), Kind: authentication.CeremonyPasskeyRegistration,
+		ID: identifier.MustNew().String(), Kind: authentication.CeremonyPasskeyRegistration,
 		IdentityID: identity.ID, SessionID: bindingSession.ID,
 		ChallengeDigest: make([]byte, 32), LibraryState: []byte(`{}`),
 		ExpiresAt: now.Add(time.Minute), CreatedAt: now,
@@ -190,8 +189,8 @@ func TestPGCredentialRemovalCannotStrandOAuthOnlyAccount(t *testing.T) {
 		t.Fatal(err)
 	}
 	credential := authentication.PasskeyCredential{
-		ID: uuid.NewString(), IdentityID: identity.ID, RPID: "account.example.test",
-		CredentialID: []byte("credential-" + uuid.NewString()),
+		ID: identifier.MustNew().String(), IdentityID: identity.ID, RPID: "account.example.test",
+		CredentialID: []byte("credential-" + identifier.MustNew().String()),
 		PublicKey:    []byte("public-key"), PublicKeyAlgorithm: -7,
 		Status: "active", Version: 1, CreatedAt: now, UpdatedAt: now,
 	}

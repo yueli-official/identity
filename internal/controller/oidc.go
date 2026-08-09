@@ -87,7 +87,7 @@ func (c *OIDCController) discoveryDoc() map[string]interface{} {
 			string(authentication.ProfilePhishingResistant),
 		},
 		"claims_supported": []string{
-			"sub", "iss", "aud", "exp", "iat", "auth_time", "acr", "amr",
+			"sub", "user_key", "iss", "aud", "exp", "iat", "auth_time", "acr", "amr",
 			"name", "preferred_username", "picture", "locale", "email", "email_verified", "roles",
 		},
 	}

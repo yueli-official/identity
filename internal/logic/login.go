@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/yueli-official/foundation/go/abuse"
+	"github.com/yueli-official/foundation/go/identifier"
 
 	"github.com/yueli-official/identity/internal/authentication"
 	"github.com/yueli-official/identity/internal/identityabuse"
@@ -41,7 +41,7 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (LoginOutput, error)
 	if gated {
 		attemptID := in.AttemptID
 		if attemptID == "" {
-			attemptID = uuid.NewString()
+			attemptID = identifier.MustNew().String()
 		}
 		network, err := identityabuse.NetworkPrefix(in.IP)
 		if err != nil {
@@ -119,7 +119,7 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (LoginOutput, error)
 	}
 	// Success: mint a fresh (rotated) session id after Abuse resolution.
 	authenticatedAt := s.now().UTC()
-	primary := authentication.Password(uuid.NewString(), authenticatedAt)
+	primary := authentication.Password(identifier.MustNew().String(), authenticatedAt)
 	if s.secondFactor != nil {
 		secondFactor, err := s.secondFactor.BeginSecondFactor(
 			ctx, id.ID, primary, in.UserAgent, in.IP,
@@ -137,7 +137,7 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (LoginOutput, error)
 		}
 	}
 	sess := model.Session{
-		ID: uuid.NewString(), IdentityID: id.ID,
+		ID: identifier.MustNew().String(), IdentityID: id.ID,
 		CreatedAt: authenticatedAt, LastSeen: authenticatedAt, UserAgent: in.UserAgent, IP: in.IP,
 		Authentication: primary,
 	}

@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
+	"github.com/yueli-official/foundation/go/identifier"
 )
 
 var (
@@ -77,7 +77,7 @@ func (module *Module) Issue(
 	}
 
 	issuedAt := module.now().UTC()
-	attestationID := uuid.NewString()
+	attestationID := identifier.MustNew().String()
 	value := statement{
 		Type: StatementType,
 		Subject: []subject{{

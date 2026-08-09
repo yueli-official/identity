@@ -49,7 +49,7 @@ func (p *PG) AdminListUsers(ctx context.Context, f repo.AdminUserFilter) ([]repo
 	}
 	if f.Keyword != "" {
 		kw := "%" + f.Keyword + "%"
-		m = m.Where("(i.email ILIKE ? OR p.display_name ILIKE ? OR p.handle ILIKE ?)", kw, kw, kw)
+		m = m.Where("(i.email ILIKE ? OR i.user_key ILIKE ? OR p.display_name ILIKE ? OR p.handle ILIKE ?)", kw, kw, kw, kw)
 	}
 
 	total, err := m.Count()

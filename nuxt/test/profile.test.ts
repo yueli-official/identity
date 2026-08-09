@@ -10,21 +10,21 @@ describe("mergePublicUser", () => {
     expect(
       mergePublicUser(
         {
-          sub: "usr_0000000000000000000000",
+          sub: "TestA123",
           email: "old@example.com",
           name: "旧名称",
           avatar: "https://old.example/avatar.png",
           roles: ["member"],
         },
         {
-          userKey: "usr_0000000000000000000000",
+          userKey: "TestA123",
           handle: "new-name",
           displayName: "新名称",
           avatar: { mediaKey: "31Pj0mXv7cfR5fdZIUvra" },
         },
       ),
     ).toEqual({
-      sub: "usr_0000000000000000000000",
+      sub: "TestA123",
       email: "old@example.com",
       name: "新名称",
       avatar: "/media/31Pj0mXv7cfR5fdZIUvra?format=webp&name=thumbnail",
@@ -36,24 +36,24 @@ describe("mergePublicUser", () => {
     expect(
       mergePublicUser(
         {
-          sub: "usr_0000000000000000000000",
+          sub: "TestA123",
           email: "user@example.com",
           avatar: "https://old.example/avatar.png",
         },
-        { userKey: "usr_0000000000000000000000", handle: "", displayName: "" },
+        { userKey: "TestA123", handle: "", displayName: "" },
       ),
     ).toEqual({
-      sub: "usr_0000000000000000000000",
+      sub: "TestA123",
       email: "user@example.com",
       avatar: undefined,
     });
   });
 
   it("ignores a profile for a different identity", () => {
-    const user = { sub: "usr_0000000000000000000000", name: "当前用户" };
+    const user = { sub: "TestA123", name: "当前用户" };
     expect(
       mergePublicUser(user, {
-        userKey: "usr_1111111111111111111111",
+        userKey: "TestB234",
         handle: "other",
         displayName: "其他用户",
         avatar: { mediaKey: "31Pj0mXv7cfR5fdZIUvra" },
@@ -64,7 +64,7 @@ describe("mergePublicUser", () => {
   it("resolves the current profile from the configured Identity issuer", async () => {
     const fetchProfile = vi.fn().mockResolvedValue({
       user: {
-        userKey: "usr_0000000000000000000000",
+        userKey: "TestA123",
         handle: "yueli",
         displayName: "月离",
         avatar: { mediaKey: "31Pj0mXv7cfR5fdZIUvra" },
@@ -73,7 +73,7 @@ describe("mergePublicUser", () => {
 
     await expect(
       resolveLatestDisplayUser(
-        { sub: "usr_0000000000000000000000", name: "旧名称" },
+        { sub: "TestA123", name: "旧名称" },
         "https://identity.example/",
         fetchProfile,
       ),
@@ -82,7 +82,32 @@ describe("mergePublicUser", () => {
       avatar: "/media/31Pj0mXv7cfR5fdZIUvra?format=webp&name=thumbnail",
     });
     expect(fetchProfile).toHaveBeenCalledWith(
-      "https://identity.example/api/v1/users/usr_0000000000000000000000",
+      "https://identity.example/api/v1/users/TestA123",
+    );
+  });
+
+  it("uses the public user key when the OIDC subject is pairwise", async () => {
+    const fetchProfile = vi.fn().mockResolvedValue({
+      user: {
+        userKey: "TestA123",
+        handle: "yueli",
+        displayName: "月离",
+      },
+    });
+
+    await expect(
+      resolveLatestDisplayUser(
+        {
+          sub: "pairwise-subject",
+          userKey: "TestA123",
+          name: "旧名称",
+        },
+        "https://identity.example",
+        fetchProfile,
+      ),
+    ).resolves.toMatchObject({ name: "月离" });
+    expect(fetchProfile).toHaveBeenCalledWith(
+      "https://identity.example/api/v1/users/TestA123",
     );
   });
 

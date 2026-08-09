@@ -1,5 +1,6 @@
 export interface SessionDisplayUser {
   sub: string;
+  userKey?: string;
   email?: string;
   name?: string;
   avatar?: string;
@@ -84,7 +85,7 @@ export function mergePublicUser<T extends SessionDisplayUser>(
   user: T,
   profile: PublicUser,
 ): T {
-	if (profile.userKey !== user.sub) return user;
+	if (profile.userKey !== (user.userKey || user.sub)) return user;
 
   return {
     ...user,
@@ -102,7 +103,7 @@ export async function resolveLatestDisplayUser<T extends SessionDisplayUser>(
 
   try {
     const response = await fetchProfile(
-		`${issuer.replace(/\/$/, "")}/api/v1/users/${encodeURIComponent(user.sub)}`,
+		`${issuer.replace(/\/$/, "")}/api/v1/users/${encodeURIComponent(user.userKey || user.sub)}`,
 	);
 	return response.user ? mergePublicUser(user, response.user) : user;
   } catch {

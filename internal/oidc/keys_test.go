@@ -20,7 +20,7 @@ func TestMintServiceTokenIdentifiesIdentityService(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err := m.MintDelegatedUserToken("https://identity.test", "usr_0000000000000000000000", "asset-api", "asset:sign", time.Minute, time.Now())
+	raw, err := m.MintDelegatedUserToken("https://identity.test", "TestA123", "asset-api", "asset:sign", time.Minute, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func TestMintServiceTokenIdentifiesIdentityService(t *testing.T) {
 	if err != nil {
 		t.Fatalf("asset verifier rejected minted service token: %v", err)
 	}
-	if principal.Subject != "usr_0000000000000000000000" || principal.ClientID != "identity-svc" || !principal.HasScope("asset:sign") {
+	if principal.Subject != "TestA123" || principal.ClientID != "identity-svc" || !principal.HasScope("asset:sign") {
 		t.Fatalf("verified principal = %+v", principal)
 	}
 }
@@ -57,7 +57,7 @@ func TestMintServiceTokenRejectsEmptyAudience(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := m.MintDelegatedUserToken("https://identity.test", "usr_0000000000000000000000", "", "", time.Minute, time.Now()); err == nil {
+	if _, err := m.MintDelegatedUserToken("https://identity.test", "TestA123", "", "", time.Minute, time.Now()); err == nil {
 		t.Fatal("MintServiceToken accepted an empty audience")
 	}
 }

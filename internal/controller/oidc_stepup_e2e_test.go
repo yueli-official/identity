@@ -14,8 +14,8 @@ import (
 
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/gogf/gf/v2/test/gtest"
-	"github.com/google/uuid"
 
+	"github.com/yueli-official/foundation/go/identifier"
 	"github.com/yueli-official/identity/internal/authentication"
 	"github.com/yueli-official/identity/internal/controller"
 	"github.com/yueli-official/identity/internal/logic"
@@ -92,7 +92,7 @@ func TestE2E_OIDCAssuranceStepUpGate(t *testing.T) {
 		session, err := store.GetSession(ctx, login.SessionID)
 		t.AssertNil(err)
 		session.Authentication = authentication.MultiFactor(
-			session.Authentication, uuid.NewString(), time.Now().UTC(), "totp-test",
+			session.Authentication, identifier.MustNew().String(), time.Now().UTC(), "totp-test",
 		)
 		t.AssertNil(store.CreateSession(ctx, session, time.Hour))
 

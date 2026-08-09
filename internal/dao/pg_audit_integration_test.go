@@ -7,8 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/google/uuid"
-
+	"github.com/yueli-official/foundation/go/identifier"
 	"github.com/yueli-official/identity/internal/dao"
 	"github.com/yueli-official/identity/internal/repo"
 )
@@ -21,9 +20,9 @@ func TestPGAuditRoundTrip(t *testing.T) {
 	d := dao.NewPG(db)
 	ctx := context.Background()
 
-	actorID := uuid.NewString()
-	targetID := uuid.NewString()
-	event := "test.audit." + uuid.NewString()
+	actorID := identifier.MustNew().String()
+	targetID := identifier.MustNew().String()
+	event := "test.audit." + identifier.MustNew().String()
 
 	// --- insert → query round-trip ---
 	row := repo.AuditRow{
@@ -34,7 +33,7 @@ func TestPGAuditRoundTrip(t *testing.T) {
 		IP:         "127.0.0.1",
 		UserAgent:  "Go-test/1.0",
 		ClientID:   "demo-web",
-		RequestID:  "test-req-" + uuid.NewString(),
+		RequestID:  "test-req-" + identifier.MustNew().String(),
 		Result:     "success",
 		Detail:     map[string]any{"role": "admin"},
 	}
@@ -106,9 +105,9 @@ func TestPGAuditQueryByIdentity(t *testing.T) {
 	d := dao.NewPG(db)
 	ctx := context.Background()
 
-	sharedID := uuid.NewString()
-	otherID := uuid.NewString()
-	eventPrefix := "test.audit.byid." + uuid.NewString()
+	sharedID := identifier.MustNew().String()
+	otherID := identifier.MustNew().String()
+	eventPrefix := "test.audit.byid." + identifier.MustNew().String()
 
 	// Row where sharedID is actor.
 	rowActor := repo.AuditRow{
@@ -161,8 +160,8 @@ func TestPGAuditQueryByEvent(t *testing.T) {
 	d := dao.NewPG(db)
 	ctx := context.Background()
 
-	eventA := "test.audit.event." + uuid.NewString()
-	eventB := "test.audit.event." + uuid.NewString()
+	eventA := "test.audit.event." + identifier.MustNew().String()
+	eventB := "test.audit.event." + identifier.MustNew().String()
 
 	for i := 0; i < 3; i++ {
 		if err := d.InsertAudit(ctx, repo.AuditRow{Event: eventA, Result: "success", Detail: map[string]any{}}); err != nil {
@@ -191,7 +190,7 @@ func TestPGAuditLimitOffset(t *testing.T) {
 	d := dao.NewPG(db)
 	ctx := context.Background()
 
-	event := "test.audit.limit." + uuid.NewString()
+	event := "test.audit.limit." + identifier.MustNew().String()
 	for i := 0; i < 5; i++ {
 		if err := d.InsertAudit(ctx, repo.AuditRow{Event: event, Result: "success", Detail: map[string]any{}}); err != nil {
 			t.Fatalf("InsertAudit: %v", err)
@@ -253,7 +252,7 @@ func TestPGAuditNullUUIDs(t *testing.T) {
 	d := dao.NewPG(db)
 	ctx := context.Background()
 
-	event := "test.audit.nulluuid." + uuid.NewString()
+	event := "test.audit.nulluuid." + identifier.MustNew().String()
 	row := repo.AuditRow{
 		Event: event,
 		// ActorID and TargetID intentionally empty → must become NULL in PG.
@@ -298,7 +297,7 @@ func TestPGAuditResultDefault(t *testing.T) {
 	d := dao.NewPG(db)
 	ctx := context.Background()
 
-	event := "test.audit.resultdefault." + uuid.NewString()
+	event := "test.audit.resultdefault." + identifier.MustNew().String()
 	if err := d.InsertAudit(ctx, repo.AuditRow{Event: event, Detail: map[string]any{}}); err != nil {
 		t.Fatalf("InsertAudit: %v", err)
 	}

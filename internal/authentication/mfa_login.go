@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/yueli-official/foundation/go/identifier"
 )
 
 var ErrAuthenticationTransactionInvalid = errors.New("authentication transaction invalid")
@@ -65,7 +65,7 @@ func (module *Module) BeginSecondFactor(
 	}
 	now := module.now().UTC()
 	transaction := AuthenticationTransaction{
-		ID: uuid.NewString(), Kind: "mfa_login", IdentityID: identityID,
+		ID: identifier.MustNew().String(), Kind: "mfa_login", IdentityID: identityID,
 		Requirement: json.RawMessage(`{"minimumLevel":"aal2"}`),
 		State:       state, ExpiresAt: now.Add(module.cfg.TransactionTTL), CreatedAt: now,
 	}
@@ -103,9 +103,9 @@ func (module *Module) FinishRecoveryLogin(
 	if err := json.Unmarshal(transaction.State, &state); err != nil {
 		return AuthenticationResult{}, ErrAuthenticationTransactionInvalid
 	}
-	auth := Recovery(state.Primary, uuid.NewString(), now)
+	auth := Recovery(state.Primary, identifier.MustNew().String(), now)
 	session := Session{
-		ID: uuid.NewString(), IdentityID: transaction.IdentityID,
+		ID: identifier.MustNew().String(), IdentityID: transaction.IdentityID,
 		CreatedAt: now, LastSeen: now, UserAgent: state.UserAgent, IP: state.IP,
 		ExpiresAt: now.Add(module.cfg.RecoveryTTL), Authentication: auth,
 	}
@@ -190,9 +190,9 @@ func (module *Module) FinishTOTPLogin(
 		_ = module.mfa.RecordAuthenticationTransactionFailure(ctx, transaction.ID, 5)
 		return AuthenticationResult{}, ErrTOTPCodeInvalid
 	}
-	auth := MultiFactor(state.Primary, uuid.NewString(), now, matched.ID)
+	auth := MultiFactor(state.Primary, identifier.MustNew().String(), now, matched.ID)
 	session := Session{
-		ID: uuid.NewString(), IdentityID: transaction.IdentityID,
+		ID: identifier.MustNew().String(), IdentityID: transaction.IdentityID,
 		CreatedAt: now, LastSeen: now, UserAgent: state.UserAgent, IP: state.IP,
 		ExpiresAt: now.Add(module.cfg.SessionTTL), Authentication: auth,
 	}

@@ -8,7 +8,11 @@ describe("Identity Nuxt BFF adapter", () => {
   it("splits a configured private base into origin and fixed path", () => {
     expect(identityBffTarget("https://shop.internal/v1")).toEqual({
       origin: "https://shop.internal",
-      pathPrefix: "/v1",
+      pathPrefix: "/v1/api/v1",
+    });
+    expect(identityBffTarget("https://shop.internal")).toEqual({
+      origin: "https://shop.internal",
+      pathPrefix: "/api/v1",
     });
   });
 

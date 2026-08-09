@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/yueli-official/foundation/go/identifier"
 )
 
 const defaultAttemptTTL = 10 * time.Minute
@@ -81,7 +81,7 @@ func (module *Module) Begin(
 	now := module.now().UTC()
 	expiresAt := now.Add(module.ttl)
 	attempt := Attempt{
-		ID: uuid.NewString(), StateDigest: stateDigest, IdentityID: identityID,
+		ID: identifier.MustNew().String(), StateDigest: stateDigest, IdentityID: identityID,
 		SessionDigest: digest(sessionID), VerifierCiphertext: encrypted,
 		ReturnTo: returnTo, ExpiresAt: expiresAt, CreatedAt: now,
 	}

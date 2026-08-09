@@ -2,9 +2,12 @@ package dao
 
 import (
 	"context"
+	"errors"
+	"strings"
 
 	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/frame/g"
+	"github.com/yueli-official/foundation/go/identifier"
 
 	"github.com/yueli-official/identity/internal/model"
 	"github.com/yueli-official/identity/internal/repo"
@@ -33,30 +36,46 @@ func (p *PG) GetByProviderUID(ctx context.Context, provider, providerUID string)
 // credential). Maps a UNIQUE violation on identities.email to repo.ErrEmailTaken
 // and on the credentials_oauth PK to repo.ErrProviderUIDTaken.
 func (p *PG) CreateOAuthIdentity(ctx context.Context, in repo.NewOAuthIdentityInput) (model.Identity, error) {
-	userKey := in.UserKey
-	if userKey == "" {
-		generated, err := user.NewPublicKey()
-		if err != nil {
+	identityID := identifier.MustNew().String()
+	if strings.TrimSpace(in.UserKey) != "" {
+		if _, err := user.ParsePublicKey(in.UserKey); err != nil {
 			return model.Identity{}, err
 		}
-		userKey = string(generated)
-	} else if _, err := user.ParsePublicKey(userKey); err != nil {
-		return model.Identity{}, err
+		return p.createOAuthIdentity(ctx, in, identityID, in.UserKey)
 	}
+	var out model.Identity
+	_, err := identifier.Allocate(ctx, identifier.CompactURLV1,
+		func(ctx context.Context, candidate identifier.Key) (identifier.ClaimResult, error) {
+			created, err := p.createOAuthIdentity(ctx, in, identityID, candidate.String())
+			if errors.Is(err, errPublicKeyCollision) {
+				return identifier.Collision, nil
+			}
+			if err != nil {
+				return 0, err
+			}
+			out = created
+			return identifier.Claimed, nil
+		})
+	return out, err
+}
+
+func (p *PG) createOAuthIdentity(ctx context.Context, in repo.NewOAuthIdentityInput, identityID, userKey string) (model.Identity, error) {
 	var out model.Identity
 	err := p.db.Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
 		// Set context on the transaction so that subsequent Model calls inherit it.
 		tx = tx.Ctx(ctx)
 
-		// Insert identity row (with email_verified); capture the DB-generated UUID.
 		if err := validateRoles(ctx, tx, in.Roles); err != nil {
 			return err
 		}
 		val, err := tx.GetValue(
-			"INSERT INTO identities (user_key, email, email_verified) VALUES (?, ?, ?) RETURNING id",
-			userKey, in.Email, in.EmailVerified,
+			"INSERT INTO identities (id, user_key, email, email_verified) VALUES (?, ?, ?, ?) RETURNING id",
+			identityID, userKey, in.Email, in.EmailVerified,
 		)
 		if err != nil {
+			if isPublicKeyCollision(err) {
+				return errPublicKeyCollision
+			}
 			if isUniqueViolation(err) {
 				return repo.ErrEmailTaken
 			}

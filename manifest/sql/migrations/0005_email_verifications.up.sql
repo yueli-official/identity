@@ -2,7 +2,7 @@
 -- One row per issued email token. purpose isolates scopes (verify_email vs password_reset,
 -- spec §11 "登录码 ≠ 找回码"). Tokens are stored hashed; single-use via used_at; TTL via expires_at.
 CREATE TABLE email_verifications (
-    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    id          UUID        PRIMARY KEY,
     identity_id UUID        NOT NULL REFERENCES identities(id) ON DELETE CASCADE,
     email       TEXT        NOT NULL,
     purpose     TEXT        NOT NULL,   -- 'verify_email' | 'password_reset'

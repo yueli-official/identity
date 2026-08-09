@@ -6,7 +6,7 @@ import "github.com/gogf/gf/v2/frame/g"
 // asserts the caller holds the "admin" role before any state change.
 type AdminGrantRoleReq struct {
 	g.Meta  `path:"/api/v1/admin/users/{userKey}/roles" method:"post" tags:"admin" summary:"Grant a role (admin only)"`
-	UserKey string `json:"userKey" in:"path" v:"required|regex:^usr_[A-Za-z0-9_-]{22}$"`
+	UserKey string `json:"userKey" in:"path" v:"required|regex:^[1-9A-HJ-NP-Za-km-z]{8}$"`
 	Role    string `json:"role" v:"required"`
 }
 type AdminGrantRoleRes struct {
@@ -16,7 +16,7 @@ type AdminGrantRoleRes struct {
 // AdminRevokeRoleReq revokes a role from an identity. Admin-only (same guard).
 type AdminRevokeRoleReq struct {
 	g.Meta  `path:"/api/v1/admin/users/{userKey}/roles/{role}" method:"delete" tags:"admin" summary:"Revoke a role (admin only)"`
-	UserKey string `json:"userKey" in:"path" v:"required|regex:^usr_[A-Za-z0-9_-]{22}$"`
+	UserKey string `json:"userKey" in:"path" v:"required|regex:^[1-9A-HJ-NP-Za-km-z]{8}$"`
 	Role    string `json:"role" in:"path"`
 }
 type AdminRevokeRoleRes struct {
@@ -27,7 +27,7 @@ type AdminRevokeRoleRes struct {
 // UserKey matches actor OR target; all filter fields are optional.
 type AdminListAuditReq struct {
 	g.Meta  `path:"/api/v1/admin/audit" method:"get" tags:"admin" summary:"List audit logs (admin only)"`
-	UserKey string `json:"userKey" in:"query" v:"regex:^$|^usr_[A-Za-z0-9_-]{22}$"`
+	UserKey string `json:"userKey" in:"query" v:"regex:^$|^[1-9A-HJ-NP-Za-km-z]{8}$"`
 	Event   string `json:"event" in:"query"`
 	Limit   int    `json:"limit" in:"query"`
 	Offset  int    `json:"offset" in:"query"`
@@ -100,7 +100,7 @@ type AdminUserStatsRes struct {
 // AdminGetUserReq returns one user's admin detail.
 type AdminGetUserReq struct {
 	g.Meta  `path:"/api/v1/admin/users/{userKey}" method:"get" tags:"admin" summary:"Get a user (admin only)"`
-	UserKey string `json:"userKey" in:"path" v:"required|regex:^usr_[A-Za-z0-9_-]{22}$"`
+	UserKey string `json:"userKey" in:"path" v:"required|regex:^[1-9A-HJ-NP-Za-km-z]{8}$"`
 }
 type AdminGetUserRes struct {
 	User AdminUserDTO `json:"user"`
@@ -109,7 +109,7 @@ type AdminGetUserRes struct {
 // AdminUpdateStatusReq sets a user's lifecycle status (ban=disabled, unban=active).
 type AdminUpdateStatusReq struct {
 	g.Meta  `path:"/api/v1/admin/users/{userKey}/status" method:"put" tags:"admin" summary:"Set user status (admin only)"`
-	UserKey string `json:"userKey" in:"path" v:"required|regex:^usr_[A-Za-z0-9_-]{22}$"`
+	UserKey string `json:"userKey" in:"path" v:"required|regex:^[1-9A-HJ-NP-Za-km-z]{8}$"`
 	Status  string `json:"status" v:"required"`
 }
 type AdminUpdateStatusRes struct {
@@ -119,14 +119,14 @@ type AdminUpdateStatusRes struct {
 // AdminDeleteUserReq soft-deletes a user (status='deleted').
 type AdminDeleteUserReq struct {
 	g.Meta  `path:"/api/v1/admin/users/{userKey}" method:"delete" tags:"admin" summary:"Delete a user (admin only)"`
-	UserKey string `json:"userKey" in:"path" v:"required|regex:^usr_[A-Za-z0-9_-]{22}$"`
+	UserKey string `json:"userKey" in:"path" v:"required|regex:^[1-9A-HJ-NP-Za-km-z]{8}$"`
 }
 type AdminDeleteUserRes struct{}
 
 // AdminResetPasswordReq overrides a user's password (admin override, no current-pw check).
 type AdminResetPasswordReq struct {
 	g.Meta      `path:"/api/v1/admin/users/{userKey}/password" method:"post" tags:"admin" summary:"Reset a user's password (admin only)"`
-	UserKey     string `json:"userKey" in:"path" v:"required|regex:^usr_[A-Za-z0-9_-]{22}$"`
+	UserKey     string `json:"userKey" in:"path" v:"required|regex:^[1-9A-HJ-NP-Za-km-z]{8}$"`
 	NewPassword string `json:"newPassword" v:"required"`
 }
 type AdminResetPasswordRes struct{}
