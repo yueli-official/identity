@@ -35,11 +35,12 @@ func BuildSession(
 	idExtra := map[string]interface{}{}
 	methods := authentication.MethodStrings(auth.Methods)
 	accessExtra := map[string]interface{}{
-		"client_id": clientID,
-		"auth_time": auth.AuthenticatedAt.Unix(),
-		"amr":       methods,
-		"acr":       string(auth.Profile),
-		"aal":       string(auth.Level),
+		"client_id":    clientID,
+		"subject_kind": "user",
+		"auth_time":    auth.AuthenticatedAt.Unix(),
+		"amr":          methods,
+		"acr":          string(auth.Profile),
+		"aal":          string(auth.Level),
 	}
 	if has["roles"] {
 		if roles == nil {

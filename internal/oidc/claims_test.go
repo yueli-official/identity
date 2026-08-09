@@ -70,6 +70,9 @@ func TestBuildSessionCarriesAccessTokenClientID(t *testing.T) {
 	if got := s.JWTClaims.Extra["client_id"]; got != "blog-ai-web" {
 		t.Fatalf("access-token client_id = %#v, want blog-ai-web", got)
 	}
+	if got := s.JWTClaims.Extra["subject_kind"]; got != "user" {
+		t.Fatalf("access-token subject_kind = %#v, want user", got)
+	}
 }
 
 func TestBuildSession_NoRolesScope_NoClaim(t *testing.T) {
