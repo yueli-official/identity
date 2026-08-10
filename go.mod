@@ -9,14 +9,13 @@ require (
 	github.com/gogf/gf/contrib/drivers/pgsql/v2 v2.10.2
 	github.com/gogf/gf/contrib/nosql/redis/v2 v2.10.2
 	github.com/gogf/gf/v2 v2.10.2
-	github.com/google/uuid v1.6.0
 	github.com/gowebpki/jcs v1.0.1
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826
 	github.com/ory/fosite v0.49.0
 	github.com/pquerna/otp v1.5.0
 	github.com/secure-systems-lab/go-securesystemslib v0.11.0
 	golang.org/x/crypto v0.53.0
-	golang.org/x/text v0.39.0
+	golang.org/x/text v0.40.0
 )
 
 require (
@@ -26,6 +25,7 @@ require (
 	github.com/go-webauthn/x v0.2.6 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/google/go-tpm v0.9.8 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/tinylib/msgp v1.6.4 // indirect
@@ -88,11 +88,11 @@ require (
 	github.com/spf13/viper v1.16.0 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/subosito/gotenv v1.4.2 // indirect
-	github.com/yueli-official/foundation/go v0.1.0
+	github.com/yueli-official/foundation/go v0.2.1
 	github.com/yueli-official/notification v0.1.0
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.46.1 // indirect
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.65.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.69.0 // indirect
 	go.opentelemetry.io/contrib/propagators/b3 v1.21.0 // indirect
 	go.opentelemetry.io/contrib/propagators/jaeger v1.21.1 // indirect
 	go.opentelemetry.io/contrib/samplers/jaegerremote v0.15.1 // indirect
@@ -108,7 +108,7 @@ require (
 	golang.org/x/mod v0.37.0 // indirect
 	golang.org/x/net v0.56.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
-	golang.org/x/sync v0.21.0 // indirect
+	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/tools v0.47.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa // indirect

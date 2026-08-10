@@ -33,6 +33,11 @@ ID Token 验签、密封 session 和 refresh 去重。SPA/原生模式需要产�
 Identity 的公开 issuer 必须是稳定、外部可访问的规范 origin。容器名、局域网 IP 和临时端口可以作为内部 target，
 但不能替代生产 issuer。redirect URI、cookie secure、Account origin、WebAuthn RP ID/origin 必须与公网地址一致。
 
+本地共享 Provider 由 Workspace 在取得 Runtime Binding 前执行 Identity-owned `cmd/devprovision`。它只接受
+`IDENTITY_DEV_PROVISIONING` 中的 `siteClients` / `serviceClients`，拒绝账户 fixture、空声明与非 Workspace-owned
+既有 client；重复声明幂等收敛。数据库连接与 client secret 只进入命令环境，不写入 Workspace registry 或日志。
+这是本地开发 Provisioning Requirement，不是生产管理端点；正式环境仍通过其受控的 client 注册流程交付。
+
 ## 3. Public User 合同
 
 - 跨服务用户主键是 8 位 Base58 `userKey`，由 Foundation Identifier `compact-url-v1` 分配。
