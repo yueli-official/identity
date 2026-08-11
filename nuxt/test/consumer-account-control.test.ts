@@ -12,6 +12,7 @@ const AccountMenu = defineComponent({
     contextActions: Array,
     utilityActions: Array,
     logout: Function,
+    triggerMode: String,
   },
   template: '<div data-account-menu="authenticated" />',
 });
@@ -19,7 +20,7 @@ const AccountMenu = defineComponent({
 const UButton = defineComponent({
   name: "UButton",
   inheritAttrs: false,
-  props: { label: String },
+  props: { label: String, square: Boolean },
   emits: ["click"],
   template:
     '<button v-bind="$attrs" @click="$emit(\'click\')">{{ label }}</button>',
@@ -72,6 +73,15 @@ describe("ConsumerAccountControl", () => {
     expect(login).toHaveBeenCalledOnce();
   });
 
+  it("renders a compact labelled login action for collapsed chrome", async () => {
+    const wrapper = mountControl({ triggerMode: "collapsed" });
+    const button = wrapper.get("button");
+
+    expect(button.text()).toBe("");
+    expect(button.attributes("aria-label")).toBe("登录");
+    expect(wrapper.getComponent(UButton).props("square")).toBe(true);
+  });
+
   it("owns identity, platform utilities and consumer context actions", () => {
     user.value = {
       sub: "user-1",
@@ -82,6 +92,7 @@ describe("ConsumerAccountControl", () => {
     admin.value = true;
 
     const wrapper = mountControl({
+      triggerMode: "collapsed",
       manageTo: "/manage",
       homeTo: "/",
       contextActions: [
@@ -94,6 +105,7 @@ describe("ConsumerAccountControl", () => {
       name: "月离",
       email: "user@example.com",
       avatarUrl: "https://identity.example/avatar.png",
+      triggerMode: "collapsed",
     });
     expect(menu.props("contextActions")).toEqual([
       { label: "我的购买", icon: "i-tabler-shopping-bag", to: "/orders" },

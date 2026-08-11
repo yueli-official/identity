@@ -3,6 +3,7 @@ import { computed } from "vue";
 import {
   AccountMenu,
   type AccountMenuAction,
+  type AccountMenuTriggerMode,
 } from "@yueli/ui/account-menu/pattern";
 import { identityAccountMenuMessages } from "../utils/account-menu";
 
@@ -14,6 +15,7 @@ const props = withDefaults(
     homeTo?: string;
     homeLabel?: string;
     loginLabel?: string;
+    triggerMode?: AccountMenuTriggerMode;
   }>(),
   {
     contextActions: () => [],
@@ -22,6 +24,7 @@ const props = withDefaults(
     homeTo: "",
     homeLabel: "返回主站",
     loginLabel: "登录",
+    triggerMode: "inline",
   },
 );
 
@@ -77,13 +80,16 @@ async function handleLogin(): Promise<void> {
     :utility-actions
     :logout
     :messages="identityAccountMenuMessages"
+    :trigger-mode="triggerMode"
   />
   <UButton
     v-else
     color="neutral"
     variant="ghost"
     icon="i-tabler-login-2"
-    :label="loginLabel"
+    :label="triggerMode === 'collapsed' ? undefined : loginLabel"
+    :square="triggerMode === 'collapsed'"
+    :aria-label="triggerMode === 'collapsed' ? loginLabel : undefined"
     @click="handleLogin"
   />
 </template>
