@@ -9,6 +9,7 @@ import { useMinimumLoading } from '@yueli/ui/feedback'
 import { createAccountNotifier } from '~/utils/feedback'
 import type {
   AssetAdminSection,
+  AssetConsumerRegistrationState,
   AssetAdminStats as Stats,
   AssetGrant as Grant,
   AssetItem,
@@ -16,7 +17,6 @@ import type {
   AssetSite as Site,
   AssetSpaceUsage,
   AssetStorageBackend as StorageBackend,
-  AssetVariant as Variant,
 } from '~/types/asset-admin'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
@@ -47,7 +47,7 @@ interface AssetCollectionQuery {
   mime: string
   task: string
 }
-const sections = ['library', 'sites', 'profiles', 'storage', 'maintenance', 'grants'] as const
+const sections = ['library', 'registrations', 'storage', 'maintenance', 'grants'] as const
 const sorts = ['createdAt', 'filename', 'size'] as const
 const views = ['grid', 'list'] as const
 const pageSizes = [12, 24, 48, 96] as const
@@ -243,6 +243,36 @@ const stats = ref<Stats>({
   activeGrants: 0,
 })
 const spaces = ref<AssetSpaceUsage[]>([])
+const registrationStates = ref<AssetConsumerRegistrationState[]>([])
+const sites = computed<Site[]>(() => registrationStates.value.flatMap((state) => {
+  const registration = state.registration
+  if (!registration) return []
+  return [{
+    siteKey: registration.namespaceKey,
+    name: registration.effective.displayName,
+    defaultStorageBackend: '',
+    enabled: true,
+    assetCount: 0,
+    profileCount: registration.effective.profiles.length,
+    variantCount: registration.effective.profiles.reduce((total, profile) => total + profile.variants.length, 0),
+  }]
+}))
+const profiles = computed<Profile[]>(() => registrationStates.value.flatMap(state =>
+  state.registration?.effective.profiles.map(profile => ({
+    siteKey: state.registration!.namespaceKey,
+    profileKey: profile.key,
+    purpose: profile.purpose,
+    storageBackend: profile.storageBackend || '',
+    allowedExt: profile.allowedMimes.join(','),
+    maxSizeBytes: profile.maxBytes,
+    defaultVisibility: profile.visibility,
+    defaultDeliveryPolicy: profile.visibility === 'public' ? 'public' : 'signed',
+    keepOriginal: profile.keepOriginal,
+    metadataPolicy: profile.metadataPolicy,
+    assetCount: 0,
+    variantCount: profile.variants.length,
+  })) || [],
+))
 const assets = computed(() => assetCollection.value.items)
 const totalAssets = computed(() => assetCollection.value.total)
 function maintenanceSelectedAssetIds() {
@@ -274,42 +304,6 @@ const {
   checkStorageBackendHealth,
   confirmRotateStorageBackendSecret,
 } = useAssetStorageBackends({ reloadAll })
-const {
-  sites,
-  profiles,
-  variants,
-  setConfigurationData,
-  profileOpen,
-  savingProfile,
-  profileForm,
-  editProfile,
-  saveProfile,
-  siteOpen,
-  savingSite,
-  siteForm,
-  editSite,
-  saveSite,
-  variantOpen,
-  savingVariant,
-  variantForm,
-  editVariant,
-  saveVariant,
-  deleteVariantTarget,
-  deleteVariantOpen,
-  deletingVariant,
-  requestDeleteVariant,
-  confirmDeleteVariant,
-  deleteProfileTarget,
-  deleteProfileOpen,
-  deletingProfile,
-  requestDeleteProfile,
-  confirmDeleteProfile,
-} = useAssetConfiguration({
-  storageBackends,
-  currentSiteKey: siteKey,
-  allSiteKey: ALL,
-  reloadAll,
-})
 const {
   grants,
   totalGrants,
@@ -430,16 +424,10 @@ const sectionItems = computed<
     count: stats.value.assets,
   },
   {
-    label: '站点',
-    icon: 'i-tabler-world',
-    value: 'sites',
-    count: stats.value.sites,
-  },
-  {
-    label: 'Profile',
-    icon: 'i-tabler-folder-cog',
-    value: 'profiles',
-    count: stats.value.profiles,
+    label: '消费者注册',
+    icon: 'i-tabler-plug-connected',
+    value: 'registrations',
+    count: registrationStates.value.length,
   },
   {
     label: '存储',
@@ -517,10 +505,6 @@ const spaceOptions = computed(() => [
     value: space.spaceKey,
   })),
 ])
-const modeOptions = [
-  { label: '等比缩放', value: 'resize' },
-  { label: '填充裁剪', value: 'fill' },
-]
 const publicPolicyOptions = [{ label: '公开直链', value: 'public' }]
 const privatePolicyOptions = [
   { label: '短期签名', value: 'signed' },
@@ -529,10 +513,6 @@ const privatePolicyOptions = [
   { label: '门禁', value: 'gated' },
 ]
 const policyOptions = [...publicPolicyOptions, ...privatePolicyOptions]
-const profileAccessLevelOptions = [
-  { label: '公开资源 · 公开直链', value: 'public' },
-  { label: '私有资源 · 签名链接', value: 'private' },
-]
 
 const selectedIds = computed<readonly string[]>(() => (assetCollection.value.selection.mode === 'keys' ? assetCollection.value.selection.keys : []))
 const isPageSelected = computed(() => assetCollection.value.isPageSelected)
@@ -574,22 +554,16 @@ onMounted(async () => {
 async function reloadAll(includeAssets = true) {
   loading.value = true
   try {
-    const [st, spaceData, siteData, backendData, profileData, variantData] = await Promise.all([
+    const [st, spaceData, backendData, registrationData] = await Promise.all([
       call<Stats>('/api/v1/admin/assets-proxy/stats'),
       call<{ items: AssetSpaceUsage[] }>('/api/v1/admin/assets-proxy/spaces'),
-      call<{ items: Site[] }>('/api/v1/admin/assets-proxy/sites'),
       call<{ items: StorageBackend[]; defaultName: string }>('/api/v1/admin/assets-proxy/storage-backends'),
-      call<{ items: Profile[] }>('/api/v1/admin/assets-proxy/profiles'),
-      call<{ items: Variant[] }>('/api/v1/admin/assets-proxy/variants'),
+      call<{ items: AssetConsumerRegistrationState[] }>('/api/v1/admin/assets-proxy/registrations'),
     ])
     stats.value = st
     spaces.value = spaceData.items ?? []
     setStorageBackends(backendData.items ?? [])
-    setConfigurationData({
-      sites: siteData.items ?? [],
-      profiles: profileData.items ?? [],
-      variants: variantData.items ?? [],
-    })
+    registrationStates.value = registrationData.items ?? []
     await Promise.all([...(includeAssets ? [reloadAssets()] : []), fetchGrants(), fetchMaintenanceTasks()])
   } catch (e) {
     toast.add({
@@ -603,18 +577,12 @@ async function reloadAll(includeAssets = true) {
 }
 
 async function refreshAfterMaintenanceTasksSettled() {
-  const [st, siteData, profileData, variantData] = await Promise.all([
+  const [st, registrationData] = await Promise.all([
     call<Stats>('/api/v1/admin/assets-proxy/stats'),
-    call<{ items: Site[] }>('/api/v1/admin/assets-proxy/sites'),
-    call<{ items: Profile[] }>('/api/v1/admin/assets-proxy/profiles'),
-    call<{ items: Variant[] }>('/api/v1/admin/assets-proxy/variants'),
+    call<{ items: AssetConsumerRegistrationState[] }>('/api/v1/admin/assets-proxy/registrations'),
   ])
   stats.value = st
-  setConfigurationData({
-    sites: siteData.items ?? [],
-    profiles: profileData.items ?? [],
-    variants: variantData.items ?? [],
-  })
+  registrationStates.value = registrationData.items ?? []
   await reloadAssets()
 }
 
@@ -624,31 +592,6 @@ function formatBytes(n: number) {
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
   if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`
   return `${(n / 1024 / 1024 / 1024).toFixed(1)} GB`
-}
-function profileActions(profile: Profile): DropdownMenuItem[][] {
-  const inUse = profile.assetCount > 0 || profile.variantCount > 0
-  return [
-    [
-      {
-        label: '编辑',
-        icon: 'i-tabler-pencil',
-        onSelect: () => editProfile(profile),
-      },
-      {
-        label: '批量重建派生图',
-        icon: 'i-tabler-refresh-dot',
-        disabled: !profile.assetCount || batchRebuilding.value,
-        onSelect: () => previewBatchRebuild(profile),
-      },
-      {
-        label: '删除',
-        icon: 'i-tabler-trash',
-        color: 'error',
-        disabled: inUse,
-        onSelect: () => requestDeleteProfile(profile),
-      },
-    ],
-  ]
 }
 function assetActions(asset: AssetItem): DropdownMenuItem[][] {
   return [
@@ -696,23 +639,6 @@ function assetActions(asset: AssetItem): DropdownMenuItem[][] {
     ],
   ]
 }
-function variantActions(variant: Variant): DropdownMenuItem[][] {
-  return [
-    [
-      {
-        label: '编辑',
-        icon: 'i-tabler-pencil',
-        onSelect: () => editVariant(variant),
-      },
-      {
-        label: '删除',
-        icon: 'i-tabler-trash',
-        color: 'error',
-        onSelect: () => requestDeleteVariant(variant),
-      },
-    ],
-  ]
-}
 function grantStatus(grant: Grant): {
   label: string
   color: 'success' | 'warning' | 'error' | 'neutral'
@@ -743,13 +669,10 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
 <template>
   <div>
     <PageHeader title="资源管理">
-      <template #subtitle>共享素材控制面：素材运营、安全授权、配置与存储维护</template>
       <template #actions>
         <div class="flex items-center gap-2">
           <UButton icon="i-tabler-refresh" label="刷新" color="neutral" variant="soft" @click="reloadAll()" />
-          <UButton v-if="tab === 'sites'" icon="i-tabler-world-plus" label="新建站点" @click="editSite()" />
-          <UButton v-else-if="tab === 'profiles'" icon="i-tabler-plus" label="新建 Profile" @click="editProfile()" />
-          <UButton v-else-if="tab === 'storage'" icon="i-tabler-database-plus" label="新建后端" @click="editStorageBackend()" />
+          <UButton v-if="tab === 'storage'" icon="i-tabler-database-plus" label="新建后端" @click="editStorageBackend()" />
           <UButton
             v-else-if="tab === 'maintenance'"
             icon="i-tabler-transfer"
@@ -767,8 +690,8 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
           ['资源', stats.assets],
           ['公开', stats.publicAssets],
           ['私有', stats.privateAssets],
-          ['站点', stats.sites],
-          ['Profile', stats.profiles],
+          ['消费者', registrationStates.length],
+          ['有效用途', registrationStates.reduce((total, item) => total + (item.registration?.effective.profiles.length || 0), 0)],
           ['有效授权', stats.activeGrants],
         ]"
         :key="item[0]"
@@ -877,17 +800,7 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
         @control="controlMaintenanceTask"
       />
 
-      <AssetSitesPanel v-else-if="tab === 'sites'" :sites="sites" @edit="editSite" />
-
-      <AssetProfilesPanel
-        v-else-if="tab === 'profiles'"
-        :profiles="profiles"
-        :variants="variants"
-        :sites="sites"
-        :profile-actions="profileActions"
-        :variant-actions="variantActions"
-        @add-variant="(profile) => editVariant(undefined, profile)"
-      />
+      <AssetRegistrationsPanel v-else-if="tab === 'registrations'" :states="registrationStates" />
 
       <AssetGrantsPanel
         v-else-if="tab === 'grants'"
@@ -898,19 +811,6 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
         :actions-for="grantActions"
       />
     </template>
-
-    <AssetProfileModal
-      v-model:open="profileOpen"
-      :initial-value="profileForm"
-      :sites="sites"
-      :site-options="siteOptions.filter((item) => item.value !== ALL)"
-      :storage-backend-options="storageBackendOptions"
-      :access-level-options="profileAccessLevelOptions"
-      :saving="savingProfile"
-      @save="saveProfile"
-    />
-
-    <AssetSiteModal v-model:open="siteOpen" :initial-value="siteForm" :storage-backend-options="storageBackendOptions" :saving="savingSite" @save="saveSite" />
 
     <AssetStorageBackendModal
       v-model:open="storageBackendOpen"
@@ -941,17 +841,6 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       :backend-name="storageBackendEditingName"
       :rotating="rotatingStorageBackend"
       @confirm="confirmRotateStorageBackendSecret"
-    />
-
-    <AssetVariantModal v-model:open="variantOpen" :initial-value="variantForm" :mode-options="modeOptions" :saving="savingVariant" @save="saveVariant" />
-
-    <AssetDeleteConfirmModal
-      v-model:open="deleteProfileOpen"
-      title="删除 Profile？"
-      description="只有没有素材、没有 Variant 的 Profile 才允许删除。"
-      :subject="deleteProfileTarget?.profileKey"
-      :deleting="deletingProfile"
-      @confirm="confirmDeleteProfile"
     />
 
     <AssetDeleteConfirmModal
@@ -1010,15 +899,6 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       :asset="securityRejectTarget"
       :rejecting="rejectingSecurity"
       @confirm="confirmRejectSecurity"
-    />
-
-    <AssetDeleteConfirmModal
-      v-model:open="deleteVariantOpen"
-      title="删除 Variant？"
-      description="已有文件不会被删除，但之后不会再生成这个派生规格。"
-      :subject="deleteVariantTarget?.variantKey"
-      :deleting="deletingVariant"
-      @confirm="confirmDeleteVariant"
     />
 
     <AssetBatchRebuildModal

@@ -39,8 +39,8 @@ function health(backend: AssetStorageBackend) {
           </div>
           <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 pl-11 text-xs text-muted">
             <span>{{ backend.assetCount || 0 }} 素材</span>
-            <span>{{ backend.siteCount || 0 }} 站点</span>
-            <span>{{ backend.profileCount || 0 }} Profile</span>
+            <span>{{ backend.consumerCount || 0 }} 消费者</span>
+            <span>{{ backend.profileCount || 0 }} 用途</span>
             <span v-if="backend.error" class="text-error">{{ backend.error }}</span>
           </div>
         </div>

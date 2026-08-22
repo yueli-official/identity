@@ -30,7 +30,7 @@ export interface AssetStorageBackend {
   lastHealthError?: string
   lastHealthCheckedAt?: string
   assetCount: number
-  siteCount: number
+  consumerCount: number
   profileCount: number
   error?: string
 }
@@ -326,4 +326,73 @@ export interface CreatedAssetGrant {
   expiresAt: string
 }
 
-export type AssetAdminSection = 'library' | 'sites' | 'profiles' | 'storage' | 'maintenance' | 'grants'
+export interface AssetRegistrationBinding {
+  kind: 'oauth-client' | 'service-client'
+  subject: string
+}
+
+export interface AssetRegistrationVariant {
+  key: string
+  width: number
+  height: number
+  mode: string
+  format: string
+  quality: number
+  visibility: 'public' | 'private'
+  metadataPolicy: 'strip' | 'preserve'
+}
+
+export interface AssetRegistrationProfile {
+  key: string
+  kind: 'public-image' | 'private-original' | 'public-file' | 'private-file'
+  purpose: string
+  allowedMimes: string[]
+  maxBytes: number
+  maxPixels: number
+  visibility: 'public' | 'private'
+  metadataPolicy: 'strip' | 'preserve'
+  keepOriginal: boolean
+  storageClass: string
+  storageBackend?: string
+  variants: AssetRegistrationVariant[]
+}
+
+export interface AssetConsumerDeclaration {
+  consumerKey: string
+  namespaceKey: string
+  displayName: string
+  bindings: AssetRegistrationBinding[]
+  profiles: AssetRegistrationProfile[]
+}
+
+export interface AssetRegistrationFinding {
+  code: string
+  path: string
+}
+
+export interface AssetRegistrationApplication {
+  consumerKey: string
+  revision: number
+  declarationDigest: string
+  declaration: AssetConsumerDeclaration
+  status: 'pending' | 'accepted' | 'rejected'
+  findings: AssetRegistrationFinding[]
+  submittedBy: string
+}
+
+export interface AssetConsumerRegistration {
+  consumerKey: string
+  namespaceKey: string
+  revision: number
+  declarationDigest: string
+  effectiveDigest: string
+  effective: AssetConsumerDeclaration & { profiles: AssetRegistrationProfile[] }
+}
+
+export interface AssetConsumerRegistrationState {
+  consumerKey: string
+  registration?: AssetConsumerRegistration
+  applications: AssetRegistrationApplication[]
+}
+
+export type AssetAdminSection = 'library' | 'registrations' | 'storage' | 'maintenance' | 'grants'
