@@ -5,6 +5,12 @@ import type {
   AssetStorageBackendEvent,
   AssetStorageBackendForm
 } from '~/types/asset-admin'
+import {
+  cosEndpointForRegion,
+  cosPublicBaseURL,
+  normalizeStorageBackendForSubmit,
+  storageBackendDefaultsForType,
+} from '~/utils/asset-storage-backend'
 
 interface SelectOption {
   label: string
@@ -39,14 +45,24 @@ const emit = defineEmits<{
 
 const open = defineModel<boolean>('open', { required: true })
 const form = reactive<AssetStorageBackendForm>({ ...props.initialValue })
+const isCOS = computed(() => form.type === 'cos')
+const cosBucket = computed({
+  get: () => form.bucketPublic || form.bucketPrivate,
+  set: (value: string) => {
+    form.bucketPublic = value
+    form.bucketPrivate = value
+  }
+})
+const cosEndpoint = computed(() => cosEndpointForRegion(form.region))
+const cosPublicURL = computed(() => cosPublicBaseURL(cosBucket.value, form.region))
 
 const canSave = computed(() => Boolean(
   form.name.trim()
   && form.type.trim()
-  && form.endpoint.trim()
   && form.region.trim()
-  && form.bucketPublic.trim()
-  && form.bucketPrivate.trim()
+  && (isCOS.value
+    ? cosBucket.value.trim()
+    : form.endpoint.trim() && form.bucketPublic.trim() && form.bucketPrivate.trim())
   && form.accessKey.trim()
   && (props.editingName || form.secretKey.trim())
 ))
@@ -59,9 +75,14 @@ watch(() => props.initialValue, (value) => {
   if (open.value) Object.assign(form, value)
 }, { deep: true })
 
+watch(() => form.type, (type, previous) => {
+  if (!open.value || props.editingName || type === previous) return
+  Object.assign(form, storageBackendDefaultsForType(type))
+}, { flush: 'sync' })
+
 function submit() {
   if (!canSave.value || props.saving || props.loading) return
-  emit('save', { ...form })
+  emit('save', normalizeStorageBackendForSubmit(form))
 }
 
 function healthBadge() {
@@ -93,7 +114,11 @@ function briefDate(value?: string) {
 </script>
 
 <template>
-  <UModal v-model:open="open" title="S3-compatible 存储后端" description="配置对象存储连接、访问凭据与运行状态。">
+  <UModal
+    v-model:open="open"
+    :title="isCOS ? '腾讯云 COS 存储后端' : '对象存储后端'"
+    description="配置对象存储连接、访问凭据与运行状态。"
+  >
     <template #body>
       <div class="space-y-4">
         <div v-if="editingName" class="rounded-lg border border-default bg-elevated/30 p-3">
@@ -138,24 +163,27 @@ function briefDate(value?: string) {
 
         <div class="grid gap-4 sm:grid-cols-2">
           <UFormField label="后端名称" required>
-            <UInput v-model="form.name" placeholder="s3main" class="w-full" :disabled="!!editingName || loading" />
+            <UInput v-model="form.name" :placeholder="isCOS ? 'tencent-cos' : 's3main'" class="w-full" :disabled="!!editingName || loading" />
           </UFormField>
           <UFormField label="后端类型" required>
-            <USelectMenu v-model="form.type" :items="typeOptions" value-key="value" class="w-full" :disabled="!!editingName || loading" />
+            <USelectMenu v-model="form.type" :items="typeOptions" value-key="value" aria-label="后端类型" class="w-full" :disabled="!!editingName || loading" />
           </UFormField>
-          <UFormField label="Region" required>
-            <UInput v-model="form.region" placeholder="us-east-1" class="w-full" :disabled="loading" />
+          <UFormField label="Region" required :hint="isCOS ? cosEndpoint : undefined">
+            <UInput v-model="form.region" :placeholder="isCOS ? 'ap-shanghai' : 'us-east-1'" class="w-full" :disabled="loading" />
           </UFormField>
-          <UFormField label="Endpoint" required>
+          <UFormField v-if="!isCOS" label="Endpoint" required>
             <UInput v-model="form.endpoint" placeholder="localhost:9000" class="w-full" :disabled="loading" />
           </UFormField>
           <UFormField label="公开访问 Base URL">
-            <UInput v-model="form.publicBaseUrl" placeholder="https://cdn.example.com" class="w-full" :disabled="loading" />
+            <UInput v-model="form.publicBaseUrl" :placeholder="isCOS ? cosPublicURL || '自动生成' : 'https://cdn.example.com'" class="w-full" :disabled="loading" />
           </UFormField>
-          <UFormField label="Public Bucket" required>
+          <UFormField v-if="isCOS" label="Bucket" required>
+            <UInput v-model="cosBucket" placeholder="bucket-1250000000" class="w-full" :disabled="loading" />
+          </UFormField>
+          <UFormField v-if="!isCOS" label="Public Bucket" required>
             <UInput v-model="form.bucketPublic" placeholder="asset-public" class="w-full" :disabled="loading" />
           </UFormField>
-          <UFormField label="Private Bucket" required>
+          <UFormField v-if="!isCOS" label="Private Bucket" required>
             <UInput v-model="form.bucketPrivate" placeholder="asset-private" class="w-full" :disabled="loading" />
           </UFormField>
           <UFormField label="Access Key" required>
@@ -173,13 +201,15 @@ function briefDate(value?: string) {
           </UFormField>
 
           <div class="flex flex-wrap items-center gap-x-5 gap-y-3 sm:col-span-2">
-            <UCheckbox v-model="form.pathStyle" label="Path-style endpoint" :disabled="loading" />
-            <UCheckbox v-model="form.useSsl" label="使用 HTTPS" :disabled="loading" />
+            <UCheckbox v-if="!isCOS" v-model="form.pathStyle" label="Path-style endpoint" :disabled="loading" />
+            <UCheckbox v-if="!isCOS" v-model="form.useSsl" label="使用 HTTPS" :disabled="loading" />
+            <span v-else class="text-xs text-muted">HTTPS · Virtual-hosted-style</span>
             <UCheckbox v-model="form.enabled" label="启用后端" :disabled="loading" />
           </div>
 
           <p class="text-xs text-muted sm:col-span-2">
-            保存时会先连接并注册后端；如果配置不可用，不会写入运行时。编辑已有后端时 Secret Key 留空会沿用旧密钥。
+            {{ isCOS ? 'Endpoint 将根据 Region 自动生成；同一个 Bucket 承担公开与私有对象角色。' : '保存时会先连接并注册后端；如果配置不可用，不会写入运行时。' }}
+            编辑已有后端时 Secret Key 留空会沿用旧密钥。
           </p>
         </div>
 

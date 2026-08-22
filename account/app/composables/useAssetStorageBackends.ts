@@ -7,6 +7,10 @@ import type {
   AssetStorageBackendForm
 } from '~/types/asset-admin'
 import { createAccountNotifier } from '~/utils/feedback'
+import {
+  normalizeStorageBackendForSubmit,
+  storageBackendDefaultsForType,
+} from '~/utils/asset-storage-backend'
 
 interface UseAssetStorageBackendsOptions {
   reloadAll: () => Promise<void>
@@ -32,15 +36,7 @@ export function useAssetStorageBackends(options: UseAssetStorageBackendsOptions)
     name: '',
     type: 's3',
     enabled: true,
-    endpoint: '',
-    region: 'us-east-1',
-    bucketPublic: '',
-    bucketPrivate: '',
-    accessKey: '',
-    secretKey: '',
-    publicBaseUrl: '',
-    pathStyle: true,
-    useSsl: false
+    ...storageBackendDefaultsForType('s3')
   })
 
   const storageBackendTypeItems = [
@@ -54,19 +50,21 @@ export function useAssetStorageBackends(options: UseAssetStorageBackendsOptions)
   }
 
   function assignStorageBackendForm(detail?: Partial<AssetStorageBackendDetail>) {
+    const type = detail?.type || 's3'
+    const defaults = storageBackendDefaultsForType(type)
     Object.assign(storageBackendForm, {
       name: detail?.name || '',
-      type: detail?.type || 's3',
+      type,
       enabled: detail?.enabled ?? true,
-      endpoint: detail?.endpoint || '',
-      region: detail?.region || 'us-east-1',
-      bucketPublic: detail?.bucketPublic || '',
-      bucketPrivate: detail?.bucketPrivate || '',
-      accessKey: detail?.accessKey || '',
-      secretKey: '',
-      publicBaseUrl: detail?.publicBaseUrl || '',
-      pathStyle: detail?.pathStyle ?? true,
-      useSsl: detail?.useSsl ?? false
+      endpoint: detail?.endpoint || defaults.endpoint,
+      region: detail?.region || defaults.region,
+      bucketPublic: detail?.bucketPublic || defaults.bucketPublic,
+      bucketPrivate: detail?.bucketPrivate || defaults.bucketPrivate,
+      accessKey: detail?.accessKey || defaults.accessKey,
+      secretKey: defaults.secretKey,
+      publicBaseUrl: detail?.publicBaseUrl || defaults.publicBaseUrl,
+      pathStyle: detail?.pathStyle ?? defaults.pathStyle,
+      useSsl: detail?.useSsl ?? defaults.useSsl
     })
   }
 
@@ -110,7 +108,7 @@ export function useAssetStorageBackends(options: UseAssetStorageBackendsOptions)
   }
 
   async function saveStorageBackend(value: AssetStorageBackendForm) {
-    Object.assign(storageBackendForm, value)
+    Object.assign(storageBackendForm, normalizeStorageBackendForSubmit(value))
     savingStorageBackend.value = true
     try {
       await call('/api/v1/admin/assets-proxy/storage-backends', { method: 'POST', body: storageBackendForm })

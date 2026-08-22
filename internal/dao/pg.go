@@ -4,6 +4,7 @@ package dao
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -130,6 +131,9 @@ func (p *PG) GetByEmail(ctx context.Context, email string) (model.Identity, erro
 	var out model.Identity
 	err := p.db.Model("identities").Ctx(ctx).
 		Where("email", email).Where("status <>", string(model.StatusDeleted)).Scan(&out)
+	if errors.Is(err, sql.ErrNoRows) {
+		return model.Identity{}, repo.ErrIdentityMissing
+	}
 	if err != nil {
 		return model.Identity{}, err
 	}

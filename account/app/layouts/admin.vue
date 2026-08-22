@@ -96,8 +96,7 @@ async function handleLogout() {
 </script>
 
 <template>
-  <ClientOnly>
-    <YAdminShell
+  <YAdminShell
       v-model:open="sidebarOpen"
       :navigation="navigation"
       :secondary-navigation="secondaryNavigation"
@@ -168,17 +167,7 @@ async function handleLogout() {
           label="返回顶部"
         />
       </div>
-    </YAdminShell>
+  </YAdminShell>
 
-    <AdminStepUpModal />
-
-    <template #fallback>
-      <div
-        class="fixed inset-0 grid place-items-center bg-default text-sm text-muted"
-        role="status"
-      >
-        正在打开管理控制台
-      </div>
-    </template>
-  </ClientOnly>
+  <AdminStepUpModal />
 </template>

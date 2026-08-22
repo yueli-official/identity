@@ -10,6 +10,29 @@ const assetApiBase = (
 
 export default defineNuxtConfig({
   modules: ["@nuxt/ui", "@yueli/ui"],
+  icon: {
+    provider: "none",
+    fallbackToApi: false,
+    serverBundle: { collections: ["tabler"] },
+    clientBundle: {
+      scan: {
+        globInclude: [
+          "app/**/*.{vue,js,mjs,ts,jsx,tsx}",
+          "node_modules/@yueli/**/*.{vue,js,mjs,ts,jsx,tsx}",
+        ],
+        globExclude: [
+          "test/**",
+          "tests/**",
+          "coverage/**",
+          "dist/**",
+          ".nuxt/**",
+          ".output/**",
+          ".*",
+        ],
+      },
+      sizeLimitKb: 256,
+    },
+  },
   css: ["~/assets/css/main.css"],
   vite: {
     optimizeDeps: {

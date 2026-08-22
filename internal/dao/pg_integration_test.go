@@ -4,6 +4,7 @@ package dao_test
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
 
@@ -42,4 +43,13 @@ func TestPGCreateAndGet(t *testing.T) {
 		t.Fatalf("want ErrEmailTaken, got %v", err)
 	}
 	_, _ = db.Model("identities").Ctx(ctx).Where("email", "it@pg.com").Delete()
+}
+
+func TestPGGetByEmailMissingMapsSentinel(t *testing.T) {
+	d := dao.NewPG(newDB(t))
+
+	_, err := d.GetByEmail(context.Background(), "missing-login@example.test")
+	if !errors.Is(err, repo.ErrIdentityMissing) {
+		t.Fatalf("want ErrIdentityMissing, got %v", err)
+	}
 }
