@@ -62,12 +62,7 @@ function applicationColor(application: AssetRegistrationApplication) {
 </script>
 
 <template>
-  <section aria-labelledby="asset-registrations-heading" class="space-y-4">
-    <div class="flex items-center justify-between gap-3">
-      <h2 id="asset-registrations-heading" class="text-sm font-semibold text-highlighted">消费者注册</h2>
-      <UBadge :label="`${states.length} 个消费者`" color="neutral" variant="soft" />
-    </div>
-
+  <section aria-label="消费者注册" class="space-y-4">
     <ManageEmpty v-if="!states.length" icon="i-tabler-file-import" text="还没有消费者提交资源声明" />
 
     <article
@@ -91,12 +86,6 @@ function applicationColor(application: AssetRegistrationApplication) {
               {{ state.consumerKey }} · Namespace {{ namespaceKey(state) }}
             </p>
           </div>
-        </div>
-        <div v-if="state.registration" class="text-sm sm:text-right">
-          <p class="font-medium text-highlighted">Revision {{ state.registration.revision }}</p>
-          <UTooltip :text="state.registration.effectiveDigest">
-            <p class="mt-1 font-mono text-xs text-muted">{{ state.registration.effectiveDigest.slice(0, 12) }}</p>
-          </UTooltip>
         </div>
       </header>
 

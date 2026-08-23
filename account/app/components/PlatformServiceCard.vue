@@ -21,6 +21,12 @@ const tone = computed(() => {
   if (issueCount.value > 0) return { color: 'warning' as const, label: '需关注', icon: 'i-tabler-alert-circle' }
   return { color: 'success' as const, label: '正常', icon: 'i-tabler-circle-check' }
 })
+const serviceErrorMessage = computed(() => {
+  const message = service.error?.message || ''
+  if (/deadline|timeout/i.test(message)) return '服务在规定时间内没有响应'
+  if (/access was denied|forbidden/i.test(message)) return '当前账号无权读取该服务状态'
+  return '服务没有返回可识别的运行状态'
+})
 </script>
 
 <template>
@@ -40,11 +46,11 @@ const tone = computed(() => {
 
     <div v-if="service.manifest" class="grid grid-cols-2 gap-3 text-sm">
       <div class="rounded-lg bg-elevated p-3">
-        <p class="text-xs text-muted">有效能力</p>
+        <p class="text-xs text-muted">可用功能</p>
         <p class="mt-1 font-semibold text-highlighted">{{ effectiveCount }} / {{ capabilityCount }}</p>
       </div>
       <div class="rounded-lg bg-elevated p-3">
-        <p class="text-xs text-muted">Provider</p>
+        <p class="text-xs text-muted">服务来源</p>
         <p class="mt-1 font-semibold text-highlighted">{{ service.manifest.providers.length }}</p>
       </div>
     </div>
@@ -54,14 +60,14 @@ const tone = computed(() => {
       variant="subtle"
       icon="i-tabler-plug-connected-x"
       title="无法读取服务状态"
-      :description="service.error?.message || '服务未返回有效状态'"
+      :description="serviceErrorMessage"
     />
 
     <div class="mt-auto flex items-center justify-between gap-3 border-t border-default pt-4 text-xs text-muted">
       <span>{{ service.latencyMs }} ms</span>
       <ClientOnly>
-        <span v-if="service.manifest">快照 {{ rel(service.manifest.generatedAt) }}</span>
-        <template #fallback><span>快照时间</span></template>
+        <span v-if="service.manifest">更新 {{ rel(service.manifest.generatedAt) }}</span>
+        <template #fallback><span>更新时间</span></template>
       </ClientOnly>
       <UButton
         :to="`/admin/platform/${service.key}`"

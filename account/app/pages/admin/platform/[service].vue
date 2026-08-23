@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PageHeader } from '@yueli/ui/dashboard/pattern'
+import { PageHeader } from '@yueli/ui/admin'
 import { rel } from '~/utils/date'
 import type { PlatformServiceKey, PlatformStatusResponse, RuntimeHealth } from '#shared/types/platform'
 
@@ -14,6 +14,12 @@ if (!validServices.includes(serviceKey.value)) {
 
 const labels: Record<PlatformServiceKey, string> = {
   identity: 'Identity', asset: 'Asset', commerce: 'Commerce', notification: 'Notification',
+}
+const icons: Record<PlatformServiceKey, string> = {
+  identity: 'i-tabler-fingerprint',
+  asset: 'i-tabler-photo-cog',
+  commerce: 'i-tabler-shopping-cart-cog',
+  notification: 'i-tabler-bell-cog',
 }
 const manageLinks: Partial<Record<PlatformServiceKey, string>> = {
   identity: '/admin/users', asset: '/admin/assets',
@@ -41,10 +47,19 @@ const probeMessage = ref('')
 const { call } = useApi()
 
 const healthTone: Record<RuntimeHealth, { color: 'neutral' | 'success' | 'warning' | 'error', label: string }> = {
-  unknown: { color: 'neutral', label: '未探测' },
-  healthy: { color: 'success', label: '健康' },
-  degraded: { color: 'warning', label: '降级' },
-  unhealthy: { color: 'error', label: '异常' },
+  unknown: { color: 'neutral', label: '尚未检查' },
+  healthy: { color: 'success', label: '运行正常' },
+  degraded: { color: 'warning', label: '运行受限' },
+  unhealthy: { color: 'error', label: '运行异常' },
+}
+const configurationLabels: Record<string, string> = {
+  complete: '配置完整', partial: '部分配置缺失', missing: '未配置',
+}
+const enablementLabels: Record<string, string> = {
+  enabled: '已启用', disabled: '未启用',
+}
+const fieldStateLabels: Record<string, string> = {
+  present: '已配置', missing: '缺失',
 }
 
 async function refreshStatus() {
@@ -59,11 +74,11 @@ async function probeProvider(provider: string) {
   try {
     await call(`/api/platform/services/${serviceKey.value}/providers/${encodeURIComponent(provider)}/health-check`, { method: 'POST' })
     await refresh()
-    probeMessage.value = `${provider} 探测完成，状态已刷新`
+    probeMessage.value = `${provider} 连接检查完成，状态已刷新`
   } catch (error) {
     probeError.value = apiErrorMessage(error, {
       context: 'admin',
-      fallback: '暂时无法完成 Provider 探测。',
+      fallback: '暂时无法检查服务来源。',
     })
   } finally {
     probingProvider.value = ''
@@ -72,11 +87,8 @@ async function probeProvider(provider: string) {
 </script>
 
 <template>
-  <div class="space-y-8">
-    <PageHeader :title="labels[serviceKey]">
-      <template #subtitle>
-        运行时能力与 Provider 快照；这里只读展示状态，不复制领域配置真值。
-      </template>
+  <div class="space-y-5">
+    <PageHeader :title="labels[serviceKey]" :icon="icons[serviceKey]">
       <template #actions>
         <UButton to="/admin/platform" icon="i-tabler-arrow-left" label="返回平台" color="neutral" variant="ghost" />
         <UButton v-if="manageLinks[serviceKey]" :to="manageLinks[serviceKey]" icon="i-tabler-settings" label="领域管理" color="neutral" variant="soft" />
@@ -95,7 +107,7 @@ async function probeProvider(provider: string) {
       variant="subtle"
       icon="i-tabler-plug-connected-x"
       title="服务不可用"
-      :description="service?.error?.message || '没有可用的 Capability Manifest。'"
+      description="服务没有返回运行状态，请确认服务已启动且当前账号有读取权限。"
     />
 
     <template v-else>
@@ -106,15 +118,15 @@ async function probeProvider(provider: string) {
             <p class="mt-1 font-mono text-sm font-medium text-highlighted">{{ manifest.service.version }}</p>
           </div>
           <div>
-            <p class="text-xs text-muted">Build SHA</p>
+            <p class="text-xs text-muted">构建标识</p>
             <p class="mt-1 truncate font-mono text-sm font-medium text-highlighted">{{ manifest.service.buildSha }}</p>
           </div>
           <div>
-            <p class="text-xs text-muted">Deployment</p>
+            <p class="text-xs text-muted">部署实例</p>
             <p class="mt-1 truncate font-mono text-sm font-medium text-highlighted">{{ manifest.service.deployment }}</p>
           </div>
           <div>
-            <p class="text-xs text-muted">快照</p>
+            <p class="text-xs text-muted">状态更新时间</p>
             <ClientOnly>
               <p class="mt-1 text-sm font-medium text-highlighted">{{ rel(manifest.generatedAt) }}</p>
               <template #fallback><p class="mt-1 text-sm text-muted">正在同步时间</p></template>
@@ -125,7 +137,7 @@ async function probeProvider(provider: string) {
 
       <section aria-labelledby="capabilities-title">
         <div class="mb-3 flex items-center justify-between gap-3">
-          <h2 id="capabilities-title" class="font-display text-sm font-semibold text-highlighted">运行能力</h2>
+          <h2 id="capabilities-title" class="font-display text-sm font-semibold text-highlighted">可用功能</h2>
           <UBadge color="neutral" variant="soft" :label="`${manifest.capabilities.length} 项`" />
         </div>
         <div class="space-y-3">
@@ -134,13 +146,13 @@ async function probeProvider(provider: string) {
               <div>
                 <div class="flex flex-wrap items-center gap-2">
                   <h3 class="font-mono text-sm font-semibold text-highlighted">{{ capability.key }}</h3>
-                  <UBadge :color="capability.effective ? 'success' : 'warning'" variant="soft" :label="capability.effective ? '有效' : '不可用'" />
+                  <UBadge :color="capability.effective ? 'success' : 'warning'" variant="soft" :label="capability.effective ? '可用' : '需处理'" />
                 </div>
-                <p class="mt-1 text-xs text-muted">契约 {{ capability.contractVersion }} · {{ capability.operations.join(' · ') }}</p>
+                <p class="mt-1 text-xs text-muted">接口版本 {{ capability.contractVersion }} · 支持 {{ capability.operations.length }} 项操作</p>
               </div>
               <div class="flex flex-wrap gap-2">
-                <UBadge color="neutral" variant="outline" :label="`配置 ${capability.configuration}`" />
-                <UBadge color="neutral" variant="outline" :label="`启用 ${capability.enablement}`" />
+                <UBadge color="neutral" variant="outline" :label="configurationLabels[capability.configuration] || capability.configuration" />
+                <UBadge color="neutral" variant="outline" :label="enablementLabels[capability.enablement] || capability.enablement" />
                 <UBadge :color="healthTone[capability.health].color" variant="soft" :label="healthTone[capability.health].label" />
               </div>
             </div>
@@ -151,7 +163,7 @@ async function probeProvider(provider: string) {
                 :color="field.state === 'present' ? 'success' : 'error'"
                 variant="subtle"
                 :icon="field.secret ? 'i-tabler-lock' : 'i-tabler-adjustments'"
-                :label="`${field.key}: ${field.state}`"
+                :label="`${field.key}: ${fieldStateLabels[field.state] || field.state}`"
               />
             </div>
           </UCard>
@@ -160,12 +172,12 @@ async function probeProvider(provider: string) {
 
       <section aria-labelledby="providers-title">
         <div class="mb-3 flex items-center justify-between gap-3">
-          <h2 id="providers-title" class="font-display text-sm font-semibold text-highlighted">Provider 实例</h2>
+          <h2 id="providers-title" class="font-display text-sm font-semibold text-highlighted">服务来源</h2>
           <UBadge color="neutral" variant="soft" :label="`${manifest.providers.length} 项`" />
         </div>
         <div aria-live="polite" aria-atomic="true">
-          <UAlert v-if="probeError" class="mb-4" color="error" variant="subtle" icon="i-tabler-alert-triangle" title="Provider 探测失败" :description="probeError" />
-          <UAlert v-else-if="probeMessage" class="mb-4" color="success" variant="subtle" icon="i-tabler-circle-check" title="Provider 探测完成" :description="probeMessage" />
+          <UAlert v-if="probeError" class="mb-4" color="error" variant="subtle" icon="i-tabler-alert-triangle" title="连接检查失败" :description="probeError" />
+          <UAlert v-else-if="probeMessage" class="mb-4" color="success" variant="subtle" icon="i-tabler-circle-check" title="连接检查完成" :description="probeMessage" />
         </div>
         <div v-if="manifest.providers.length" class="grid gap-4 lg:grid-cols-2">
           <UCard v-for="provider in manifest.providers" :key="provider.key" :ui="{ body: 'space-y-4' }">
@@ -174,13 +186,13 @@ async function probeProvider(provider: string) {
                 <h3 class="truncate font-mono text-sm font-semibold text-highlighted">{{ provider.key }}</h3>
                 <p class="mt-1 text-xs text-muted">{{ provider.adapter }}<template v-if="provider.mode"> · {{ provider.mode }}</template></p>
               </div>
-              <UBadge :color="provider.effective ? 'success' : 'warning'" variant="soft" :label="provider.effective ? '有效' : '不可用'" />
+              <UBadge :color="provider.effective ? 'success' : 'warning'" variant="soft" :label="provider.effective ? '可用' : '需处理'" />
             </div>
             <div class="grid grid-cols-2 gap-3 text-xs">
-              <div class="rounded-lg bg-elevated p-3"><span class="text-muted">注册</span><p class="mt-1 font-medium text-highlighted">{{ provider.registered ? '是' : '否' }}</p></div>
-              <div class="rounded-lg bg-elevated p-3"><span class="text-muted">配置</span><p class="mt-1 font-medium text-highlighted">{{ provider.configuration }}</p></div>
-              <div class="rounded-lg bg-elevated p-3"><span class="text-muted">启用</span><p class="mt-1 font-medium text-highlighted">{{ provider.enablement }}</p></div>
-              <div class="rounded-lg bg-elevated p-3"><span class="text-muted">健康</span><p class="mt-1 font-medium text-highlighted">{{ healthTone[provider.health].label }}</p></div>
+              <div class="rounded-lg bg-elevated p-3"><span class="text-muted">已接入</span><p class="mt-1 font-medium text-highlighted">{{ provider.registered ? '是' : '否' }}</p></div>
+              <div class="rounded-lg bg-elevated p-3"><span class="text-muted">配置状态</span><p class="mt-1 font-medium text-highlighted">{{ configurationLabels[provider.configuration] || provider.configuration }}</p></div>
+              <div class="rounded-lg bg-elevated p-3"><span class="text-muted">启用状态</span><p class="mt-1 font-medium text-highlighted">{{ enablementLabels[provider.enablement] || provider.enablement }}</p></div>
+              <div class="rounded-lg bg-elevated p-3"><span class="text-muted">运行状态</span><p class="mt-1 font-medium text-highlighted">{{ healthTone[provider.health].label }}</p></div>
             </div>
             <div v-if="provider.requiredConfig.length" class="flex flex-wrap gap-2">
               <UBadge
@@ -189,15 +201,12 @@ async function probeProvider(provider: string) {
                 :color="field.state === 'present' ? 'success' : 'error'"
                 variant="subtle"
                 :icon="field.secret ? 'i-tabler-lock' : 'i-tabler-adjustments'"
-                :label="`${field.key}: ${field.state}`"
+                :label="`${field.key}: ${fieldStateLabels[field.state] || field.state}`"
               />
-            </div>
-            <div class="flex flex-wrap gap-1.5">
-              <UBadge v-for="operation in provider.operations" :key="operation" color="neutral" variant="outline" :label="operation" />
             </div>
             <UButton
               icon="i-tabler-heart-rate-monitor"
-              label="主动探测"
+              label="检查连接"
               color="neutral"
               variant="soft"
               size="sm"
@@ -207,30 +216,40 @@ async function probeProvider(provider: string) {
             />
           </UCard>
         </div>
-        <UAlert v-else color="neutral" variant="subtle" icon="i-tabler-package-off" title="该服务没有 Provider Instance" />
+        <UAlert v-else color="neutral" variant="subtle" icon="i-tabler-package-off" title="该服务没有可检查的服务来源" />
       </section>
 
       <section id="management-links" aria-labelledby="management-links-title">
         <div class="mb-3 flex items-center justify-between gap-3">
-          <h2 id="management-links-title" class="font-display text-sm font-semibold text-highlighted">领域管理与服务入口</h2>
-          <UBadge color="neutral" variant="soft" :label="`${domainLinks.length} 项服务声明`" />
+          <h2 id="management-links-title" class="font-display text-sm font-semibold text-highlighted">管理入口</h2>
+          <UBadge color="neutral" variant="soft" :label="`${domainLinks.length} 项接口信息`" />
         </div>
         <UCard :ui="{ body: 'space-y-4' }">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p class="text-sm font-medium text-highlighted">配置真值归所属服务管理</p>
-              <p class="mt-1 text-xs text-muted">控制中心只展示 Manifest 声明，不复制 Provider 配置。</p>
+              <p class="text-sm font-medium text-highlighted">配置由对应服务维护</p>
+              <p class="mt-1 text-xs text-muted">这里汇总运行状态，实际配置仍在对应管理页面修改。</p>
             </div>
             <UButton v-if="manageLinks[serviceKey]" :to="manageLinks[serviceKey]" icon="i-tabler-settings" label="打开管理界面" color="neutral" variant="soft" />
             <UBadge v-else color="warning" variant="subtle" label="尚无统一管理界面" />
           </div>
-          <div v-if="domainLinks.length" class="divide-y divide-default rounded-lg border border-default">
-            <div v-for="link in domainLinks" :key="`${link.rel}:${link.href}`" class="grid gap-1 px-3 py-2.5 sm:grid-cols-[10rem_1fr_auto] sm:items-center">
-              <span class="text-xs font-medium text-muted">{{ link.rel }}</span>
-              <code class="break-all text-xs text-highlighted">{{ link.href }}</code>
-              <UBadge color="neutral" variant="outline" :label="link.source" />
-            </div>
-          </div>
+          <UCollapsible v-if="domainLinks.length">
+            <UButton
+              color="neutral"
+              variant="ghost"
+              trailing-icon="i-tabler-chevron-down"
+              label="查看接口信息"
+            />
+            <template #content>
+              <div class="mt-3 divide-y divide-default rounded-lg border border-default">
+                <div v-for="link in domainLinks" :key="`${link.rel}:${link.href}`" class="grid gap-1 px-3 py-2.5 sm:grid-cols-[10rem_1fr_auto] sm:items-center">
+                  <span class="text-xs font-medium text-muted">{{ link.rel }}</span>
+                  <code class="break-all text-xs text-highlighted">{{ link.href }}</code>
+                  <UBadge color="neutral" variant="outline" :label="link.source" />
+                </div>
+              </div>
+            </template>
+          </UCollapsible>
         </UCard>
       </section>
     </template>

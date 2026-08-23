@@ -3,6 +3,7 @@ import {
   type ProblemParams,
   type RemoteFailure,
 } from '@yueli/http-runtime'
+import { externalLoginProviderMeta } from './external-login'
 
 export type IdentityErrorContext =
   | 'generic'
@@ -36,6 +37,7 @@ export const IDENTITY_ERROR_MESSAGES = {
   'identity.credential_conflict': '该登录账户已经绑定到其他用户。',
   'identity.credential_not_found': '没有找到这项登录方式，请刷新后确认当前状态。',
   'identity.email_taken': '该邮箱已注册，请直接登录或找回密码。',
+  'identity.external_login_provider_invalid': '登录提供商配置不完整，请检查客户端凭据。',
   'identity.forbidden': '你没有执行此操作的权限。',
   'identity.github_binding_attempt_invalid': 'GitHub 绑定请求无效、已过期或已经使用，请重新开始。',
   'identity.github_binding_conflict': '该 GitHub 账户已经绑定到其他用户。',
@@ -59,6 +61,8 @@ export const IDENTITY_ERROR_MESSAGES = {
   'identity.not_authenticated': '登录状态已失效，请重新登录。',
   'identity.not_found': '没有找到该用户，请刷新后确认。',
   'identity.oauth_email_conflict': '该邮箱已有账户，请先用原有方式登录后再绑定。',
+  'identity.oauth_email_unverified': '第三方账户没有提供已验证邮箱，请改用其他登录方式。',
+  'identity.oauth_binding_required': '该第三方账户尚未绑定，请先登录后完成绑定。',
   'identity.oauth_failed': '第三方登录失败，请重试或改用其他登录方式。',
   'identity.oauth_no_email': '第三方账户没有提供可用邮箱，请改用其他登录方式。',
   'identity.passkey_ceremony_invalid': '这枚通行密钥当前无法用于登录。它可能已被移除，或本次请求已过期；请改用其他登录方式。',
@@ -67,6 +71,7 @@ export const IDENTITY_ERROR_MESSAGES = {
   'identity.password_already_set': '该账户已有密码，请使用“修改密码”。',
   'identity.pat_expired': '访问令牌已过期，请创建新令牌。',
   'identity.pat_invalid': '访问令牌无效。',
+  'identity.pat_insufficient_scope': '访问令牌缺少执行此操作所需的权限。',
   'identity.pat_limit_reached': '访问令牌数量已达上限，请先移除不再使用的令牌。',
   'identity.pat_name_required': '请填写访问令牌名称。',
   'identity.pat_not_found': '没有找到该访问令牌，请刷新后确认。',
@@ -297,28 +302,36 @@ export type OAuthRedirectAction = 'login' | 'register' | 'bind'
 export function oauthRedirectErrorMessage(
   error: unknown,
   action: OAuthRedirectAction,
+  providerKey?: unknown,
 ): string {
   const code = Array.isArray(error) ? error[0] : error
   if (typeof code !== 'string' || !code) return ''
+  const provider = externalLoginProviderMeta(
+    typeof providerKey === 'string' ? providerKey : 'google',
+  ).label
   if (action === 'bind') {
     return code === 'oauth_bind'
-      ? 'Google 账户绑定失败；该账户可能已绑定到其他用户，请刷新后确认。'
-      : 'Google 账户绑定失败，请重新开始。'
+      ? `${provider} 账户绑定失败；该账户可能已绑定到其他用户，请刷新后确认。`
+      : `${provider} 账户绑定失败，请重新开始。`
   }
 
   const fallback = action === 'register' ? '邮箱注册' : '邮箱登录'
   switch (code) {
     case 'oauth_unavailable':
-      return `Google 登录在当前环境未配置，请使用${fallback}。`
+      return `${provider} 登录当前不可用，请使用${fallback}。`
     case 'oauth_state':
       return '第三方登录请求已失效，请重新开始。'
     case 'oauth_denied':
-      return `你已取消 Google 授权；可以重新尝试或使用${fallback}。`
+      return `你已取消 ${provider} 授权；可以重新尝试或使用${fallback}。`
     case 'oauth_exchange':
     case 'oauth_userinfo':
-      return `暂时无法从 Google 获取账户信息，请重试或使用${fallback}。`
+      return `暂时无法从 ${provider} 获取账户信息，请重试或使用${fallback}。`
+    case 'oauth_link_required':
+      return `该邮箱已有月离账户，请先使用邮箱登录，再绑定 ${provider}。`
+    case 'oauth_binding_required':
+      return `该 ${provider} 尚未绑定月离账户，请先使用其他方式登录后绑定。`
     case 'oauth_login':
-      return `Google 登录未完成，请重试或使用${fallback}。`
+      return `${provider} 登录未完成，请重试或使用${fallback}。`
     default:
       return `第三方登录失败，请重试或使用${fallback}。`
   }

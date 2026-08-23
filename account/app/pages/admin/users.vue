@@ -10,7 +10,7 @@ import {
 import { CollectionPanel } from '@yueli/ui/collection/pattern'
 import { useVueCollectionWorkflow } from '@yueli/ui/collection/vue'
 import { createVueRouterCollectionQuerySync } from '@yueli/ui/collection/vue-router'
-import { PageHeader } from '@yueli/ui/dashboard/pattern'
+import { PageHeader } from '@yueli/ui/admin'
 import { useMinimumLoading } from '@yueli/ui/feedback'
 import { abs } from '~/utils/date'
 import { createAccountNotifier } from '~/utils/feedback'
@@ -533,23 +533,10 @@ const userLabel = (user: AdminUser) => user.displayName || user.email
 </script>
 
 <template>
-  <div>
-    <PageHeader title="用户管理">
-      <template #subtitle>Identity 全局账户 —— 状态、凭据与控制面管理员</template>
+  <div class="space-y-5">
+    <PageHeader title="用户管理" icon="i-tabler-users">
       <template #actions>
-        <div class="flex items-center gap-3">
-          <div class="hidden items-center gap-2 sm:flex">
-            <div class="rounded-lg border border-default bg-default px-3 py-1.5 text-center">
-              <div class="text-base font-semibold text-highlighted tabular-nums">{{ stats.total }}</div>
-              <div class="text-xs text-muted">总用户</div>
-            </div>
-            <div class="rounded-lg border border-error/20 bg-error/5 px-3 py-1.5 text-center">
-              <div class="text-base font-semibold text-error tabular-nums">{{ stats.disabled }}</div>
-              <div class="text-xs text-error/80">已封禁</div>
-            </div>
-          </div>
-          <UButton icon="i-tabler-user-plus" label="新建用户" size="sm" @click="openCreate" />
-        </div>
+        <UButton icon="i-tabler-user-plus" label="新建用户" @click="openCreate" />
       </template>
     </PageHeader>
 

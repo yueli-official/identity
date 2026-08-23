@@ -10,9 +10,19 @@ const { call } = useApi()
 const { refresh } = useSession()
 const error = ref('')
 const loading = ref(false)
+const { data: externalProviderData } = await useAsyncData(
+  'external-login-providers',
+  () => call<{ entries: ExternalLoginProvider[] }>('/api/v1/auth/oauth/providers'),
+  { default: () => ({ entries: [] }) },
+)
+const registrationProviders = computed(() =>
+  externalProviderData.value.entries.filter(
+    provider => provider.registrationPolicy === 'verified_email',
+  ),
+)
 
 const oauthError = computed(() => {
-  return oauthRedirectErrorMessage(route.query.error, 'register')
+  return oauthRedirectErrorMessage(route.query.error, 'register', route.query.provider)
 })
 
 const returnTo = computed(() => String(route.query.return_to ?? '/'))
@@ -81,14 +91,16 @@ async function onSubmit(e: FormSubmitEvent<Schema>) {
           <UButton type="submit" label="注册" block size="lg" :loading="loading" />
         </UForm>
 
-        <USeparator label="或" class="my-4" />
+        <USeparator v-if="registrationProviders.length" label="或" class="my-4" />
         <UButton
+          v-for="provider in registrationProviders"
+          :key="provider.key"
           block
           color="neutral"
           variant="outline"
-          icon="i-tabler-brand-google"
-          label="使用 Google 登录"
-          :to="`/api/v1/auth/oauth/google/start?return_to=${encodeURIComponent(returnTo)}`"
+          :icon="externalLoginProviderMeta(provider.key).icon"
+          :label="`使用 ${provider.label} 注册`"
+          :to="`/api/v1/auth/oauth/${provider.key}/start?return_to=${encodeURIComponent(returnTo)}`"
           external
         />
       </UCard>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PageHeader } from '@yueli/ui/dashboard/pattern'
+import { PageHeader } from '@yueli/ui/admin'
 import { rel } from '~/utils/date'
 import type { CapabilityGapReason, PlatformStatusResponse } from '#shared/types/platform'
 
@@ -27,12 +27,18 @@ const attentionCount = computed(() =>
 )
 const gapLabels: Record<CapabilityGapReason, string> = {
   service_unavailable: '服务不可达',
-  capability_missing: '能力未声明',
+  capability_missing: '缺少所需功能',
   unsupported: '当前不支持',
   version_incompatible: '版本不兼容',
   configuration_incomplete: '配置不完整',
   disabled: '未启用',
   unhealthy: '运行异常',
+}
+const configurationLabels: Record<string, string> = {
+  complete: '配置完整', partial: '部分配置缺失', missing: '未配置',
+}
+const healthLabels: Record<string, string> = {
+  healthy: '运行正常', degraded: '运行受限', unhealthy: '运行异常', unknown: '尚未检查',
 }
 
 async function refreshStatus() {
@@ -42,11 +48,8 @@ async function refreshStatus() {
 </script>
 
 <template>
-  <div class="space-y-8">
-    <PageHeader title="平台状态">
-      <template #subtitle>
-        集中查看基础服务、运行时能力和 Provider 状态；配置修改仍由各领域管理页负责。
-      </template>
+  <div class="space-y-5">
+    <PageHeader title="平台状态" icon="i-tabler-activity-heartbeat">
       <template #actions>
         <UButton
           label="刷新状态"
@@ -80,10 +83,9 @@ async function refreshStatus() {
     <template v-else-if="data">
       <section aria-labelledby="platform-summary-title">
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 id="platform-summary-title" class="font-display text-sm font-semibold text-highlighted">运行摘要</h2>
+          <h2 id="platform-summary-title" class="font-display text-sm font-semibold text-highlighted">整体状态</h2>
           <div class="flex flex-wrap items-center gap-2 text-xs text-muted">
             <UBadge color="neutral" variant="soft" :label="data.environment" />
-            <span class="font-mono">{{ data.catalogFingerprint.slice(0, 12) }}</span>
             <ClientOnly>
               <span>更新于 {{ rel(data.observedAt) }}</span>
               <template #fallback><span>刚刚更新</span></template>
@@ -92,21 +94,21 @@ async function refreshStatus() {
         </div>
         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <UCard>
-            <p class="text-xs text-muted">基础服务</p>
+            <p class="text-xs text-muted">已连接服务</p>
             <p class="mt-2 text-2xl font-semibold text-highlighted">{{ data.summary.available }} / {{ data.summary.total }}</p>
           </UCard>
           <UCard>
-            <p class="text-xs text-muted">有效能力</p>
+            <p class="text-xs text-muted">可用功能</p>
             <p class="mt-2 text-2xl font-semibold text-success">{{ data.summary.effectiveCapabilities }}</p>
           </UCard>
           <UCard>
-            <p class="text-xs text-muted">启用能力异常</p>
+            <p class="text-xs text-muted">功能异常</p>
             <p class="mt-2 text-2xl font-semibold" :class="data.summary.capabilityIssues ? 'text-warning' : 'text-success'">
               {{ data.summary.capabilityIssues }}
             </p>
           </UCard>
           <UCard>
-            <p class="text-xs text-muted">不可达服务</p>
+            <p class="text-xs text-muted">未连接服务</p>
             <p class="mt-2 text-2xl font-semibold" :class="data.summary.available === data.summary.total ? 'text-success' : 'text-error'">
               {{ data.summary.total - data.summary.available }}
             </p>
@@ -119,20 +121,20 @@ async function refreshStatus() {
         color="warning"
         variant="subtle"
         icon="i-tabler-alert-triangle"
-        :title="`${attentionCount} 项运行问题需要检查`"
-        :description="`${unavailableServices} 个服务不可达，${data.summary.capabilityIssues} 项启用能力无效，${data.summary.applicationGaps} 项应用能力契约未满足。`"
+        :title="`${attentionCount} 项状态需要处理`"
+        :description="`${unavailableServices} 个服务未连接，${data.summary.capabilityIssues} 项功能不可用，${data.summary.applicationGaps} 项应用依赖未满足。`"
       />
       <UAlert
         v-else
         color="success"
         variant="subtle"
         icon="i-tabler-circle-check"
-        title="平台能力与应用契约均处于可用状态"
-        description="所有基础服务可达，已启用能力有效，Catalog 中声明的应用要求均已满足。"
+        title="平台服务运行正常"
+        description="所有基础服务均已连接，已启用功能和应用依赖都处于正常状态。"
       />
 
       <section aria-labelledby="platform-services-title">
-        <h2 id="platform-services-title" class="font-display mb-3 text-sm font-semibold text-highlighted">基础服务</h2>
+        <h2 id="platform-services-title" class="font-display mb-3 text-sm font-semibold text-highlighted">服务状态</h2>
         <div class="grid gap-4 lg:grid-cols-2">
           <PlatformServiceCard v-for="service in services" :key="service.key" :service />
         </div>
@@ -140,8 +142,8 @@ async function refreshStatus() {
 
       <section aria-labelledby="application-requirements-title">
         <div class="mb-3 flex items-center justify-between gap-3">
-          <h2 id="application-requirements-title" class="font-display text-sm font-semibold text-highlighted">应用能力契约</h2>
-          <UBadge :color="data.summary.applicationGaps ? 'warning' : 'success'" variant="soft" :label="`${data.summary.applicationGaps} 项缺口`" />
+          <h2 id="application-requirements-title" class="font-display text-sm font-semibold text-highlighted">应用依赖</h2>
+          <UBadge :color="data.summary.applicationGaps ? 'warning' : 'success'" variant="soft" :label="`${data.summary.applicationGaps} 项未满足`" />
         </div>
         <div v-if="data.applications.length" class="grid gap-4 lg:grid-cols-2">
           <UCard v-for="application in data.applications" :key="application.site" :ui="{ body: 'space-y-4' }">
@@ -150,13 +152,13 @@ async function refreshStatus() {
                 <h3 class="truncate text-sm font-semibold text-highlighted">{{ application.brand || application.site }}</h3>
                 <p class="mt-1 font-mono text-xs text-muted">{{ application.site }} · {{ application.productType }}</p>
               </div>
-              <UBadge :color="application.satisfied ? 'success' : 'warning'" variant="soft" :label="application.satisfied ? '契约满足' : '存在缺口'" />
+              <UBadge :color="application.satisfied ? 'success' : 'warning'" variant="soft" :label="application.satisfied ? '依赖正常' : '依赖缺失'" />
             </div>
             <div class="space-y-2">
               <div v-for="requirement in application.requirements" :key="requirement.key" class="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-elevated px-3 py-2">
                 <div class="min-w-0">
                   <p class="break-all font-mono text-xs font-medium text-highlighted">{{ requirement.key }}</p>
-                  <p class="mt-0.5 text-xs text-muted">要求 {{ requirement.constraint }}<template v-if="requirement.actualVersion"> · 当前 {{ requirement.actualVersion }}</template></p>
+                  <p class="mt-0.5 text-xs text-muted">需要版本 {{ requirement.constraint }}<template v-if="requirement.actualVersion"> · 当前提供 {{ requirement.actualVersion }}</template></p>
                 </div>
                 <UBadge
                   :color="requirement.satisfied ? 'success' : 'error'"
@@ -168,12 +170,19 @@ async function refreshStatus() {
             </div>
           </UCard>
         </div>
-        <UAlert v-else color="neutral" variant="subtle" icon="i-tabler-list-check" title="Catalog 尚未声明应用能力契约" />
+        <UAlert
+          v-else
+          color="neutral"
+          variant="subtle"
+          icon="i-tabler-list-check"
+          title="尚未配置应用依赖"
+          description="当前没有应用声明它依赖哪些基础功能，不影响服务本身运行。"
+        />
       </section>
 
       <section aria-labelledby="platform-issues-title">
         <div class="mb-3 flex items-center justify-between gap-3">
-          <h2 id="platform-issues-title" class="font-display text-sm font-semibold text-highlighted">启用能力异常</h2>
+          <h2 id="platform-issues-title" class="font-display text-sm font-semibold text-highlighted">功能异常</h2>
           <UBadge :color="issues.length ? 'warning' : 'success'" variant="soft" :label="`${issues.length} 项`" />
         </div>
         <UCard v-if="issues.length" :ui="{ body: 'divide-y divide-default p-0 sm:p-0' }">
@@ -185,12 +194,15 @@ async function refreshStatus() {
           >
             <div class="min-w-0">
               <p class="truncate text-sm font-medium text-highlighted">{{ issue.capability.key }}</p>
-              <p class="truncate text-xs text-muted">{{ issue.service }} · {{ issue.capability.configuration }} · {{ issue.capability.health }}</p>
+              <p class="truncate text-xs text-muted">
+                {{ issue.service }} · {{ configurationLabels[issue.capability.configuration] || issue.capability.configuration }} ·
+                {{ healthLabels[issue.capability.health] || issue.capability.health }}
+              </p>
             </div>
             <UIcon name="i-tabler-chevron-right" class="size-4 shrink-0 text-muted" />
           </NuxtLink>
         </UCard>
-        <UAlert v-else color="success" variant="subtle" icon="i-tabler-circle-check" title="所有已启用且受支持的能力均有效" />
+        <UAlert v-else color="success" variant="subtle" icon="i-tabler-circle-check" title="所有已启用功能均可用" />
       </section>
     </template>
   </div>

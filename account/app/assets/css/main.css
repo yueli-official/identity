@@ -1,3 +1,26 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
+@import "@yueli/ui/tailwind.css";
 @import "@yueli/ui/theme.css";
+
+@layer components {
+  .account-admin-shell {
+    --yueli-admin-shell: oklch(98.8% 0.003 80);
+    --yueli-admin-canvas: oklch(97.1% 0.005 80);
+    --yueli-admin-search: oklch(95.8% 0.006 80);
+    --yueli-surface-page: var(--yueli-admin-canvas);
+    --yueli-surface-region: oklch(98.2% 0.004 80);
+    --yueli-surface-card: oklch(99.8% 0.002 80);
+    --yueli-surface-inset: oklch(95.8% 0.006 80);
+  }
+
+  .dark .account-admin-shell {
+    --yueli-admin-shell: oklch(15.5% 0.014 225);
+    --yueli-admin-canvas: oklch(12.8% 0.014 225);
+    --yueli-admin-search: oklch(25.8% 0.019 225);
+    --yueli-surface-page: var(--yueli-admin-canvas);
+    --yueli-surface-region: oklch(17.8% 0.015 225);
+    --yueli-surface-card: oklch(21.2% 0.017 225);
+    --yueli-surface-inset: oklch(25.8% 0.019 225);
+  }
+}

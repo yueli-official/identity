@@ -81,13 +81,9 @@ function canCancel(task: AssetMaintenanceTask) {
 </script>
 
 <template>
-  <section class="space-y-4" aria-labelledby="asset-maintenance-heading">
-    <div class="rounded-lg border border-default bg-default p-4">
-      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 id="asset-maintenance-heading" class="text-sm font-semibold text-highlighted">维护任务</h2>
-          <p class="mt-1 text-xs text-muted">低频清理、扫描和迁移操作集中在这里执行，并保留可恢复的任务记录。</p>
-        </div>
+  <section class="space-y-4" aria-label="维护任务">
+    <div>
+      <div class="rounded-xl bg-muted/45 p-3 sm:flex sm:items-center sm:justify-end">
         <div class="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:justify-end">
           <UButton icon="i-tabler-broom" label="清理暂存" color="neutral" variant="soft" size="sm" :loading="sweeping" @click="emit('sweepStaging')" />
           <UButton icon="i-tabler-unlink" label="清理无引用" color="neutral" variant="soft" size="sm" :loading="pruning" @click="emit('previewPrune')" />
@@ -95,7 +91,7 @@ function canCancel(task: AssetMaintenanceTask) {
         </div>
       </div>
 
-      <div class="mt-4 overflow-hidden rounded-lg border border-default bg-elevated/30">
+      <div class="mt-4 overflow-hidden rounded-lg border border-default bg-default">
         <div class="flex items-center justify-between border-b border-default px-3 py-2">
           <h3 class="text-xs font-medium text-muted">最近维护</h3>
           <UTooltip text="刷新任务">

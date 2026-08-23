@@ -33,18 +33,7 @@ function auditText(grant: AssetGrant) {
 </script>
 
 <template>
-  <section class="space-y-4" aria-labelledby="asset-grants-heading">
-    <div>
-      <h2
-        id="asset-grants-heading"
-        class="text-sm font-semibold text-highlighted"
-      >
-        交付授权
-      </h2>
-      <p class="mt-1 text-xs text-muted">
-        查看私有素材的签发用途、使用次数、有效期与撤销状态。
-      </p>
-    </div>
+  <section class="space-y-4" aria-label="交付授权">
     <ManageEmpty
       v-if="!grants.length"
       icon="i-tabler-key-off"

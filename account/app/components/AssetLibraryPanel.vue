@@ -42,6 +42,7 @@ const {
   task,
   controllingTaskId = "",
   actionsFor,
+  previewFor,
 } = defineProps<{
   assets: readonly AssetItem[];
   total: number;
@@ -65,6 +66,7 @@ const {
   task?: AssetMaintenanceTask;
   controllingTaskId?: string;
   actionsFor: (asset: AssetItem) => DropdownMenuItem[][];
+  previewFor: (asset: AssetItem) => string;
 }>();
 
 const emit = defineEmits<{
@@ -294,8 +296,8 @@ function formatBytes(value: number) {
             class="relative aspect-[4/3] overflow-hidden border-b border-default bg-elevated"
           >
             <img
-              v-if="asset.cdnUrl && asset.mime.startsWith('image/')"
-              :src="asset.cdnUrl"
+              v-if="previewFor(asset)"
+              :src="previewFor(asset)"
               :alt="asset.filename"
               loading="lazy"
               class="size-full object-cover transition duration-300 hover:scale-[1.03]"
@@ -362,8 +364,8 @@ function formatBytes(value: number) {
             class="hidden size-14 place-items-center overflow-hidden rounded-lg bg-elevated sm:grid"
           >
             <img
-              v-if="asset.cdnUrl && asset.mime.startsWith('image/')"
-              :src="asset.cdnUrl"
+              v-if="previewFor(asset)"
+              :src="previewFor(asset)"
               :alt="asset.filename"
               loading="lazy"
               class="size-full object-cover"

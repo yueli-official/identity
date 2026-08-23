@@ -20,6 +20,15 @@ describe("admin users mobile filters", () => {
     expect(source).not.toContain("<style scoped>");
   });
 
+  it("uses the shared content-page header without duplicate metrics or prose", () => {
+    expect(source).toContain(
+      '<PageHeader title="用户管理" icon="i-tabler-users">',
+    );
+    expect(source).not.toContain("<template #subtitle>");
+    expect(source).not.toContain("总用户</div>");
+    expect(source).not.toContain("已封禁</div>");
+  });
+
   it("keeps row actions touch friendly on mobile", () => {
     expect(source).toContain(
       'class="min-h-11 min-w-11 touch-manipulation sm:min-h-0 sm:min-w-0"',

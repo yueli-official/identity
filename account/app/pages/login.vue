@@ -13,6 +13,12 @@ const loading = ref(false)
 const passkeyLoading = ref(false)
 const passkeyAvailable = ref(false)
 const passkeys = usePasskeys()
+const { data: externalProviderData } = await useAsyncData(
+  'external-login-providers',
+  () => call<{ entries: ExternalLoginProvider[] }>('/api/v1/auth/oauth/providers'),
+  { default: () => ({ entries: [] }) },
+)
+const externalProviders = computed(() => externalProviderData.value.entries)
 const mfaTransaction = ref(String(route.query.mfa_transaction ?? ''))
 const mfaExpiresAt = ref('')
 const mfaCode = ref('')
@@ -41,7 +47,7 @@ onMounted(() => {
 // Surface an error handed back via the query string (e.g. an OAuth redirect that
 // failed) so the "Sign in with Google" button never silently appears dead.
 const oauthError = computed(() => {
-  return oauthRedirectErrorMessage(route.query.error, 'login')
+  return oauthRedirectErrorMessage(route.query.error, 'login', route.query.provider)
 })
 
 const returnTo = computed(() => String(route.query.return_to ?? '/'))
@@ -265,12 +271,14 @@ function cancelPasskeyLogin() {
             @click="onPasskeyLogin"
           />
           <UButton
+            v-for="provider in externalProviders"
+            :key="provider.key"
             block
             color="neutral"
             variant="outline"
-            icon="i-tabler-brand-google"
-            label="使用 Google 登录"
-            :to="`/api/v1/auth/oauth/google/start?return_to=${encodeURIComponent(returnTo)}`"
+            :icon="externalLoginProviderMeta(provider.key).icon"
+            :label="`使用 ${provider.label} 登录`"
+            :to="`/api/v1/auth/oauth/${provider.key}/start?return_to=${encodeURIComponent(returnTo)}`"
             external
           />
         </div>

@@ -4,13 +4,11 @@ import { SkeletonList } from '~/components/manage'
 import { createCollectionRouteQueryCodec, createJsonCollectionQueryPolicy, type CollectionPanelState, type CollectionWorkflow } from '@yueli/ui/collection'
 import { useVueCollectionWorkflow } from '@yueli/ui/collection/vue'
 import { createVueRouterCollectionQuerySync } from '@yueli/ui/collection/vue-router'
-import { PageHeader } from '@yueli/ui/dashboard/pattern'
+import { PageHeader, TabbedSurface } from '@yueli/ui/admin'
 import { useMinimumLoading } from '@yueli/ui/feedback'
-import { createAccountNotifier } from '~/utils/feedback'
 import type {
   AssetAdminSection,
   AssetConsumerRegistrationState,
-  AssetAdminStats as Stats,
   AssetGrant as Grant,
   AssetItem,
   AssetProfile as Profile,
@@ -23,12 +21,30 @@ definePageMeta({ layout: 'admin', middleware: 'admin' })
 useSeoMeta({ title: '资源管理 · 控制台' })
 
 const { call } = useApi()
-const toast = createAccountNotifier(useToast())
 const router = useRouter()
 const ALL = '__all__' as const
 
 const mounted = ref(false)
 const loading = ref(true)
+const sectionReady = reactive<Record<Exclude<AssetAdminSection, 'library'>, boolean>>({
+  registrations: false,
+  storage: false,
+  maintenance: false,
+  grants: false,
+})
+const sectionLoading = reactive<Record<Exclude<AssetAdminSection, 'library'>, boolean>>({
+  registrations: true,
+  storage: true,
+  maintenance: true,
+  grants: true,
+})
+const sectionIssues = reactive<Record<AssetAdminSection, string>>({
+  library: '',
+  registrations: '',
+  storage: '',
+  maintenance: '',
+  grants: '',
+})
 type AssetSort = 'createdAt' | 'filename' | 'size'
 type AssetDirection = 'asc' | 'desc'
 type AssetView = 'grid' | 'list'
@@ -234,14 +250,6 @@ watch(q, (value) => {
 onScopeDispose(() => {
   if (searchTimer) clearTimeout(searchTimer)
 })
-const stats = ref<Stats>({
-  assets: 0,
-  publicAssets: 0,
-  privateAssets: 0,
-  sites: 0,
-  profiles: 0,
-  activeGrants: 0,
-})
 const spaces = ref<AssetSpaceUsage[]>([])
 const registrationStates = ref<AssetConsumerRegistrationState[]>([])
 const sites = computed<Site[]>(() => registrationStates.value.flatMap((state) => {
@@ -407,45 +415,53 @@ const {
   showQueuedTask: showQueuedMaintenanceTask,
   reloadAll,
 })
-const showSkeleton = useMinimumLoading(computed(() => !mounted.value || loading.value))
+const currentSectionIssue = computed(() => sectionIssues[tab.value])
+const currentSectionLoading = computed(() =>
+  tab.value === 'library' ? assetPending.value : sectionLoading[tab.value],
+)
+const showSkeleton = useMinimumLoading(computed(() => {
+  if (!mounted.value) return true
+  if (tab.value === 'library') return false
+  return sectionLoading[tab.value] && !sectionReady[tab.value]
+}))
 const enabledStorageBackends = computed(() => storageBackends.value.filter((b) => b.enabled !== false))
 const sectionItems = computed<
   Array<{
     label: string
     icon: string
     value: AssetAdminSection
-    count: number
+    badge: number | string
   }>
 >(() => [
   {
     label: '素材库',
     icon: 'i-tabler-photo',
     value: 'library',
-    count: stats.value.assets,
+    badge: ['idle', 'loading'].includes(assetCollection.value.loadState) ? '—' : totalAssets.value,
   },
   {
     label: '消费者注册',
     icon: 'i-tabler-plug-connected',
     value: 'registrations',
-    count: registrationStates.value.length,
+    badge: sectionReady.registrations ? registrationStates.value.length : '—',
   },
   {
     label: '存储',
     icon: 'i-tabler-database',
     value: 'storage',
-    count: storageBackends.value.length,
+    badge: sectionReady.storage ? storageBackends.value.length : '—',
   },
   {
     label: '维护',
     icon: 'i-tabler-tool',
     value: 'maintenance',
-    count: activeMaintenanceCount.value || maintenanceTasks.value.length,
+    badge: sectionReady.maintenance ? activeMaintenanceCount.value || maintenanceTasks.value.length : '—',
   },
   {
     label: '授权',
     icon: 'i-tabler-key',
     value: 'grants',
-    count: stats.value.activeGrants,
+    badge: sectionReady.grants ? totalGrants.value : '—',
   },
 ])
 
@@ -533,7 +549,7 @@ function submitAssetSearch(value: string) {
 }
 
 const assetPending = computed(
-  () => assetCollection.value.loadState === 'loading' || assetCollection.value.loadState === 'refreshing' || assetCollection.value.loadState === 'idle',
+  () => assetCollection.value.loadState === 'loading' || assetCollection.value.loadState === 'idle',
 )
 const showLibrarySkeleton = useMinimumLoading(computed(() => !mounted.value || assetPending.value))
 const libraryState = computed<CollectionPanelState>(() => {
@@ -548,42 +564,79 @@ function openMaintenanceTaskList() {
 
 onMounted(async () => {
   mounted.value = true
-  await reloadAll(false)
+  await reloadAll()
 })
+
+async function loadSection(
+  key: Exclude<AssetAdminSection, 'library'>,
+  load: () => Promise<void>,
+) {
+  sectionLoading[key] = true
+  sectionIssues[key] = ''
+  try {
+    await load()
+    sectionReady[key] = true
+  } catch (error) {
+    sectionIssues[key] = apiErrorMessage(error, {
+      fallback: '暂时无法加载当前资源数据，请检查服务状态后重试。',
+    })
+  } finally {
+    sectionLoading[key] = false
+  }
+}
+
+async function reloadSection(key: AssetAdminSection) {
+  if (key === 'library') {
+    sectionIssues.library = ''
+    try {
+      const spaceData = await call<{ items: AssetSpaceUsage[] }>('/api/v1/admin/assets-proxy/spaces')
+      spaces.value = spaceData.items ?? []
+      await reloadAssets()
+    } catch (error) {
+      sectionIssues.library = apiErrorMessage(error, {
+        fallback: '暂时无法加载素材库，请检查服务状态后重试。',
+      })
+    }
+    return
+  }
+  if (key === 'registrations') {
+    await loadSection(key, async () => {
+      const data = await call<{ items: AssetConsumerRegistrationState[] }>('/api/v1/admin/assets-proxy/registrations')
+      registrationStates.value = data.items ?? []
+    })
+    return
+  }
+  if (key === 'storage') {
+    await loadSection(key, async () => {
+      const data = await call<{ items: StorageBackend[]; defaultName: string }>('/api/v1/admin/assets-proxy/storage-backends')
+      setStorageBackends(data.items ?? [])
+    })
+    return
+  }
+  if (key === 'maintenance') {
+    await loadSection(key, fetchMaintenanceTasks)
+    return
+  }
+  await loadSection(key, fetchGrants)
+}
 
 async function reloadAll(includeAssets = true) {
   loading.value = true
   try {
-    const [st, spaceData, backendData, registrationData] = await Promise.all([
-      call<Stats>('/api/v1/admin/assets-proxy/stats'),
-      call<{ items: AssetSpaceUsage[] }>('/api/v1/admin/assets-proxy/spaces'),
-      call<{ items: StorageBackend[]; defaultName: string }>('/api/v1/admin/assets-proxy/storage-backends'),
-      call<{ items: AssetConsumerRegistrationState[] }>('/api/v1/admin/assets-proxy/registrations'),
+    await Promise.all([
+      ...(includeAssets ? [reloadSection('library')] : []),
+      reloadSection('registrations'),
+      reloadSection('storage'),
+      reloadSection('maintenance'),
+      reloadSection('grants'),
     ])
-    stats.value = st
-    spaces.value = spaceData.items ?? []
-    setStorageBackends(backendData.items ?? [])
-    registrationStates.value = registrationData.items ?? []
-    await Promise.all([...(includeAssets ? [reloadAssets()] : []), fetchGrants(), fetchMaintenanceTasks()])
-  } catch (e) {
-    toast.add({
-      title: '资源后台加载失败',
-      description: apiErrorMessage(e, { fallback: '暂时无法加载资源后台。' }),
-      color: 'error',
-    })
   } finally {
     loading.value = false
   }
 }
 
 async function refreshAfterMaintenanceTasksSettled() {
-  const [st, registrationData] = await Promise.all([
-    call<Stats>('/api/v1/admin/assets-proxy/stats'),
-    call<{ items: AssetConsumerRegistrationState[] }>('/api/v1/admin/assets-proxy/registrations'),
-  ])
-  stats.value = st
-  registrationStates.value = registrationData.items ?? []
-  await reloadAssets()
+  await Promise.all([reloadSection('library'), reloadSection('registrations')])
 }
 
 function formatBytes(n: number) {
@@ -592,6 +645,25 @@ function formatBytes(n: number) {
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
   if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`
   return `${(n / 1024 / 1024 / 1024).toFixed(1)} GB`
+}
+const previewVariantPreference = ['thumbnail', 'card', 'inline', 'home', 'content', 'og']
+function assetPreviewURL(asset: AssetItem) {
+  if (!asset.mediaKey || asset.visibility !== 'public' || !asset.mime.startsWith('image/')) return ''
+  const registration = registrationStates.value.find((state) =>
+    state.registration?.namespaceKey === asset.siteKey,
+  )?.registration
+  const variants = registration?.effective.profiles.find((profile) =>
+    profile.key === asset.profileKey,
+  )?.variants.filter((variant) => variant.visibility === 'public') || []
+  const variant = [...variants].sort((left, right) => {
+    const leftIndex = previewVariantPreference.indexOf(left.key)
+    const rightIndex = previewVariantPreference.indexOf(right.key)
+    return (leftIndex < 0 ? previewVariantPreference.length : leftIndex)
+      - (rightIndex < 0 ? previewVariantPreference.length : rightIndex)
+  })[0]
+  if (!variant) return ''
+  const format = variant.format.toLowerCase() === 'jpeg' ? 'jpg' : variant.format.toLowerCase()
+  return `/media/${asset.mediaKey}?format=${encodeURIComponent(format)}&name=${encodeURIComponent(variant.key)}`
 }
 function assetActions(asset: AssetItem): DropdownMenuItem[][] {
   return [
@@ -610,9 +682,10 @@ function assetActions(asset: AssetItem): DropdownMenuItem[][] {
       {
         label: '打开文件',
         icon: 'i-tabler-external-link',
-        disabled: asset.securityState !== 'ready' || !asset.cdnUrl,
+        disabled: asset.securityState !== 'ready' || !assetPreviewURL(asset),
         onSelect: () => {
-          if (asset.cdnUrl) window.open(asset.cdnUrl, '_blank')
+          const url = assetPreviewURL(asset)
+          if (url) window.open(url, '_blank')
         },
       },
       {
@@ -667,11 +740,21 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
 </script>
 
 <template>
-  <div>
-    <PageHeader title="资源管理">
+  <div class="w-full space-y-5">
+    <PageHeader title="资源管理" icon="i-tabler-photo-cog">
       <template #actions>
         <div class="flex items-center gap-2">
-          <UButton icon="i-tabler-refresh" label="刷新" color="neutral" variant="soft" @click="reloadAll()" />
+          <UTooltip text="刷新资源数据">
+            <UButton
+              icon="i-tabler-refresh"
+              color="neutral"
+              variant="ghost"
+              square
+              :loading="loading"
+              aria-label="刷新资源数据"
+              @click="reloadAll()"
+            />
+          </UTooltip>
           <UButton v-if="tab === 'storage'" icon="i-tabler-database-plus" label="新建后端" @click="editStorageBackend()" />
           <UButton
             v-else-if="tab === 'maintenance'"
@@ -684,135 +767,143 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       </template>
     </PageHeader>
 
-    <div class="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-      <div
-        v-for="item in [
-          ['资源', stats.assets],
-          ['公开', stats.publicAssets],
-          ['私有', stats.privateAssets],
-          ['消费者', registrationStates.length],
-          ['有效用途', registrationStates.reduce((total, item) => total + (item.registration?.effective.profiles.length || 0), 0)],
-          ['有效授权', stats.activeGrants],
-        ]"
-        :key="item[0]"
-        class="rounded-lg border border-default bg-default px-4 py-3"
-      >
-        <div class="text-xs text-muted">{{ item[0] }}</div>
-        <div class="mt-1 text-xl font-semibold text-highlighted tabular-nums">
-          {{ item[1] }}
-        </div>
-      </div>
-    </div>
-
-    <div class="mb-5 flex flex-wrap items-center gap-2">
-      <UButton
-        v-for="item in sectionItems"
-        :key="item.value"
-        :label="`${item.label} · ${item.count}`"
-        :icon="item.icon"
-        :color="tab === item.value ? 'primary' : 'neutral'"
-        :variant="tab === item.value ? 'solid' : 'ghost'"
-        @click="
-          () => {
-            tab = item.value
-          }
-        "
-      />
-    </div>
-
-    <UAlert
-      v-if="operationFeedback"
-      class="mb-5"
-      :color="operationFeedback.tone"
-      variant="subtle"
-      :icon="operationFeedback.tone === 'warning' ? 'i-tabler-alert-triangle' : 'i-tabler-circle-check'"
-      :title="operationFeedback.title"
-      :description="operationFeedback.description"
-      role="status"
+    <TabbedSurface
+      v-model="tab"
+      :items="sectionItems"
+      navigation-label="资源管理分区"
+      data-asset-control-surface
     >
-      <template #actions>
-        <UButton label="关闭" color="neutral" variant="ghost" size="xs" @click="dismissOperationFeedback" />
-      </template>
-    </UAlert>
+      <div v-if="operationFeedback" class="border-b border-default px-4 py-3 sm:px-5">
+        <UAlert
+          :color="operationFeedback.tone"
+          variant="subtle"
+          :icon="operationFeedback.tone === 'warning' ? 'i-tabler-alert-triangle' : 'i-tabler-circle-check'"
+          :title="operationFeedback.title"
+          :description="operationFeedback.description"
+          role="status"
+        >
+          <template #actions>
+            <UButton label="关闭" color="neutral" variant="ghost" size="xs" @click="dismissOperationFeedback" />
+          </template>
+        </UAlert>
+      </div>
 
-    <AssetLibraryPanel
-      v-if="tab === 'library'"
-      v-model:search="searchInput"
-      v-model:space-key="spaceKey"
-      v-model:site-key="siteKey"
-      v-model:profile-key="profileKey"
-      v-model:visibility="visibility"
-      v-model:mime="mime"
-      v-model:sort="sort"
-      v-model:direction="direction"
-      v-model:view="libraryView"
-      v-model:page="page"
-      v-model:page-size="size"
-      :assets="assets"
-      :total="totalAssets"
-      :filter-count="activeLibraryFilterCount"
-      :space-options="spaceOptions"
-      :site-options="siteOptions"
-      :profile-options="profileOptions"
-      :visibility-options="visibilityOptions"
-      :mime-options="mimeOptions"
-      :sort-options="sortOptions"
-      :selected-ids="selectedIds"
-      :page-selected="isPageSelected"
-      :page-indeterminate="isPageIndeterminate"
-      :page-size-items="pageSizeItems"
-      :sites="sites"
-      :state="libraryState"
-      :error-message="libraryErrorMessage"
-      :queueing="queueingSelectedRebuild"
-      :queue-error="selectedRebuildError"
-      :task-id="selectedTaskId"
-      :task="selectedTask"
-      :controlling-task-id="controllingMaintenanceTaskId"
-      :actions-for="assetActions"
-      @search="submitAssetSearch"
-      @retry="reloadAssets"
-      @toggle-one="toggleOne"
-      @toggle-page="togglePage"
-      @queue-selected="queueSelectedRebuild"
-      @clear-selection="clearSelection"
-      @task-action="controlSelectedTask"
-      @open-maintenance="openMaintenanceTaskList"
-      @dismiss-task="dismissSelectedTask"
-    />
+      <div v-if="currentSectionIssue" class="border-b border-default px-4 py-3 sm:px-5">
+        <UAlert
+          color="error"
+          variant="subtle"
+          icon="i-tabler-alert-circle"
+          title="资源数据加载失败"
+          :description="currentSectionIssue"
+        >
+          <template #actions>
+            <UButton
+              label="重新加载"
+              color="neutral"
+              variant="outline"
+              size="xs"
+              :loading="currentSectionLoading"
+              @click="reloadSection(tab)"
+            />
+          </template>
+        </UAlert>
+      </div>
 
-    <SkeletonList v-else-if="showSkeleton" :rows="8" />
-
-    <template v-else>
-      <AssetStoragePanel v-if="tab === 'storage'" :backends="storageBackends" @edit="editStorageBackend" />
-
-      <AssetMaintenancePanel
-        v-else-if="tab === 'maintenance'"
-        :tasks="maintenanceTasks"
+      <LazyAssetLibraryPanel
+        v-if="tab === 'library'"
+        v-model:search="searchInput"
+        v-model:space-key="spaceKey"
+        v-model:site-key="siteKey"
+        v-model:profile-key="profileKey"
+        v-model:visibility="visibility"
+        v-model:mime="mime"
+        v-model:sort="sort"
+        v-model:direction="direction"
+        v-model:view="libraryView"
+        v-model:page="page"
+        v-model:page-size="size"
+        class="p-3 sm:p-5"
+        :assets="assets"
+        :total="totalAssets"
+        :filter-count="activeLibraryFilterCount"
+        :space-options="spaceOptions"
+        :site-options="siteOptions"
+        :profile-options="profileOptions"
+        :visibility-options="visibilityOptions"
+        :mime-options="mimeOptions"
+        :sort-options="sortOptions"
+        :selected-ids="selectedIds"
+        :page-selected="isPageSelected"
+        :page-indeterminate="isPageIndeterminate"
+        :page-size-items="pageSizeItems"
+        :sites="sites"
+        :state="libraryState"
+        :error-message="libraryErrorMessage"
+        :queueing="queueingSelectedRebuild"
+        :queue-error="selectedRebuildError"
+        :task-id="selectedTaskId"
+        :task="selectedTask"
         :controlling-task-id="controllingMaintenanceTaskId"
-        :sweeping="sweepingStaging"
-        :pruning="pruningUnreferenced"
-        :auditing="auditingOrphanObjects"
-        @refresh="fetchMaintenanceTasks"
-        @sweep-staging="sweepStaging"
-        @preview-prune="previewPruneUnreferenced"
-        @preview-orphans="previewOrphanObjects"
-        @control="controlMaintenanceTask"
+        :actions-for="assetActions"
+        :preview-for="assetPreviewURL"
+        @search="submitAssetSearch"
+        @retry="reloadAssets"
+        @toggle-one="toggleOne"
+        @toggle-page="togglePage"
+        @queue-selected="queueSelectedRebuild"
+        @clear-selection="clearSelection"
+        @task-action="controlSelectedTask"
+        @open-maintenance="openMaintenanceTaskList"
+        @dismiss-task="dismissSelectedTask"
       />
 
-      <AssetRegistrationsPanel v-else-if="tab === 'registrations'" :states="registrationStates" />
+      <div v-else-if="showSkeleton" class="p-3 sm:p-5">
+        <SkeletonList :rows="7" />
+      </div>
 
-      <AssetGrantsPanel
-        v-else-if="tab === 'grants'"
-        v-model:page="grantPage"
-        :grants="grants"
-        :total="totalGrants"
-        :page-size="grantPageSize"
-        :actions-for="grantActions"
-      />
-    </template>
+      <template v-else>
+        <LazyAssetStoragePanel
+          v-if="tab === 'storage'"
+          class="p-4 sm:p-5"
+          :backends="storageBackends"
+          @edit="editStorageBackend"
+        />
 
-    <AssetStorageBackendModal
+        <LazyAssetMaintenancePanel
+          v-else-if="tab === 'maintenance'"
+          class="p-4 sm:p-5"
+          :tasks="maintenanceTasks"
+          :controlling-task-id="controllingMaintenanceTaskId"
+          :sweeping="sweepingStaging"
+          :pruning="pruningUnreferenced"
+          :auditing="auditingOrphanObjects"
+          @refresh="fetchMaintenanceTasks"
+          @sweep-staging="sweepStaging"
+          @preview-prune="previewPruneUnreferenced"
+          @preview-orphans="previewOrphanObjects"
+          @control="controlMaintenanceTask"
+        />
+
+        <LazyAssetRegistrationsPanel
+          v-else-if="tab === 'registrations'"
+          class="p-4 sm:p-5"
+          :states="registrationStates"
+        />
+
+        <LazyAssetGrantsPanel
+          v-else-if="tab === 'grants'"
+          v-model:page="grantPage"
+          class="p-4 sm:p-5"
+          :grants="grants"
+          :total="totalGrants"
+          :page-size="grantPageSize"
+          :actions-for="grantActions"
+        />
+      </template>
+    </TabbedSurface>
+
+    <LazyAssetStorageBackendModal
+      v-if="storageBackendOpen"
       v-model:open="storageBackendOpen"
       :initial-value="storageBackendForm"
       :editing-name="storageBackendEditingName"
@@ -829,21 +920,24 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       @delete="deleteStorageBackendOpen = true"
     />
 
-    <AssetStorageBackendDeleteModal
+    <LazyAssetStorageBackendDeleteModal
+      v-if="deleteStorageBackendOpen"
       v-model:open="deleteStorageBackendOpen"
       :backend-name="storageBackendEditingName"
       :deleting="deletingStorageBackend"
       @confirm="confirmDeleteStorageBackend"
     />
 
-    <AssetStorageBackendRotateModal
+    <LazyAssetStorageBackendRotateModal
+      v-if="rotateStorageBackendOpen"
       v-model:open="rotateStorageBackendOpen"
       :backend-name="storageBackendEditingName"
       :rotating="rotatingStorageBackend"
       @confirm="confirmRotateStorageBackendSecret"
     />
 
-    <AssetDeleteConfirmModal
+    <LazyAssetDeleteConfirmModal
+      v-if="deleteAssetOpen"
       v-model:open="deleteAssetOpen"
       title="删除素材？"
       description="原文件、派生图和相关交付授权会一并失效。"
@@ -852,7 +946,8 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       @confirm="confirmDeleteAsset"
     />
 
-    <AssetPruneModal
+    <LazyAssetPruneModal
+      v-if="pruneOpen"
       v-model:open="pruneOpen"
       :initial-value="pruneForm"
       :preview="prunePreview"
@@ -861,7 +956,8 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       @confirm="confirmPruneUnreferenced"
     />
 
-    <AssetOrphanObjectsModal
+    <LazyAssetOrphanObjectsModal
+      v-if="orphanObjectsOpen"
       v-model:open="orphanObjectsOpen"
       :initial-value="orphanObjectsForm"
       :preview="orphanObjectsPreview"
@@ -871,7 +967,8 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       @confirm="confirmPruneOrphanObjects"
     />
 
-    <AssetStorageMigrationModal
+    <LazyAssetStorageMigrationModal
+      v-if="storageMigrationOpen"
       v-model:open="storageMigrationOpen"
       :initial-value="storageMigrationForm"
       :preview="storageMigrationPreview"
@@ -881,9 +978,16 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       @confirm="confirmStorageMigration"
     />
 
-    <AssetReferencesModal v-model:open="referencesOpen" :asset-id="referenceAsset?.id" :references="references" :loading="loadingReferences" />
+    <LazyAssetReferencesModal
+      v-if="referencesOpen"
+      v-model:open="referencesOpen"
+      :asset-id="referenceAsset?.id"
+      :references="references"
+      :loading="loadingReferences"
+    />
 
-    <AssetSecurityModal
+    <LazyAssetSecurityModal
+      v-if="securityOpen"
       v-model:open="securityOpen"
       :asset="securityAsset"
       :detail="securityDetail"
@@ -894,14 +998,16 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       @delete="deleteFromSecurity"
     />
 
-    <AssetSecurityRejectModal
+    <LazyAssetSecurityRejectModal
+      v-if="securityRejectOpen"
       v-model:open="securityRejectOpen"
       :asset="securityRejectTarget"
       :rejecting="rejectingSecurity"
       @confirm="confirmRejectSecurity"
     />
 
-    <AssetBatchRebuildModal
+    <LazyAssetBatchRebuildModal
+      v-if="batchRebuildOpen"
       v-model:open="batchRebuildOpen"
       :profile="batchRebuildProfile"
       :preview="batchRebuildPreview"
@@ -911,7 +1017,8 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       @confirm="confirmBatchRebuild"
     />
 
-    <AssetGrantModal
+    <LazyAssetGrantModal
+      v-if="createGrantOpen"
       v-model:open="createGrantOpen"
       :asset-id="grantAsset?.id"
       :initial-value="grantForm"
@@ -921,6 +1028,12 @@ function grantActions(grant: Grant): DropdownMenuItem[][] {
       @create="createGrant"
     />
 
-    <AssetRevokeGrantModal v-model:open="revokeGrantOpen" :asset-id="revokeGrantTarget?.assetId" :revoking="revokingGrant" @confirm="confirmRevokeGrant" />
+    <LazyAssetRevokeGrantModal
+      v-if="revokeGrantOpen"
+      v-model:open="revokeGrantOpen"
+      :asset-id="revokeGrantTarget?.assetId"
+      :revoking="revokingGrant"
+      @confirm="confirmRevokeGrant"
+    />
   </div>
 </template>

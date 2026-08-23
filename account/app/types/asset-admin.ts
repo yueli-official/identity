@@ -112,6 +112,7 @@ export interface AssetVariant {
 
 export interface AssetItem {
   id: string
+  mediaKey?: string
   visibility: string
   filename: string
   mime: string

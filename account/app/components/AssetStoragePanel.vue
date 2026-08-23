@@ -13,15 +13,7 @@ function health(backend: AssetStorageBackend) {
 </script>
 
 <template>
-  <section class="space-y-4" aria-labelledby="asset-storage-heading">
-    <div>
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <h2 id="asset-storage-heading" class="text-sm font-semibold text-highlighted">存储后端</h2>
-        <UBadge :label="`${backends.length} 个后端`" color="neutral" variant="soft" />
-      </div>
-      <p class="mt-1 text-xs text-muted">站点上传会落到自己的默认后端；未配置或异常的后端不能用于新上传。</p>
-    </div>
-
+  <section aria-label="存储后端">
     <ManageEmpty v-if="!backends.length" icon="i-tabler-database-off" text="还没有存储后端" />
     <div v-else class="overflow-hidden rounded-lg border border-default bg-default">
       <div v-for="backend in backends" :key="backend.name" class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-default px-4 py-3 last:border-b-0">
