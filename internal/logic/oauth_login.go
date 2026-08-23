@@ -8,18 +8,20 @@ import (
 	"github.com/yueli-official/identity/internal/authentication"
 	"github.com/yueli-official/identity/internal/iderr"
 	"github.com/yueli-official/identity/internal/model"
+	"github.com/yueli-official/identity/internal/oauthlogin"
 	"github.com/yueli-official/identity/internal/repo"
 )
 
 type OAuthLoginInput struct {
-	Provider      string
-	ProviderUID   string
-	Email         string
-	EmailVerified bool
-	DisplayName   string
-	Locale        string
-	UserAgent     string
-	IP            string
+	Provider           string
+	ProviderUID        string
+	Email              string
+	EmailVerified      bool
+	DisplayName        string
+	Locale             string
+	UserAgent          string
+	IP                 string
+	RegistrationPolicy oauthlogin.RegistrationPolicy
 }
 
 // OAuthLogin resolves (or links/creates) the identity behind an external provider
@@ -90,30 +92,26 @@ func (s *Service) OAuthLogin(ctx context.Context, in OAuthLoginInput) (LoginOutp
 // credential link was found. Returns the resolved identity, a bool indicating
 // whether it was newly created (implicit-register), and any error.
 func (s *Service) resolveOAuthIdentity(ctx context.Context, in OAuthLoginInput, email string) (model.Identity, bool, error) {
+	policy := in.RegistrationPolicy
+	if policy == "" {
+		policy = oauthlogin.RegistrationVerifiedEmail
+	}
+	if policy == oauthlogin.RegistrationExistingOnly {
+		return model.Identity{}, false, iderr.OAuthBindingRequired(in.Provider)
+	}
 	if email == "" {
 		return model.Identity{}, false, iderr.OAuthNoEmail()
 	}
-	existing, gerr := s.store.GetByEmail(ctx, email)
+	if !in.EmailVerified {
+		return model.Identity{}, false, iderr.OAuthEmailUnverified()
+	}
+	_, gerr := s.store.GetByEmail(ctx, email)
 	switch {
 	case gerr == nil:
-		// verified email matches an existing identity → link; unverified → refuse.
-		if !in.EmailVerified {
-			return model.Identity{}, false, iderr.OAuthEmailConflict(email)
-		}
-		if existing.Status != model.StatusActive {
-			return model.Identity{}, false, iderr.AccountDisabled()
-		}
-		if lerr := s.store.LinkOAuthCredential(ctx, existing.ID, in.Provider, in.ProviderUID, email, true); lerr != nil {
-			return model.Identity{}, false, lerr
-		}
-		s.audit(ctx, AuditEvent{
-			Event:    EvCredentialLinked,
-			ActorID:  existing.ID,
-			TargetID: existing.ID,
-			Email:    existing.Email,
-			Detail:   map[string]any{"provider": in.Provider},
-		})
-		return existing, false, nil
+		// A verified provider email is sufficient to create a new account, but it
+		// is not proof that the caller controls an existing Yueli account with the
+		// same address. Linking requires an authenticated bind flow and step-up.
+		return model.Identity{}, false, iderr.OAuthEmailConflict(email)
 	case errors.Is(gerr, repo.ErrIdentityMissing):
 		// no collision → implicit register (NEW identity, not a link)
 		id, cerr := s.store.CreateOAuthIdentity(ctx, repo.NewOAuthIdentityInput{

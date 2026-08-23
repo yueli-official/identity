@@ -272,6 +272,35 @@ func TestRevokeSession_UnknownHidden(t *testing.T) {
 	}
 }
 
+func TestLogoutOtherSessions_PreservesCurrentAndRevokesTheRest(t *testing.T) {
+	ctx := context.Background()
+	_, svc, identityID, currentSessionID := setupAccount(t)
+	second, err := svc.Login(ctx, logic.LoginInput{
+		Email: "u@e.com", Password: "correct horse battery", IP: "10.0.0.2",
+	})
+	if err != nil {
+		t.Fatalf("second login: %v", err)
+	}
+	third, err := svc.Login(ctx, logic.LoginInput{
+		Email: "u@e.com", Password: "correct horse battery", IP: "10.0.0.3",
+	})
+	if err != nil {
+		t.Fatalf("third login: %v", err)
+	}
+
+	if err := svc.LogoutOtherSessions(ctx, identityID, currentSessionID); err != nil {
+		t.Fatalf("logout other sessions: %v", err)
+	}
+	if _, err := svc.Me(ctx, currentSessionID); err != nil {
+		t.Fatalf("current session was revoked: %v", err)
+	}
+	for _, sessionID := range []string{second.SessionID, third.SessionID} {
+		if _, err := svc.Me(ctx, sessionID); err == nil {
+			t.Fatalf("other session %q remained active", sessionID)
+		}
+	}
+}
+
 func mustHash(t *testing.T, store *repo.Memory, id string) string {
 	t.Helper()
 	h, err := store.GetPasswordHash(context.Background(), id)

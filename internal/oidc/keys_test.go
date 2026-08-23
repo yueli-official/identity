@@ -62,6 +62,36 @@ func TestMintServiceTokenRejectsEmptyAudience(t *testing.T) {
 	}
 }
 
+func TestMintServiceTokenIdentifiesClientActor(t *testing.T) {
+	ctx := context.Background()
+	m, err := oidc.NewManager(ctx, repo.NewMemory())
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := m.MintServiceToken(
+		"https://identity.test", "identity-svc", "asset-api",
+		"platform:capabilities:read", time.Minute, time.Now(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	verifier, err := foundationauth.NewVerifier(foundationauth.Config{
+		Keys: m, Issuer: "https://identity.test", Audiences: []string{"asset-api"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	principal, err := verifier.Verify(ctx, raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if principal.SubjectKind != foundationauth.SubjectClient ||
+		principal.ClientID != "identity-svc" ||
+		!principal.HasScope("platform:capabilities:read") {
+		t.Fatalf("service principal = %+v", principal)
+	}
+}
+
 func TestBootstrapGeneratesActiveKeyWhenEmpty(t *testing.T) {
 	ctx := context.Background()
 	r := repo.NewMemory()

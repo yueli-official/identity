@@ -203,6 +203,40 @@ func (m *Manager) MintDelegatedUserToken(issuer, subject, audience, scope string
 	return builder.CompactSerialize()
 }
 
+// MintServiceToken self-signs a short-lived client-actor access token for
+// first-party control-plane calls. The caller must already have authorized the
+// initiating user before minting this token; downstream services authorize the
+// client through the requested scope rather than inheriting user roles.
+func (m *Manager) MintServiceToken(issuer, clientID, audience, scope string, ttl time.Duration, now time.Time) (string, error) {
+	clientID = strings.TrimSpace(clientID)
+	if clientID == "" {
+		return "", fmt.Errorf("service token client id is required")
+	}
+	audience = strings.TrimSpace(audience)
+	if audience == "" {
+		return "", fmt.Errorf("service token audience is required")
+	}
+	sig, err := jose.NewSigner(
+		jose.SigningKey{Algorithm: jose.RS256, Key: m.activeKey},
+		(&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", m.activeKID),
+	)
+	if err != nil {
+		return "", err
+	}
+	claims := jwt.Claims{
+		Issuer: issuer, Subject: clientID, Audience: jwt.Audience{audience},
+		IssuedAt: jwt.NewNumericDate(now), NotBefore: jwt.NewNumericDate(now),
+		Expiry: jwt.NewNumericDate(now.Add(ttl)),
+	}
+	extra := map[string]interface{}{
+		"client_id": clientID, "subject_kind": "client",
+	}
+	if scope != "" {
+		extra["scope"] = scope
+	}
+	return jwt.Signed(sig).Claims(claims).Claims(extra).CompactSerialize()
+}
+
 func (m *Manager) MintGuestToken(issuer, subject, clientID, audience string, ttl time.Duration, now time.Time) (string, error) {
 	if strings.TrimSpace(subject) == "" || strings.TrimSpace(clientID) == "" || strings.TrimSpace(audience) == "" {
 		return "", fmt.Errorf("guest token subject, client id and audience are required")

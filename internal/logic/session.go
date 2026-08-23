@@ -180,3 +180,22 @@ func (s *Service) LogoutAll(ctx context.Context, identityID string) error {
 	})
 	return nil
 }
+
+// LogoutOtherSessions revokes every active session owned by identityID except
+// currentSessionID. A session remains an authentication event, so this method
+// never merges records by IP or user agent.
+func (s *Service) LogoutOtherSessions(ctx context.Context, identityID, currentSessionID string) error {
+	sessions, err := s.store.ListSessionsByIdentity(ctx, identityID)
+	if err != nil {
+		return err
+	}
+	for _, session := range sessions {
+		if session.ID == currentSessionID {
+			continue
+		}
+		if err := s.RevokeSession(ctx, identityID, session.ID); err != nil {
+			return err
+		}
+	}
+	return nil
+}

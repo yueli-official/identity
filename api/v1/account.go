@@ -61,6 +61,8 @@ type SetPasswordRes struct{}
 
 type SessionListReq struct {
 	g.Meta `path:"/api/v1/session/list" method:"get" tags:"account" summary:"List own login sessions"`
+	Limit  int `json:"limit" in:"query"`
+	Offset int `json:"offset" in:"query"`
 }
 
 type SessionEntry struct {
@@ -73,7 +75,9 @@ type SessionEntry struct {
 }
 
 type SessionListRes struct {
+	Current *SessionEntry  `json:"current,omitempty"`
 	Entries []SessionEntry `json:"entries"`
+	Total   int            `json:"total"`
 }
 
 type RevokeSessionReq struct {
@@ -88,6 +92,12 @@ type LogoutAllReq struct {
 }
 
 type LogoutAllRes struct{}
+
+type LogoutOthersReq struct {
+	g.Meta `path:"/api/v1/auth/logout-others" method:"post" tags:"account" summary:"Log out other sessions"`
+}
+
+type LogoutOthersRes struct{}
 
 // ── Credentials (login methods: password + bound oauth) ─────────────────────
 

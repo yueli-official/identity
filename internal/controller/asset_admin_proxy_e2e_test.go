@@ -183,3 +183,92 @@ func TestAssetAdminProxyAcceptsVerifiedAdminBearerAndAdminCookie(t *testing.T) {
 		})
 	}
 }
+
+func TestPlatformCapabilityProxyUsesScopedClientActor(t *testing.T) {
+	ctx := context.Background()
+	store := repo.NewMemory()
+	service := logic.New(store, logic.DefaultConfig())
+	baseController := controller.New(service, false)
+	admin, err := service.Register(ctx, logic.RegisterInput{
+		Email: "platform-admin@example.test", Password: "correct horse battery",
+		DisplayName: "Platform admin",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.GrantRole(ctx, admin.ID, logic.AdminRole); err != nil {
+		t.Fatal(err)
+	}
+	login, err := service.Login(ctx, logic.LoginInput{
+		Email: admin.Email, Password: "correct horse battery",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager, err := oidc.NewManager(ctx, store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const issuer = "https://identity.example.test"
+	const audience = "asset-api"
+	verifier, err := coreauth.NewVerifier(coreauth.Config{
+		Keys: manager, Issuer: issuer, Audiences: []string{audience},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var upstreamCalls atomic.Int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		upstreamCalls.Add(1)
+		raw := strings.TrimPrefix(request.Header.Get("Authorization"), "Bearer ")
+		principal, verifyErr := verifier.Verify(request.Context(), raw)
+		if verifyErr != nil {
+			http.Error(writer, verifyErr.Error(), http.StatusUnauthorized)
+			return
+		}
+		if principal.SubjectKind != coreauth.SubjectClient ||
+			principal.ClientID != "identity-svc" ||
+			!principal.HasScope("platform:capabilities:read") {
+			http.Error(writer, "expected scoped client actor", http.StatusForbidden)
+			return
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"manifest":{"service":{"name":"asset"}}}`))
+	}))
+	defer upstream.Close()
+	proxy, err := controller.NewPlatformCapabilityProxy(
+		baseController, manager, issuer,
+		map[string]controller.CapabilityProxyTarget{
+			"asset": {BaseURL: upstream.URL, Audience: audience},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := g.Server(t.Name())
+	server.SetAddr("127.0.0.1:0")
+	server.SetDumpRouterMap(false)
+	server.Group("/", func(group *ghttp.RouterGroup) {
+		group.Middleware(identityruntime.APIMiddleware)
+		group.ALL("/api/v1/admin/platform-proxy/*", proxy.Forward)
+	})
+	server.Start()
+	defer server.Shutdown()
+	request, err := http.NewRequestWithContext(
+		ctx, http.MethodGet,
+		fmt.Sprintf("http://127.0.0.1:%d/api/v1/admin/platform-proxy/asset/capabilities", server.GetListenedPort()),
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Cookie", "id_session="+login.SessionID)
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK || upstreamCalls.Load() != 1 {
+		t.Fatalf("status=%d upstreamCalls=%d", response.StatusCode, upstreamCalls.Load())
+	}
+}

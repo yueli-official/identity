@@ -76,6 +76,14 @@ _Avoid_: Access Token、上架许可、代码安全证明
 Identity 向外部 Provider 验证过的稳定账号 ID 与 User 的所有权绑定事实。
 _Avoid_: OAuth 登录凭据、用户名、邮箱、Profile 社交链接
 
+**External Login Provider（外部登录提供商）**:
+Identity 明确支持并由管理员配置的 OAuth/OIDC 身份来源，例如 Google 或 QQ；Provider Adapter 固定协议行为，管理员只管理实例凭据、启停和回调配置。
+_Avoid_: External Identity Binding、允许任意授权端点的通用 HTTP 配置、产品站自己的 OIDC Client
+
+**Personal Access Token（个人访问令牌）**:
+User 为程序调用创建、带固定权限目录和有效期的 API Credential；明文只展示一次，可独立撤销，不建立浏览器登录会话。
+_Avoid_: 登录方式、Identity Session、OIDC Access Token、Service Client Credential
+
 **Platform Publication Proof（平台发布证明）**:
 Registry 审核通过后对精确制品摘要与 Publisher Attestation 签发的上架批准事实。
 _Avoid_: Publisher Attestation、Identity 凭证、远程撤销开关
@@ -98,6 +106,9 @@ _Avoid_: Publisher Attestation、Identity 凭证、远程撤销开关
 - Publisher Attestation 只证明 User 的精确投稿声明；Registry 仍拥有 namespace、审核、上架和下架决策。
 - Publisher signing key 与 OIDC、step-up 和 Registry publication key 必须按用途隔离；`kid` 只是验签 key 查找提示。
 - External Identity Binding 使用 Provider 稳定账号 ID，不能由 login、email、Profile 链接或浏览器自报字段建立。
+- External Login Provider 的 Client Secret 只由 Identity 控制面持有；Provider 配置不能把任意外部端点变成受信身份来源。
+- External Login Provider 必须声明注册策略：只有能提供并验证 Identity 所需邮箱的 Adapter 才能创建 User；QQ 固定为 existing-user-only，只能绑定和登录既有 User。
+- Personal Access Token 只授予目录中声明的最小 API scope，不能换取浏览器 Cookie，也不能接受任意自定义 scope。
 - 公开 User 读取合同从 `/api/v1/users*` 开始；未发布的 `/api/v1/profiles*` 不提供兼容或 fallback。
 - User Handle 规范化为小写 ASCII 3–30 位且历史值不重新分配；Display Name 不参与地址、解析、登录或授权。
 - User 的 avatar/cover 只保存 Asset `mediaKey`；公开响应与 OIDC claim 不保存或信任任意外部图片 URL。

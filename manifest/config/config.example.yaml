@@ -65,9 +65,11 @@ oidc:
   allowPrivateHttpRedirects: false
   globalSecret: "" # set via env GF_OIDC_GLOBALSECRET (>=32 bytes), never commit a real value
   google:
-    clientId: "" # set via env GF_OIDC_GOOGLE_CLIENTID
-    clientSecret: "" # set via env GF_OIDC_GOOGLE_CLIENTSECRET
-    redirectUrl: "http://localhost:3000/api/v1/auth/oauth/google/callback" # env GF_OIDC_GOOGLE_REDIRECTURL
+    # Bootstrap-only compatibility: when the provider database is empty these
+    # values create its first Google record. Later changes belong to the admin
+    # control plane and take effect without a restart.
+    clientId: "" # env GF_OIDC_GOOGLE_CLIENTID
+    clientSecret: "" # env GF_OIDC_GOOGLE_CLIENTSECRET
 account:
   loginUrl: "http://localhost:3000/login"
   baseUrl: "http://localhost:3000" # env GF_ACCOUNT_BASEURL — used to build email links

@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	jose "github.com/go-jose/go-jose/v4"
@@ -66,6 +67,22 @@ func RequiredAuth(verifier goframeauth.TokenVerifier) func(*ghttp.Request) {
 
 func OptionalAuth(verifier goframeauth.TokenVerifier) func(*ghttp.Request) {
 	return mustAuthMiddleware(verifier).Optional
+}
+
+// OptionalIdentityAuth lets PAT-owned endpoints receive their opaque Bearer
+// credential without first feeding it into the JWT verifier. PATs do not create
+// a request principal; every PAT endpoint must still verify the token and scope
+// through the PAT module itself.
+func OptionalIdentityAuth(verifier goframeauth.TokenVerifier) func(*ghttp.Request) {
+	jwtOptional := OptionalAuth(verifier)
+	return func(request *ghttp.Request) {
+		parts := strings.Fields(request.Header.Get("Authorization"))
+		if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") && strings.HasPrefix(parts[1], "pat_") {
+			request.Middleware.Next()
+			return
+		}
+		jwtOptional(request)
+	}
 }
 
 func mustAuthMiddleware(verifier goframeauth.TokenVerifier) *goframeauth.Middleware {

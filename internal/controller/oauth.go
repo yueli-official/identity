@@ -1,8 +1,10 @@
 package controller
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"net/http"
 	"net/url"
 	"strings"
@@ -10,20 +12,36 @@ import (
 
 	"github.com/gogf/gf/v2/net/ghttp"
 
+	"github.com/yueli-official/identity/internal/iderr"
 	"github.com/yueli-official/identity/internal/logic"
 	"github.com/yueli-official/identity/internal/oauthlogin"
 )
 
 // oauthStateCookie holds the short-lived CSRF nonce that must match the nonce
 // signed into the OAuth state parameter at /callback.
-const oauthStateCookie = "g_oauth_state"
+const oauthStateCookiePrefix = "g_oauth_state_"
+
+type OAuthProviderSource interface {
+	Resolve(context.Context, string) (oauthlogin.Provider, oauthlogin.RegistrationPolicy, error)
+}
+
+type staticOAuthProviderSource struct {
+	provider oauthlogin.Provider
+}
+
+func (source staticOAuthProviderSource) Resolve(_ context.Context, key string) (oauthlogin.Provider, oauthlogin.RegistrationPolicy, error) {
+	if source.provider == nil || source.provider.Name() != key {
+		return nil, "", errors.New("provider unavailable")
+	}
+	return source.provider, oauthlogin.RegistrationVerifiedEmail, nil
+}
 
 // OAuthController handles the external-provider (Google) login redirect dance.
 // These are raw redirect endpoints that bypass the gokit JSON envelope, the same
 // precedent as the OIDC endpoints.
 type OAuthController struct {
 	svc          *logic.Service
-	google       oauthlogin.Provider // nil when unconfigured
+	providers    OAuthProviderSource
 	secureCookie bool
 	sessionTTL   time.Duration
 	stateSecret  []byte
@@ -33,18 +51,47 @@ type OAuthController struct {
 // NewOAuth builds the OAuth controller. google may be nil when no credentials are
 // configured, in which case the endpoints redirect to the login page with an error.
 func NewOAuth(svc *logic.Service, google oauthlogin.Provider, secureCookie bool, stateSecret []byte, loginURL string, sessionTTL ...time.Duration) *OAuthController {
+	return NewOAuthRegistry(svc, staticOAuthProviderSource{provider: google}, secureCookie, stateSecret, loginURL, sessionTTL...)
+}
+
+func NewOAuthRegistry(svc *logic.Service, providers OAuthProviderSource, secureCookie bool, stateSecret []byte, loginURL string, sessionTTL ...time.Duration) *OAuthController {
 	ttl := logic.DefaultConfig().SessionIdleTTL
 	if len(sessionTTL) > 0 {
 		ttl = sessionTTL[0]
 	}
-	return &OAuthController{svc: svc, google: google, secureCookie: secureCookie, sessionTTL: ttl, stateSecret: stateSecret, loginURL: loginURL}
+	return &OAuthController{svc: svc, providers: providers, secureCookie: secureCookie, sessionTTL: ttl, stateSecret: stateSecret, loginURL: loginURL}
 }
 
 // GoogleStart handles GET /api/v1/auth/oauth/google/start.
 // It signs the (validated) return_to + a random nonce into the OAuth state,
 // drops the nonce in a short-lived HttpOnly cookie, then redirects to Google.
 func (c *OAuthController) GoogleStart(r *ghttp.Request) {
-	if c.google == nil {
+	c.start(r, "google")
+}
+
+func (c *OAuthController) GoogleCallback(r *ghttp.Request) {
+	c.callback(r, "google")
+}
+
+func (c *OAuthController) QQStart(r *ghttp.Request) {
+	c.start(r, "qq")
+}
+
+func (c *OAuthController) QQCallback(r *ghttp.Request) {
+	c.callback(r, "qq")
+}
+
+func (c *OAuthController) Start(r *ghttp.Request) {
+	c.start(r, strings.ToLower(strings.TrimSpace(r.Get("provider").String())))
+}
+
+func (c *OAuthController) Callback(r *ghttp.Request) {
+	c.callback(r, strings.ToLower(strings.TrimSpace(r.Get("provider").String())))
+}
+
+func (c *OAuthController) start(r *ghttp.Request, key string) {
+	provider, _, err := c.providers.Resolve(r.Context(), key)
+	if err != nil {
 		r.Response.RedirectTo(c.loginURL + "?error=oauth_unavailable")
 		return
 	}
@@ -59,28 +106,30 @@ func (c *OAuthController) GoogleStart(r *ghttp.Request) {
 		}
 	}
 	nonce := randHex(16)
-	state := oauthlogin.EncodeState(c.stateSecret, returnTo, nonce, bind, time.Now().Add(10*time.Minute).Unix())
+	state := oauthlogin.EncodeProviderState(c.stateSecret, key, returnTo, nonce, bind, time.Now().Add(10*time.Minute).Unix())
 	r.Cookie.SetHttpCookie(&http.Cookie{
-		Name: oauthStateCookie, Value: nonce, Path: "/",
+		Name: oauthStateCookiePrefix + key, Value: nonce, Path: "/",
 		HttpOnly: true, Secure: c.secureCookie, SameSite: http.SameSiteLaxMode, MaxAge: 600,
 	})
-	r.Response.RedirectTo(c.google.AuthorizeURL(state))
+	r.Response.RedirectTo(provider.AuthorizeURL(state))
 }
 
 // GoogleCallback handles GET /api/v1/auth/oauth/google/callback.
 // It verifies the signed state + nonce cookie (CSRF), exchanges the code, fetches
 // the profile, performs account-linking via OAuthLogin, mints an id_session
 // cookie, and redirects back to the validated return_to.
-func (c *OAuthController) GoogleCallback(r *ghttp.Request) {
+func (c *OAuthController) callback(r *ghttp.Request, key string) {
 	ctx := r.Context()
-	if c.google == nil {
+	provider, policy, err := c.providers.Resolve(ctx, key)
+	if err != nil {
 		r.Response.RedirectTo(c.loginURL + "?error=oauth_unavailable")
 		return
 	}
-	returnTo, nonce, bind, err := oauthlogin.DecodeState(c.stateSecret, r.Get("state").String())
-	cookieNonce := r.Cookie.Get(oauthStateCookie, "").String()
-	r.Cookie.Remove(oauthStateCookie)
-	if err != nil || nonce == "" || nonce != cookieNonce {
+	stateProvider, returnTo, nonce, bind, err := oauthlogin.DecodeProviderState(c.stateSecret, r.Get("state").String())
+	cookieName := oauthStateCookiePrefix + key
+	cookieNonce := r.Cookie.Get(cookieName, "").String()
+	r.Cookie.Remove(cookieName)
+	if err != nil || stateProvider != key || nonce == "" || nonce != cookieNonce {
 		r.Response.RedirectTo(c.loginURL + "?error=oauth_state")
 		return
 	}
@@ -89,12 +138,12 @@ func (c *OAuthController) GoogleCallback(r *ghttp.Request) {
 		r.Response.RedirectTo(c.loginURL + "?error=oauth_denied")
 		return
 	}
-	at, err := c.google.ExchangeCode(ctx, code)
+	at, err := provider.ExchangeCode(ctx, code)
 	if err != nil {
 		r.Response.RedirectTo(c.loginURL + "?error=oauth_exchange")
 		return
 	}
-	ui, err := c.google.FetchUserInfo(ctx, at)
+	ui, err := provider.FetchUserInfo(ctx, at)
 	if err != nil {
 		r.Response.RedirectTo(c.loginURL + "?error=oauth_userinfo")
 		return
@@ -109,11 +158,11 @@ func (c *OAuthController) GoogleCallback(r *ghttp.Request) {
 			r.Cookie.Get(sessionCookie, "").String(),
 		)
 		if sessionErr != nil || current.ID != bind {
-			r.Response.RedirectTo(withError(returnTo, "oauth_bind"))
+			r.Response.RedirectTo(withProviderError(returnTo, "oauth_bind", key))
 			return
 		}
-		if berr := c.svc.BindOAuth(ctx, bind, c.google.Name(), ui.ProviderUID, ui.Email, ui.EmailVerified); berr != nil {
-			r.Response.RedirectTo(withError(returnTo, "oauth_bind"))
+		if berr := c.svc.BindOAuth(ctx, bind, provider.Name(), ui.ProviderUID, ui.Email, ui.EmailVerified); berr != nil {
+			r.Response.RedirectTo(withProviderError(returnTo, "oauth_bind", key))
 			return
 		}
 		r.Response.RedirectTo(returnTo)
@@ -121,12 +170,22 @@ func (c *OAuthController) GoogleCallback(r *ghttp.Request) {
 	}
 
 	out, err := c.svc.OAuthLogin(ctx, logic.OAuthLoginInput{
-		Provider: c.google.Name(), ProviderUID: ui.ProviderUID, Email: ui.Email,
+		Provider: provider.Name(), ProviderUID: ui.ProviderUID, Email: ui.Email,
 		EmailVerified: ui.EmailVerified, DisplayName: ui.DisplayName,
 		UserAgent: r.UserAgent(), IP: r.GetClientIp(),
+		RegistrationPolicy: policy,
 	})
 	if err != nil {
-		r.Response.RedirectTo(c.loginURL + "?error=oauth_login")
+		code := "oauth_login"
+		if failure, ok := iderr.Resolve(err); ok {
+			switch failure.Code {
+			case iderr.CodeOAuthEmailConflict:
+				code = "oauth_link_required"
+			case iderr.CodeOAuthBindingRequired:
+				code = "oauth_binding_required"
+			}
+		}
+		r.Response.RedirectTo(c.loginURL + "?error=" + code + "&provider=" + url.QueryEscape(key))
 		return
 	}
 	if out.MFARequired {
@@ -179,6 +238,10 @@ func withError(path, code string) string {
 		sep = "&"
 	}
 	return path + sep + "error=" + code
+}
+
+func withProviderError(path, code, provider string) string {
+	return withError(path, code) + "&provider=" + url.QueryEscape(provider)
 }
 
 // randHex returns a random hex string of n bytes (2n hex chars).

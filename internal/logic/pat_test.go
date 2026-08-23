@@ -87,7 +87,7 @@ func TestCreatePAT_Success(t *testing.T) {
 	svc, _ := newPATSvcClk(m)
 	ctx := context.Background()
 
-	plaintext, row, err := svc.CreatePAT(ctx, "id-1", "my-token", []string{"read", "write"}, 0)
+	plaintext, row, err := svc.CreatePAT(ctx, "id-1", "my-token", []string{PATScopeProfileRead, PATScopeEmailRead}, 0)
 	if err != nil {
 		t.Fatalf("CreatePAT: %v", err)
 	}
@@ -132,7 +132,7 @@ func TestCreatePAT_Success(t *testing.T) {
 func TestCreatePAT_EmptyName(t *testing.T) {
 	m := repo.NewMemory()
 	svc, _ := newPATSvcClk(m)
-	_, _, err := svc.CreatePAT(context.Background(), "id-1", "", []string{"read"}, 0)
+	_, _, err := svc.CreatePAT(context.Background(), "id-1", "", []string{PATScopeProfileRead}, 0)
 	if patCodeOfErr(err) != iderr.CodePATNameRequired {
 		t.Errorf("empty name: want PATNameRequired, got %v", err)
 	}
@@ -141,7 +141,7 @@ func TestCreatePAT_EmptyName(t *testing.T) {
 func TestCreatePAT_WhitespaceName(t *testing.T) {
 	m := repo.NewMemory()
 	svc, _ := newPATSvcClk(m)
-	_, _, err := svc.CreatePAT(context.Background(), "id-1", "   ", []string{"read"}, 0)
+	_, _, err := svc.CreatePAT(context.Background(), "id-1", "   ", []string{PATScopeProfileRead}, 0)
 	if patCodeOfErr(err) != iderr.CodePATNameRequired {
 		t.Errorf("whitespace name: want PATNameRequired, got %v", err)
 	}
@@ -166,6 +166,40 @@ func TestCreatePAT_ScopeWithSpace(t *testing.T) {
 	coded, ok := iderr.Resolve(err)
 	if !ok || coded.Params["reason"] != "invalid_scope" || coded.Params["index"] != 0 {
 		t.Errorf("scope params: %#v", coded)
+	}
+}
+
+func TestCreatePAT_UnknownScopeRejected(t *testing.T) {
+	m := repo.NewMemory()
+	svc, _ := newPATSvcClk(m)
+	_, _, err := svc.CreatePAT(context.Background(), "id-1", "tok", []string{"posts:write"}, 0)
+	if patCodeOfErr(err) != iderr.CodePATScopeInvalid {
+		t.Fatalf("unknown scope must be rejected: %v", err)
+	}
+}
+
+func TestVerifyPATRejectsLegacyUnknownScope(t *testing.T) {
+	m := repo.NewMemory()
+	svc, _ := newPATSvcClk(m)
+	identity, err := m.CreateIdentityWithProfile(context.Background(), repo.NewIdentityInput{
+		Email: "legacy-pat@example.test", DisplayName: "Legacy PAT", PasswordHash: "hash",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	plaintext, err := pat.Generate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = m.InsertPAT(context.Background(), repo.PATRow{
+		IdentityID: identity.ID, Name: "legacy", TokenHash: patHash(plaintext),
+		TokenPrefix: pat.Display(plaintext), Scopes: []string{"posts:write"}, CreatedAt: time.Now(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.VerifyPAT(context.Background(), plaintext); patCodeOfErr(err) != iderr.CodePATInvalid {
+		t.Fatalf("legacy unknown scope remained valid: %v", err)
 	}
 }
 
@@ -197,13 +231,13 @@ func TestCreatePAT_LimitReached(t *testing.T) {
 	cfg := DefaultConfig()
 
 	for i := 0; i < cfg.PATMaxPerUser; i++ {
-		_, _, err := svc.CreatePAT(ctx, "id-cap", "tok", []string{"read"}, 0)
+		_, _, err := svc.CreatePAT(ctx, "id-cap", "tok", []string{PATScopeProfileRead}, 0)
 		if err != nil {
 			t.Fatalf("create #%d: %v", i+1, err)
 		}
 	}
 
-	_, _, err := svc.CreatePAT(ctx, "id-cap", "extra", []string{"read"}, 0)
+	_, _, err := svc.CreatePAT(ctx, "id-cap", "extra", []string{PATScopeProfileRead}, 0)
 	if patCodeOfErr(err) != iderr.CodePATLimitReached {
 		t.Errorf("over limit: want PATLimitReached, got %v", err)
 	}
@@ -218,7 +252,7 @@ func TestRevokePAT_Success(t *testing.T) {
 	svc, _ := newPATSvcClk(m)
 	ctx := context.Background()
 
-	_, row, err := svc.CreatePAT(ctx, "id-1", "tok", []string{"read"}, 0)
+	_, row, err := svc.CreatePAT(ctx, "id-1", "tok", []string{PATScopeProfileRead}, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,7 +276,7 @@ func TestRevokePAT_WrongIdentity(t *testing.T) {
 	svc, _ := newPATSvcClk(m)
 	ctx := context.Background()
 
-	_, row, err := svc.CreatePAT(ctx, "id-owner", "tok", []string{"read"}, 0)
+	_, row, err := svc.CreatePAT(ctx, "id-owner", "tok", []string{PATScopeProfileRead}, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,7 +292,7 @@ func TestRevokePAT_ThenVerify(t *testing.T) {
 	svc, _ := newPATSvcClk(m)
 	ctx := context.Background()
 
-	plaintext, row, err := svc.CreatePAT(ctx, "id-1", "tok", []string{"read"}, 0)
+	plaintext, row, err := svc.CreatePAT(ctx, "id-1", "tok", []string{PATScopeProfileRead}, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,7 +317,7 @@ func TestVerifyPAT_Success(t *testing.T) {
 	ctx := context.Background()
 	userKey := seedPATIdentity(t, m, "id-1")
 
-	plaintext, _, err := svc.CreatePAT(ctx, "id-1", "tok", []string{"read", "write"}, 0)
+	plaintext, _, err := svc.CreatePAT(ctx, "id-1", "tok", []string{PATScopeProfileRead, PATScopeEmailRead}, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -295,7 +329,7 @@ func TestVerifyPAT_Success(t *testing.T) {
 	if result.UserKey != userKey {
 		t.Errorf("UserKey: want %q, got %q", userKey, result.UserKey)
 	}
-	if len(result.Scopes) != 2 || result.Scopes[0] != "read" || result.Scopes[1] != "write" {
+	if len(result.Scopes) != 2 || result.Scopes[0] != PATScopeProfileRead || result.Scopes[1] != PATScopeEmailRead {
 		t.Errorf("Scopes: want [read write], got %v", result.Scopes)
 	}
 }
@@ -316,7 +350,7 @@ func TestVerifyPAT_Expired(t *testing.T) {
 	seedPATIdentity(t, m, "id-1")
 
 	// create with 1-day expiry
-	plaintext, _, err := svc.CreatePAT(ctx, "id-1", "tok", []string{"read"}, 1)
+	plaintext, _, err := svc.CreatePAT(ctx, "id-1", "tok", []string{PATScopeProfileRead}, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -340,7 +374,7 @@ func TestVerifyPAT_ThrottleTouch(t *testing.T) {
 	ctx := context.Background()
 	seedPATIdentity(t, m, "id-1")
 
-	plaintext, _, err := svc.CreatePAT(ctx, "id-1", "tok", []string{"read"}, 0)
+	plaintext, _, err := svc.CreatePAT(ctx, "id-1", "tok", []string{PATScopeProfileRead}, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -388,7 +422,7 @@ func TestVerifyPAT_RejectsDisabledIdentity(t *testing.T) {
 	ctx := context.Background()
 	seedPATIdentity(t, m, "id-disabled")
 
-	plaintext, _, err := svc.CreatePAT(ctx, "id-disabled", "tok", []string{"read"}, 0)
+	plaintext, _, err := svc.CreatePAT(ctx, "id-disabled", "tok", []string{PATScopeProfileRead}, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -420,7 +454,7 @@ func TestPAT_Audit(t *testing.T) {
 	svc, _ := newPATSvcClk(m)
 	ctx := context.Background()
 
-	_, row, err := svc.CreatePAT(ctx, "id-audit", "tok", []string{"read"}, 0)
+	_, row, err := svc.CreatePAT(ctx, "id-audit", "tok", []string{PATScopeProfileRead}, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

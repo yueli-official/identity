@@ -9,6 +9,7 @@ import (
 
 	v1 "github.com/yueli-official/identity/api/v1"
 	"github.com/yueli-official/identity/internal/iderr"
+	"github.com/yueli-official/identity/internal/logic"
 )
 
 // patRFC3339 formats a *time.Time as RFC3339, returning "" for nil.
@@ -94,9 +95,8 @@ func (c *Controller) RevokePAT(ctx context.Context, req *v1.RevokePATReq) (*v1.R
 // for resource servers that need to validate a PAT on behalf of a caller.
 func (c *Controller) VerifyPAT(ctx context.Context, _ *v1.VerifyPATReq) (*v1.VerifyPATRes, error) {
 	r := g.RequestFromCtx(ctx)
-	authz := r.Header.Get("Authorization")
-	token := strings.TrimPrefix(authz, "Bearer ")
-	if token == authz || token == "" {
+	token, ok := patBearer(r.Header.Get("Authorization"))
+	if !ok {
 		return nil, iderr.PATInvalid()
 	}
 
@@ -110,4 +110,50 @@ func (c *Controller) VerifyPAT(ctx context.Context, _ *v1.VerifyPATReq) (*v1.Ver
 		Scopes:    res.Scopes,
 		ExpiresAt: patRFC3339(res.ExpiresAt),
 	}, nil
+}
+
+func (c *Controller) PATScopeCatalog(context.Context, *v1.PATScopeCatalogReq) (*v1.PATScopeCatalogRes, error) {
+	definitions := logic.PATScopes()
+	entries := make([]v1.PATScopeEntry, 0, len(definitions))
+	for _, definition := range definitions {
+		entries = append(entries, v1.PATScopeEntry{
+			Key: definition.Key, Label: definition.Label, Description: definition.Description,
+		})
+	}
+	return &v1.PATScopeCatalogRes{Entries: entries}, nil
+}
+
+func (c *Controller) PATUserInfo(ctx context.Context, _ *v1.PATUserInfoReq) (*v1.PATUserInfoRes, error) {
+	r := g.RequestFromCtx(ctx)
+	token, ok := patBearer(r.Header.Get("Authorization"))
+	if !ok {
+		return nil, iderr.PATInvalid()
+	}
+	info, err := c.svc.PATUserInfo(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+	response := &v1.PATUserInfoRes{UserKey: info.UserKey}
+	if info.Email != nil {
+		response.Email = *info.Email
+		response.EmailVerified = info.EmailVerified
+	}
+	if info.Profile != nil {
+		profile := info.Profile
+		response.DisplayName = profile.DisplayName
+		response.Handle = profile.Handle
+		response.Bio = profile.Bio
+		response.Avatar = mediaRef(profile.AvatarMediaKey)
+		response.Cover = mediaRef(profile.CoverMediaKey)
+		response.SocialLinks = socialToDTO(profile.SocialLinks)
+	}
+	return response, nil
+}
+
+func patBearer(value string) (string, bool) {
+	parts := strings.Fields(value)
+	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") || parts[1] == "" {
+		return "", false
+	}
+	return parts[1], true
 }

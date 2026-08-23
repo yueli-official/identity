@@ -19,6 +19,8 @@ func TestCodesDeclareExpectedStatus(t *testing.T) {
 		iderr.CodeNotAuthenticated:         401,
 		iderr.CodeOAuthEmailConflict:       409,
 		iderr.CodeOAuthNoEmail:             400,
+		iderr.CodeOAuthEmailUnverified:     401,
+		iderr.CodeOAuthBindingRequired:     409,
 		iderr.CodeOAuthFailed:              401,
 		iderr.CodeVerificationInvalid:      400,
 		iderr.CodeResetThrottled:           429,
@@ -40,8 +42,8 @@ func TestCodesDeclareExpectedStatus(t *testing.T) {
 
 func TestCatalogContainsEveryDescriptorInStableOrder(t *testing.T) {
 	catalog := iderr.Catalog()
-	if len(catalog) != 73 {
-		t.Fatalf("catalog length = %d, want 73", len(catalog))
+	if len(catalog) != 77 {
+		t.Fatalf("catalog length = %d, want 77", len(catalog))
 	}
 	codes := make([]string, 0, len(catalog))
 	for _, entry := range catalog {

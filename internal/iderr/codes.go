@@ -229,6 +229,22 @@ func OAuthNoEmail() error {
 	return mapped(CodeOAuthNoEmail, nil)
 }
 
+func OAuthEmailUnverified() error {
+	return mapped(CodeOAuthEmailUnverified, nil)
+}
+
+func OAuthBindingRequired(provider string) error {
+	return mapped(CodeOAuthBindingRequired, map[string]any{"provider": provider})
+}
+
+func ExternalLoginProviderInvalid(provider string) error {
+	return mapped(CodeExternalLoginProviderInvalid, map[string]any{"provider": provider})
+}
+
+func PATInsufficientScope() error {
+	return mapped(CodePATInsufficientScope, nil)
+}
+
 // OAuthFailed is a generic provider/exchange failure for any non-redirect caller
 // that needs a coded error (the redirect endpoints surface errors via query string).
 func OAuthFailed() error {

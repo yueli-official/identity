@@ -49,3 +49,33 @@ type VerifyPATRes struct {
 	Scopes    []string `json:"scopes"`
 	ExpiresAt string   `json:"expiresAt,omitempty"`
 }
+
+type PATScopeCatalogReq struct {
+	g.Meta `path:"/api/v1/pat/scopes" method:"get" tags:"pat" summary:"List supported personal access token scopes"`
+}
+
+type PATScopeEntry struct {
+	Key         string `json:"key"`
+	Label       string `json:"label"`
+	Description string `json:"description"`
+}
+
+type PATScopeCatalogRes struct {
+	Entries []PATScopeEntry `json:"entries"`
+}
+
+type PATUserInfoReq struct {
+	g.Meta `path:"/api/v1/pat/userinfo" method:"get" tags:"pat" summary:"Read own account information with a PAT"`
+}
+
+type PATUserInfoRes struct {
+	UserKey       string          `json:"userKey"`
+	Email         string          `json:"email,omitempty"`
+	EmailVerified *bool           `json:"emailVerified,omitempty"`
+	DisplayName   string          `json:"displayName,omitempty"`
+	Handle        string          `json:"handle,omitempty"`
+	Bio           string          `json:"bio,omitempty"`
+	Avatar        *MediaRef       `json:"avatar,omitempty"`
+	Cover         *MediaRef       `json:"cover,omitempty"`
+	SocialLinks   []SocialLinkDTO `json:"socialLinks,omitempty"`
+}

@@ -157,7 +157,7 @@ func TestE2E_PAT(t *testing.T) {
 		// Step 2: CreatePAT for user A
 		// =====================================================================
 		createBody, _, createStatus := doPost("/api/v1/pat",
-			`{"name":"ci","scopes":["read:post","write:post"],"expiresInDays":0}`,
+			`{"name":"ci","scopes":["identity:profile:read","identity:email:read"],"expiresInDays":0}`,
 			cookieHdr(userASID),
 		)
 		t.Assert(createStatus, 200)
@@ -177,8 +177,8 @@ func TestE2E_PAT(t *testing.T) {
 		for _, sc := range patScopes {
 			scopeSet[sc] = true
 		}
-		t.Assert(scopeSet["read:post"], true)
-		t.Assert(scopeSet["write:post"], true)
+		t.Assert(scopeSet["identity:profile:read"], true)
+		t.Assert(scopeSet["identity:email:read"], true)
 
 		// =====================================================================
 		// Step 3: ListPAT — exactly one entry; raw body does NOT expose plaintext
@@ -199,8 +199,8 @@ func TestE2E_PAT(t *testing.T) {
 		for _, sc := range listEntryScopes {
 			listScopeSet[sc] = true
 		}
-		t.Assert(listScopeSet["read:post"], true)
-		t.Assert(listScopeSet["write:post"], true)
+		t.Assert(listScopeSet["identity:profile:read"], true)
+		t.Assert(listScopeSet["identity:email:read"], true)
 
 		// Security assertion: plaintext must not appear in the raw body,
 		// and neither "token" nor "tokenHash" keys should appear in entries.
@@ -231,8 +231,19 @@ func TestE2E_PAT(t *testing.T) {
 		for _, sc := range verifyScopes {
 			verifyScopeSet[sc] = true
 		}
-		t.Assert(verifyScopeSet["read:post"], true)
-		t.Assert(verifyScopeSet["write:post"], true)
+		t.Assert(verifyScopeSet["identity:profile:read"], true)
+		t.Assert(verifyScopeSet["identity:email:read"], true)
+
+		// The same PAT can read only the caller's own fields covered by its fixed
+		// scope catalog; it does not establish an Identity browser session.
+		userinfoBody, userinfoStatus := doGet("/api/v1/pat/userinfo", map[string]string{
+			"Authorization": "Bearer " + plaintext,
+		})
+		t.Assert(userinfoStatus, 200)
+		userinfo := gjson.New(userinfoBody)
+		t.Assert(userinfo.Get("userKey").String(), userAKey)
+		t.Assert(userinfo.Get("email").String(), "usera@pat.test")
+		t.Assert(userinfo.Get("displayName").String(), "UserA")
 
 		// =====================================================================
 		// Step 5: RevokePAT then VerifyPAT → 401 identity.pat_invalid
@@ -271,7 +282,7 @@ func TestE2E_PAT(t *testing.T) {
 
 		// Create a fresh PAT for user A so there is a live id for B to attempt.
 		freshCreateBody, _, freshCreateStatus := doPost("/api/v1/pat",
-			`{"name":"ci-fresh","scopes":["read:post"],"expiresInDays":0}`,
+			`{"name":"ci-fresh","scopes":["identity:profile:read"],"expiresInDays":0}`,
 			cookieHdr(userASID),
 		)
 		t.Assert(freshCreateStatus, 200)

@@ -7,6 +7,7 @@ import (
 	"github.com/yueli-official/identity/internal/iderr"
 	"github.com/yueli-official/identity/internal/logic"
 	"github.com/yueli-official/identity/internal/model"
+	"github.com/yueli-official/identity/internal/oauthlogin"
 	"github.com/yueli-official/identity/internal/repo"
 )
 
@@ -40,18 +41,22 @@ func TestOAuthLogin_ReturningUser(t *testing.T) {
 	}
 }
 
-func TestOAuthLogin_LinkByVerifiedEmail(t *testing.T) {
+func TestOAuthLogin_DoesNotAutoLinkByVerifiedEmail(t *testing.T) {
 	m := repo.NewMemory()
 	s := logic.New(m, logic.DefaultConfig())
 	base, _ := m.CreateIdentityWithProfile(context.Background(), repo.NewIdentityInput{Email: "link@example.com", DisplayName: "L", PasswordHash: "h"})
-	out, err := s.OAuthLogin(context.Background(), logic.OAuthLoginInput{
+	_, err := s.OAuthLogin(context.Background(), logic.OAuthLoginInput{
 		Provider: "google", ProviderUID: "sub-3", Email: "link@example.com", EmailVerified: true,
 	})
+	if codeOfErr(err) != iderr.CodeOAuthEmailConflict {
+		t.Fatalf("verified provider email must not silently link an existing account: %v", err)
+	}
+	credentials, err := m.ListOAuthCredentials(context.Background(), base.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.Identity.ID != base.ID {
-		t.Fatal("verified email should link to existing identity")
+	if len(credentials) != 0 {
+		t.Fatalf("existing account gained a credential without step-up: %+v", credentials)
 	}
 }
 
@@ -65,8 +70,8 @@ func TestOAuthLogin_UnverifiedEmailCollision_Rejected(t *testing.T) {
 	if err == nil {
 		t.Fatal("unverified-email collision must be rejected")
 	}
-	if codeOfErr(err) != iderr.CodeOAuthEmailConflict {
-		t.Fatalf("want oauth_email_conflict, got %v", err)
+	if codeOfErr(err) != iderr.CodeOAuthEmailUnverified {
+		t.Fatalf("want oauth_email_unverified, got %v", err)
 	}
 }
 
@@ -77,6 +82,27 @@ func TestOAuthLogin_NoEmail_Rejected(t *testing.T) {
 	})
 	if codeOfErr(err) != iderr.CodeOAuthNoEmail {
 		t.Fatalf("want oauth_no_email, got %v", err)
+	}
+}
+
+func TestOAuthLogin_UnverifiedNewEmail_Rejected(t *testing.T) {
+	s := newSvc()
+	_, err := s.OAuthLogin(context.Background(), logic.OAuthLoginInput{
+		Provider: "google", ProviderUID: "sub-unverified", Email: "new@example.com", EmailVerified: false,
+	})
+	if codeOfErr(err) != iderr.CodeOAuthEmailUnverified {
+		t.Fatalf("want oauth_email_unverified, got %v", err)
+	}
+}
+
+func TestOAuthLogin_ExistingOnlyRequiresPriorBinding(t *testing.T) {
+	s := newSvc()
+	_, err := s.OAuthLogin(context.Background(), logic.OAuthLoginInput{
+		Provider: "qq", ProviderUID: "openid-1",
+		RegistrationPolicy: oauthlogin.RegistrationExistingOnly,
+	})
+	if codeOfErr(err) != iderr.CodeOAuthBindingRequired {
+		t.Fatalf("want oauth_binding_required, got %v", err)
 	}
 }
 
@@ -98,8 +124,8 @@ func TestOAuthLogin_DoesNotLinkCredentialToDisabledIdentity(t *testing.T) {
 		Provider: "google", ProviderUID: "disabled-provider-sub",
 		Email: "disabled@example.com", EmailVerified: true,
 	})
-	if codeOfErr(err) != iderr.CodeAccountDisabled {
-		t.Fatalf("want account disabled, got %v", err)
+	if codeOfErr(err) != iderr.CodeOAuthEmailConflict {
+		t.Fatalf("unbound provider must not disclose account status, got %v", err)
 	}
 	credentials, err := m.ListOAuthCredentials(ctx, base.ID)
 	if err != nil {

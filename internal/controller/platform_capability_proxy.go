@@ -52,7 +52,7 @@ func NewPlatformCapabilityProxy(base *Controller, mgr *oidc.Manager, issuer stri
 }
 
 func (proxy *PlatformCapabilityProxy) Forward(request *ghttp.Request) {
-	adminID, err := proxy.base.requireAdmin(request.Context())
+	_, err := proxy.base.requireAdmin(request.Context())
 	if err != nil {
 		request.SetError(err)
 		return
@@ -67,12 +67,7 @@ func (proxy *PlatformCapabilityProxy) Forward(request *ghttp.Request) {
 		request.Response.WriteStatus(404)
 		return
 	}
-	admin, err := proxy.base.svc.GetByID(request.Context(), adminID)
-	if err != nil {
-		request.SetError(err)
-		return
-	}
-	bearer, err := proxy.mgr.MintDelegatedUserToken(proxy.issuer, admin.UserKey, target.Audience, scope, 2*time.Minute, time.Now())
+	bearer, err := proxy.mgr.MintServiceToken(proxy.issuer, "identity-svc", target.Audience, scope, 2*time.Minute, time.Now())
 	if err != nil {
 		request.SetError(err)
 		return

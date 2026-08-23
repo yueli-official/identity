@@ -34,6 +34,7 @@ import (
 	"github.com/yueli-official/identity/internal/cache"
 	"github.com/yueli-official/identity/internal/controller"
 	"github.com/yueli-official/identity/internal/dao"
+	"github.com/yueli-official/identity/internal/externallogin"
 	"github.com/yueli-official/identity/internal/githubbinding"
 	"github.com/yueli-official/identity/internal/guest"
 	"github.com/yueli-official/identity/internal/identityabuse"
@@ -44,7 +45,6 @@ import (
 	"github.com/yueli-official/identity/internal/identitysecurity"
 	"github.com/yueli-official/identity/internal/logic"
 	"github.com/yueli-official/identity/internal/mailer"
-	"github.com/yueli-official/identity/internal/oauthlogin"
 	"github.com/yueli-official/identity/internal/oidc"
 	"github.com/yueli-official/identity/internal/publisher"
 	"github.com/yueli-official/identity/internal/repo"
@@ -65,6 +65,7 @@ type runtimeRepositories struct {
 	sessionCache   authentication.SessionCache
 	publisherStore publisher.Store
 	githubStore    githubbinding.Store
+	externalLogin  externallogin.Store
 }
 
 type privacyOwnerConfig struct {
@@ -95,6 +96,7 @@ func newRuntimeRepositories(openAPIExport bool) runtimeRepositories {
 			oidcBackend:    oidc.NewMemBackend(),
 			publisherStore: publisher.NewMemoryStore(),
 			githubStore:    githubbinding.NewMemoryStore(),
+			externalLogin:  externallogin.NewMemoryStore(),
 		}
 	}
 
@@ -112,6 +114,7 @@ func newRuntimeRepositories(openAPIExport bool) runtimeRepositories {
 		sessionCache:   redis,
 		publisherStore: postgres,
 		githubStore:    postgres,
+		externalLogin:  externallogin.NewPostgresStore(g.DB()),
 	}
 }
 
@@ -684,24 +687,36 @@ func main() {
 		AccessTokenTTL: g.Cfg().MustGet(ctx, "guest.accessTokenTtl", "10m").Duration(),
 	}))
 
-	// ── Google OAuth login ──────────────────────────────────────────────────
-	// Provider stays nil when credentials are unconfigured; the controller then
-	// redirects the start/callback endpoints to login with ?error=oauth_unavailable.
+	// ── External login provider registry ────────────────────────────────────
+	// Environment values bootstrap an empty database only. Once an administrator
+	// saves a provider, the encrypted database record remains authoritative.
 	googleClientID := g.Cfg().MustGet(ctx, "oidc.google.clientId").String()
 	googleClientSecret := g.Cfg().MustGet(ctx, "oidc.google.clientSecret").String()
-	googleRedirectURL := g.Cfg().MustGet(ctx, "oidc.google.redirectUrl").String()
-	var googleProvider oauthlogin.Provider
-	if googleClientID != "" && googleClientSecret != "" {
-		googleProvider = oauthlogin.NewGoogle(googleClientID, googleClientSecret, googleRedirectURL)
+	providerManager, err := externallogin.New(repositories.externalLogin, globalSecret, accountBaseURL)
+	if err != nil {
+		panic(fmt.Sprintf("external login registry: %v", err))
 	}
-	oauthCtl := controller.NewOAuth(svc, googleProvider, secureCookie, []byte(globalSecret), loginURL, cfg.SessionIdleTTL)
+	if err := providerManager.Bootstrap(ctx, externallogin.BootstrapInput{
+		Key: "google", ClientID: googleClientID, ClientSecret: googleClientSecret,
+		Enabled: googleClientID != "" && googleClientSecret != "",
+	}); err != nil {
+		panic(fmt.Sprintf("external login bootstrap: %v", err))
+	}
+	oauthCtl := controller.NewOAuthRegistry(svc, providerManager, secureCookie, []byte(globalSecret), loginURL, cfg.SessionIdleTTL)
+	externalLoginCtl := controller.NewExternalLoginController(authCtl, providerManager)
 
 	coreKeys := []string{"identity.oidc", "identity.pat", "identity.profile", "identity.publisher-attestation", "identity.user-admin"}
 	mailKeys := []string{"identity.reset-password", "identity.verify-email"}
-	var googleChecker identitycap.HealthChecker
-	if googleProvider != nil {
-		googleChecker, _ = googleProvider.(identitycap.HealthChecker)
-	}
+	externalLoginChecker := identitycap.HealthCheckFunc(func(ctx context.Context) error {
+		providers, err := providerManager.Public(ctx)
+		if err != nil {
+			return err
+		}
+		if len(providers) == 0 {
+			return errors.New("no external login provider is enabled")
+		}
+		return nil
+	})
 	capabilityRegistry, err := identitycap.New(
 		identitycap.Registration{
 			Key: "identity-jwks", Adapter: "builtin", Mode: "in-memory", Registered: true, Enabled: true,
@@ -731,12 +746,9 @@ func main() {
 			},
 		},
 		identitycap.Registration{
-			Key: "google", Adapter: "google-oauth", Mode: "external", Registered: googleProvider != nil, Enabled: googleProvider != nil,
-			CapabilityKeys: []string{"identity.external-login"}, Operations: []string{"authorize", "callback", "link", "unlink"}, Checker: googleChecker,
-			RequiredConfig: []capability.ConfigField{
-				identitycap.Field("client_id", googleClientID, false), identitycap.Field("client_secret", googleClientSecret, true),
-				identitycap.Field("redirect_url", googleRedirectURL, false),
-			},
+			Key: "external-login", Adapter: "provider-registry", Mode: "external", Registered: true, Enabled: true,
+			CapabilityKeys: []string{"identity.external-login"}, Operations: []string{"authorize", "callback", "link", "unlink"},
+			Checker: externalLoginChecker,
 		},
 		identitycap.Registration{
 			Key: "github-binding", Adapter: "github-app-user-authorization", Mode: "external",
@@ -794,7 +806,7 @@ func main() {
 
 	// Business API: raw-success/Problem middleware applied to this group only.
 	s.Group("/", func(grp *ghttp.RouterGroup) {
-		grp.Middleware(apiMiddleware.Handle, identityruntime.OptionalAuth(identityVerifier))
+		grp.Middleware(apiMiddleware.Handle, identityruntime.OptionalIdentityAuth(identityVerifier))
 		grp.GET("/healthz", controller.Healthz)
 		grp.GET("/readyz", identityruntime.ReadinessHandler(map[string]identityruntime.ReadinessCheck{
 			"database": identityruntime.DatabaseReadiness,
@@ -809,6 +821,7 @@ func main() {
 		grp.Bind(publisherAdminCtl)
 		grp.Bind(githubCtl)
 		grp.Bind(githubSubmissionCtl)
+		grp.Bind(externalLoginCtl)
 		if privacyOwner != nil {
 			grp.POST("/api/internal/privacy/owner", identityruntime.PrivacyOwnerHandler(privacyOwner, "privacy:owner"))
 		}
@@ -831,8 +844,8 @@ func main() {
 	// External OAuth callbacks and GitHub webhook: raw protocol responses.
 	s.Group("/", func(grp *ghttp.RouterGroup) {
 		grp.Middleware(rawRateLimitMiddleware)
-		grp.GET("/api/v1/auth/oauth/google/start", oauthCtl.GoogleStart)
-		grp.GET("/api/v1/auth/oauth/google/callback", oauthCtl.GoogleCallback)
+		grp.GET("/api/v1/auth/oauth/{provider}/start", oauthCtl.Start)
+		grp.GET("/api/v1/auth/oauth/{provider}/callback", oauthCtl.Callback)
 		grp.GET("/api/v1/account/github-bindings/callback", githubCtl.GitHubCallback)
 		grp.POST("/api/v1/webhooks/github", githubCtl.GitHubWebhook)
 	})

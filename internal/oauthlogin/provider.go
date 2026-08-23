@@ -4,6 +4,13 @@ package oauthlogin
 
 import "context"
 
+type RegistrationPolicy string
+
+const (
+	RegistrationVerifiedEmail RegistrationPolicy = "verified_email"
+	RegistrationExistingOnly  RegistrationPolicy = "existing_user_only"
+)
+
 // UserInfo is the normalized profile an OAuth provider returns.
 type UserInfo struct {
 	ProviderUID   string

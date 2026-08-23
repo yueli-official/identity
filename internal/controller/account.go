@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	"github.com/gogf/gf/v2/net/ghttp"
@@ -73,7 +74,7 @@ func (c *Controller) SetPassword(ctx context.Context, req *v1.SetPasswordReq) (*
 }
 
 // SessionList returns the caller's active login sessions, flagging the current.
-func (c *Controller) SessionList(ctx context.Context, _ *v1.SessionListReq) (*v1.SessionListRes, error) {
+func (c *Controller) SessionList(ctx context.Context, req *v1.SessionListReq) (*v1.SessionListRes, error) {
 	r := ghttp.RequestFromCtx(ctx)
 	sid := r.Cookie.Get(sessionCookie, "").String()
 	id, err := c.svc.Me(ctx, sid)
@@ -84,18 +85,48 @@ func (c *Controller) SessionList(ctx context.Context, _ *v1.SessionListReq) (*v1
 	if err != nil {
 		return nil, err
 	}
+	sort.SliceStable(sessions, func(left, right int) bool {
+		return sessions[left].CreatedAt.After(sessions[right].CreatedAt)
+	})
 	entries := make([]v1.SessionEntry, 0, len(sessions))
+	var current *v1.SessionEntry
 	for _, s := range sessions {
-		entries = append(entries, v1.SessionEntry{
+		entry := v1.SessionEntry{
 			ID:        s.ID,
 			CreatedAt: s.CreatedAt.Format(time.RFC3339),
 			LastSeen:  s.LastSeen.Format(time.RFC3339),
 			IP:        s.IP,
 			UserAgent: s.UserAgent,
 			Current:   s.ID == sid,
-		})
+		}
+		if entry.Current {
+			copy := entry
+			current = &copy
+			continue
+		}
+		entries = append(entries, entry)
 	}
-	return &v1.SessionListRes{Entries: entries}, nil
+	total := len(entries)
+	limit := req.Limit
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	offset := req.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	if offset >= total {
+		entries = []v1.SessionEntry{}
+	} else {
+		entries = entries[offset:]
+		if len(entries) > limit {
+			entries = entries[:limit]
+		}
+	}
+	return &v1.SessionListRes{Current: current, Entries: entries, Total: total}, nil
 }
 
 // RevokeSession revokes one of the caller's own sessions (ownership-checked).
@@ -156,4 +187,20 @@ func (c *Controller) LogoutAll(ctx context.Context, _ *v1.LogoutAllReq) (*v1.Log
 	}
 	r.Cookie.Remove(sessionCookie)
 	return &v1.LogoutAllRes{}, nil
+}
+
+// LogoutOthers clears every other session while preserving the browser that
+// initiated the action. It is deliberately different from LogoutAll: the
+// account-center action must not contradict its "other sessions" label.
+func (c *Controller) LogoutOthers(ctx context.Context, _ *v1.LogoutOthersReq) (*v1.LogoutOthersRes, error) {
+	r := ghttp.RequestFromCtx(ctx)
+	sid := r.Cookie.Get(sessionCookie, "").String()
+	id, err := c.svc.Me(ctx, sid)
+	if err != nil {
+		return nil, err
+	}
+	if err := c.svc.LogoutOtherSessions(ctx, id.ID, sid); err != nil {
+		return nil, err
+	}
+	return &v1.LogoutOthersRes{}, nil
 }

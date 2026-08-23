@@ -295,7 +295,7 @@ func TestE2E_GoogleBindRequiresLiveOriginalSession(t *testing.T) {
 		t.Fatalf("bind callback: %v", err)
 	}
 	callback.Body.Close()
-	if got := callback.Header.Get("Location"); got != returnTo+"?error=oauth_bind" {
+	if got := callback.Header.Get("Location"); got != returnTo+"?error=oauth_bind&provider=google" {
 		t.Fatalf("bind callback Location = %q", got)
 	}
 	credentials, err := store.ListOAuthCredentials(ctx, identity.ID)
@@ -309,7 +309,7 @@ func TestE2E_GoogleBindRequiresLiveOriginalSession(t *testing.T) {
 
 // oauthStateCookieName mirrors the controller's oauthStateCookie const (which is
 // unexported and lives in the controller package, not this _test package).
-const oauthStateCookieName = "g_oauth_state"
+const oauthStateCookieName = "g_oauth_state_google"
 
 // hasSetCookie reports whether the response sets a cookie with the given name.
 func hasSetCookie(resp *http.Response, name string) bool {

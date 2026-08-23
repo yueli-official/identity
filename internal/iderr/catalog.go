@@ -25,7 +25,10 @@ const (
 	CodeAbuseReplay                  = "identity.abuse_attempt_replayed"
 	CodeOAuthEmailConflict           = "identity.oauth_email_conflict"
 	CodeOAuthNoEmail                 = "identity.oauth_no_email"
+	CodeOAuthEmailUnverified         = "identity.oauth_email_unverified"
+	CodeOAuthBindingRequired         = "identity.oauth_binding_required"
 	CodeOAuthFailed                  = "identity.oauth_failed"
+	CodeExternalLoginProviderInvalid = "identity.external_login_provider_invalid"
 	CodeVerificationInvalid          = "identity.verification_invalid"
 	CodeResetThrottled               = "identity.reset_throttled"
 	CodeVerifyThrottled              = "identity.verify_throttled"
@@ -85,6 +88,7 @@ const (
 	CodePATNotFound                  = "identity.pat_not_found"
 	CodePATInvalid                   = "identity.pat_invalid"
 	CodePATExpired                   = "identity.pat_expired"
+	CodePATInsufficientScope         = "identity.pat_insufficient_scope"
 )
 
 var (
@@ -107,7 +111,10 @@ var (
 		CodeAbuseReplay:                  descriptor(CodeAbuseReplay, http.StatusConflict),
 		CodeOAuthEmailConflict:           descriptor(CodeOAuthEmailConflict, http.StatusConflict),
 		CodeOAuthNoEmail:                 descriptor(CodeOAuthNoEmail, http.StatusBadRequest),
+		CodeOAuthEmailUnverified:         descriptor(CodeOAuthEmailUnverified, http.StatusUnauthorized),
+		CodeOAuthBindingRequired:         descriptor(CodeOAuthBindingRequired, http.StatusConflict),
 		CodeOAuthFailed:                  descriptor(CodeOAuthFailed, http.StatusUnauthorized),
+		CodeExternalLoginProviderInvalid: descriptor(CodeExternalLoginProviderInvalid, http.StatusBadRequest),
 		CodeVerificationInvalid:          descriptor(CodeVerificationInvalid, http.StatusBadRequest),
 		CodeResetThrottled:               descriptor(CodeResetThrottled, http.StatusTooManyRequests),
 		CodeVerifyThrottled:              descriptor(CodeVerifyThrottled, http.StatusTooManyRequests),
@@ -167,6 +174,7 @@ var (
 		CodePATNotFound:                  descriptor(CodePATNotFound, http.StatusNotFound),
 		CodePATInvalid:                   descriptor(CodePATInvalid, http.StatusUnauthorized),
 		CodePATExpired:                   descriptor(CodePATExpired, http.StatusUnauthorized),
+		CodePATInsufficientScope:         descriptor(CodePATInsufficientScope, http.StatusForbidden),
 	}
 )
 
