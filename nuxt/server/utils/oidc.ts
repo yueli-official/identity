@@ -28,6 +28,12 @@ export interface OidcCfg {
   downstreamBase: string
   sealSecret: string
   cookieSecure: boolean
+  cookies: ProductCookieNames
+}
+
+export interface ProductCookieNames {
+  session: string
+  transaction: string
 }
 
 export interface Session {
@@ -37,15 +43,35 @@ export interface Session {
   user: { sub: string; userKey?: string; email?: string; name?: string; avatar?: string; roles?: string[] }
 }
 
-export const SESSION_COOKIE = 'rs_session'
-export const TX_COOKIE = 'rs_oidc_tx'
+// OAuth client identifiers are stable, case-sensitive registration identities.
+// The safe client label keeps browser diagnostics readable. A 48-bit SHA-256
+// prefix still binds the name to the exact, case-sensitive client ID, so two IDs
+// that normalize to the same label remain isolated.
+export function productCookieNames(clientId: string): ProductCookieNames {
+  if (!clientId.trim()) {
+    throw new Error('OIDC client ID is required for the product session namespace')
+  }
+  const label = clientId
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-web$/g, '')
+    .slice(0, 40)
+    .replace(/-+$/g, '') || 'client'
+  const namespace = createHash('sha256').update(clientId).digest('hex').slice(0, 12)
+  return {
+    session: `ys_${label}_${namespace}`,
+    transaction: `yt_${label}_${namespace}`,
+  }
+}
 
 export function oidcConfig(event: H3Event): OidcCfg {
   const rc = useRuntimeConfig(event)
   const issuer = (rc.public.oidcIssuer as string).replace(/\/$/, '')
+  const clientId = rc.public.oidcClientId as string
   return {
     issuer,
-    clientId: rc.public.oidcClientId as string,
+    clientId,
     clientSecret: rc.oidcClientSecret as string,
     redirectUri: rc.public.oidcRedirectUri as string,
     postLogoutRedirectUri: rc.public.oidcPostLogoutRedirectUri as string,
@@ -57,6 +83,7 @@ export function oidcConfig(event: H3Event): OidcCfg {
     downstreamBase: (rc.downstreamBase as string).replace(/\/$/, ''),
     sealSecret: rc.sealSecret as string,
     cookieSecure: Boolean(rc.authCookieSecure),
+    cookies: productCookieNames(clientId),
   }
 }
 

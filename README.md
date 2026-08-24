@@ -91,6 +91,11 @@ pnpm --dir nuxt pack --dry-run
 PostgreSQL、Redis 和至少 32 字节且稳定的 `GF_OIDC_GLOBALSECRET`；`oidc.issuer` 必须等于外部可访问的
 Identity origin。需要与 Asset 或其他消费者一起联调时，由 Workspace 的环境定义统一准备、启停和收集日志。
 
+Account 头像与资料封面的 Asset Consumer Template 位于
+[`contracts/asset.consumer.json`](contracts/asset.consumer.json)，绑定服务主体 `identity-svc`、namespace `account`。
+任何同时运行 Identity Account 与 Asset 的 Workspace 组合都必须在开放上传前把该声明注册为 accepted；Identity 不在
+运行时创建 Profile，也不回退到 Asset 的历史静态策略。
+
 ```powershell
 $env:GOWORK = "off"
 go run ./cmd/publishertrust `

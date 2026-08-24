@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { seal, unseal, type Session } from "../server/utils/oidc";
+import {
+  productCookieNames,
+  seal,
+  unseal,
+  type Session,
+} from "../server/utils/oidc";
 import { sessionForEvent } from "../server/utils/session";
 
 describe("OIDC BFF session refresh", () => {
@@ -17,6 +22,7 @@ describe("OIDC BFF session refresh", () => {
     oidcClientSecret: "",
     downstreamBase: "https://gallery-api.test",
     sealSecret: "session-test-secret",
+    cookies: productCookieNames("gallery-main-web"),
   };
 
   beforeEach(() => {
@@ -24,7 +30,6 @@ describe("OIDC BFF session refresh", () => {
     vi.stubGlobal("useRuntimeConfig", () => runtime);
     vi.stubGlobal("setCookie", setCookie);
     vi.stubGlobal("deleteCookie", deleteCookie);
-    vi.stubGlobal("SESSION_COOKIE", "rs_session");
     vi.stubGlobal("oidcConfig", () => runtime);
     vi.stubGlobal("seal", seal);
     vi.stubGlobal("unseal", unseal);
@@ -83,7 +88,7 @@ describe("OIDC BFF session refresh", () => {
     });
     expect(setCookie).toHaveBeenCalledWith(
       expect.anything(),
-      "rs_session",
+      runtime.cookies.session,
       expect.any(String),
       expect.objectContaining({ maxAge: 7 * 24 * 60 * 60 }),
     );

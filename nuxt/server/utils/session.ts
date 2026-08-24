@@ -17,21 +17,21 @@ function refreshFailureCode(error: unknown): string {
 
 export async function sessionForEvent(event: H3Event, _options: SessionOptions = {}): Promise<Session | null> {
   const cfg = oidcConfig(event)
-  const session = unseal<Session>(getCookie(event, SESSION_COOKIE), cfg.sealSecret)
+  const session = unseal<Session>(getCookie(event, cfg.cookies.session), cfg.sealSecret)
   if (!session) return null
 
   if (Date.now() <= session.exp - 30_000) {
     return session
   }
   if (!session.refresh) {
-    deleteCookie(event, SESSION_COOKIE, { path: '/' })
+    deleteCookie(event, cfg.cookies.session, { path: '/' })
     return null
   }
 
   try {
     const tok = await refreshSingleFlight(cfg, session.refresh)
     const next = sessionFromTokens(tok, session)
-    setCookie(event, SESSION_COOKIE, seal(next, cfg.sealSecret), {
+    setCookie(event, cfg.cookies.session, seal(next, cfg.sealSecret), {
       httpOnly: true,
       secure: cfg.cookieSecure,
       sameSite: 'lax',
@@ -41,7 +41,7 @@ export async function sessionForEvent(event: H3Event, _options: SessionOptions =
     return next
   } catch (error) {
     if (refreshFailureCode(error) === 'invalid_grant') {
-      deleteCookie(event, SESSION_COOKIE, { path: '/' })
+      deleteCookie(event, cfg.cookies.session, { path: '/' })
       return null
     }
     throw error

@@ -46,6 +46,10 @@ function config(suffix: string): OidcCfg {
     downstreamBase: "https://shop-api.test",
     sealSecret: "test-seal-secret-at-least-32-bytes",
     cookieSecure: true,
+    cookies: {
+      session: "ys_shop-main_0123456789ab",
+      transaction: "yt_shop-main_0123456789ab",
+    },
   };
 }
 

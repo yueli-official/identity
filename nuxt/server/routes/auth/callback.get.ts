@@ -12,8 +12,8 @@ export default defineEventHandler(async (event) => {
   const cfg = oidcConfig(event)
   const q = getQuery(event)
 
-  const tx = unseal<Tx>(getCookie(event, TX_COOKIE), cfg.sealSecret)
-  deleteCookie(event, TX_COOKIE, { path: '/' })
+  const tx = unseal<Tx>(getCookie(event, cfg.cookies.transaction), cfg.sealSecret)
+  deleteCookie(event, cfg.cookies.transaction, { path: '/' })
   if (!tx || !q.code || q.state !== tx.state) {
     throw createError({ statusCode: 400, statusMessage: 'invalid oauth state' })
   }
@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
   const claims = await verifyIdentityIdToken(tok.id_token, cfg, tx.nonce)
   const session = sessionFromTokens(tok, undefined, claims)
 
-  setCookie(event, SESSION_COOKIE, seal(session, cfg.sealSecret), {
+  setCookie(event, cfg.cookies.session, seal(session, cfg.sealSecret), {
     httpOnly: true,
     secure: cfg.cookieSecure,
     sameSite: 'lax',

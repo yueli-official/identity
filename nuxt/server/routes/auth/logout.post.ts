@@ -13,7 +13,7 @@ export default defineEventHandler((event) => {
       statusMessage: "Cross-origin logout is not allowed",
     });
   }
-  deleteCookie(event, SESSION_COOKIE, { path: '/' })
+  deleteCookie(event, cfg.cookies.session, { path: '/' })
 
   const query = new URLSearchParams({
     client_id: cfg.clientId,

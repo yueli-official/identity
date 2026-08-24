@@ -7,7 +7,7 @@ export default defineEventHandler((event) => {
   const nonce = randomToken()
   const returnTo = safeReturnTo(getQuery(event).return_to as string)
 
-  setCookie(event, TX_COOKIE, seal({ verifier, state, nonce, returnTo }, cfg.sealSecret), {
+  setCookie(event, cfg.cookies.transaction, seal({ verifier, state, nonce, returnTo }, cfg.sealSecret), {
     httpOnly: true,
     secure: cfg.cookieSecure,
     sameSite: 'lax',
