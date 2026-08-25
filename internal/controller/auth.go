@@ -116,6 +116,21 @@ func (c *Controller) Logout(ctx context.Context, _ *v1.LogoutReq) (*v1.LogoutRes
 	return &v1.LogoutRes{}, nil
 }
 
+func (c *Controller) Reauthenticate(ctx context.Context, req *v1.ReauthenticateReq) (*v1.ReauthenticateRes, error) {
+	r := ghttp.RequestFromCtx(ctx)
+	sid := r.Cookie.Get(sessionCookie, "").String()
+	if err := c.svc.Reauthenticate(ctx, sid, req.Password); err != nil {
+		return nil, err
+	}
+	session, _, err := c.svc.AuthenticatedSession(ctx, sid)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.ReauthenticateRes{
+		AuthenticatedAt: session.Authentication.AuthenticatedAt.Format(time.RFC3339),
+	}, nil
+}
+
 // EmailVerifyRequest sends a verify-email link to the logged-in caller. The
 // caller is resolved from the session cookie (same seam as Me).
 func (c *Controller) EmailVerifyRequest(ctx context.Context, _ *v1.EmailVerifyRequestReq) (*v1.EmailVerifyRequestRes, error) {

@@ -6,6 +6,7 @@ const props = defineProps<{ recovery?: boolean }>()
 const emit = defineEmits<{ recovered: [] }>()
 const toast = createAccountNotifier(useToast())
 const mfa = useMFA()
+const reauthentication = useAccountReauthentication()
 const modalOpen = ref(false)
 const removeOpen = ref(false)
 const starting = ref(false)
@@ -45,7 +46,7 @@ async function startEnrollment() {
   starting.value = true
   try {
     clearEnrollment()
-    enrollment.value = await mfa.beginTOTP('身份验证器')
+    enrollment.value = await reauthentication.run(() => mfa.beginTOTP('身份验证器'))
     stage.value = 'verify'
     code.value = ''
     recoveryCodes.value = []
@@ -56,6 +57,7 @@ async function startEnrollment() {
     qrDataUrl.value = qr.dataUrl
     modalOpen.value = true
   } catch (error) {
+    if (isAccountReauthenticationCancelled(error)) return
     toast.add({ title: '无法开始设置', description: identityErrorMessage(error, { context: 'mfa' }), color: 'error' })
   } finally {
     starting.value = false

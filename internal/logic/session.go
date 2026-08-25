@@ -4,11 +4,32 @@ import (
 	"context"
 	"errors"
 
+	"github.com/yueli-official/foundation/go/identifier"
 	"github.com/yueli-official/identity/internal/authentication"
 	"github.com/yueli-official/identity/internal/iderr"
 	"github.com/yueli-official/identity/internal/model"
 	"github.com/yueli-official/identity/internal/repo"
 )
+
+func (s *Service) Reauthenticate(ctx context.Context, sessionID, password string) error {
+	session, identity, err := s.AuthenticatedSession(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+	hash, err := s.store.GetPasswordHash(ctx, identity.ID)
+	if err != nil || !s.passwords.Verify(hash, password) {
+		return iderr.InvalidCredentials()
+	}
+	session.Authentication = authentication.Password(identifier.MustNew().String(), s.now())
+	if err := s.store.UpdateSessionAuthentication(ctx, session); err != nil {
+		return err
+	}
+	s.audit(ctx, AuditEvent{
+		Event: EvSessionReauthenticated, ActorID: identity.ID, TargetID: identity.ID,
+		Detail: map[string]any{"session_id": session.ID},
+	})
+	return nil
+}
 
 // AuthenticatedSession resolves the server-side session and its active identity.
 // Callers that need assurance facts must use the returned Session rather than

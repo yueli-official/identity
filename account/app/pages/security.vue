@@ -230,5 +230,7 @@ async function onSetPassword(event: FormSubmitEvent<InitialPasswordSchema>) {
       <PasskeyManager @changed="refreshCredentials" />
       <TOTPManager />
     </div>
+
+    <AccountReauthenticationModal :has-password="credentials?.hasPassword ?? false" />
   </div>
 </template>

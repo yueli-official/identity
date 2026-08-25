@@ -11,6 +11,7 @@ import {
   identityAccountMenuAppearanceMessages,
   identityAccountMenuMessages,
 } from "../utils/account-menu";
+import { accountMediaUrl } from "../utils/account-media";
 
 const props = withDefaults(
   defineProps<{
@@ -32,6 +33,9 @@ const props = withDefaults(
 const { user, loggedIn, login, logout } = useAuth();
 const accountUrl = computed(
   () => useRuntimeConfig().public.accountUrl || "http://localhost:3000",
+);
+const avatarUrl = computed(() =>
+  accountMediaUrl(user.value?.avatar, accountUrl.value),
 );
 const colorMode = useColorMode();
 
@@ -82,7 +86,7 @@ async function handleLogin(): Promise<void> {
     v-if="loggedIn"
     :name="user?.name"
     :email="user?.email"
-    :avatar-url="user?.avatar"
+    :avatar-url="avatarUrl"
     :utility-actions
     :appearance
     :trigger-mode="props.triggerMode"

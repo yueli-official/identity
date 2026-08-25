@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
+import type { PasskeySupport } from '~/composables/usePasskeys'
 import { safeReturnTo } from '~/utils/returnTo'
 
 definePageMeta({ layout: 'auth', middleware: 'guest' })
@@ -11,7 +12,8 @@ const { refresh } = useSession()
 const error = ref('')
 const loading = ref(false)
 const passkeyLoading = ref(false)
-const passkeyAvailable = ref(false)
+const passkeySupport = ref<PasskeySupport>('unsupported')
+const passkeyAvailable = computed(() => passkeySupport.value === 'supported')
 const passkeys = usePasskeys()
 const { data: externalProviderData } = await useAsyncData(
   'external-login-providers',
@@ -41,7 +43,7 @@ watch(mfaExpiry.expired, (expired) => {
 })
 
 onMounted(() => {
-  passkeyAvailable.value = passkeys.isSupported()
+  passkeySupport.value = passkeys.support()
 })
 
 // Surface an error handed back via the query string (e.g. an OAuth redirect that
@@ -282,8 +284,11 @@ function cancelPasskeyLogin() {
             external
           />
         </div>
-        <p v-if="!mfaTransaction && !passkeyAvailable" class="mt-3 text-center text-xs text-muted">
-          当前浏览器不支持通行密钥登录
+        <p v-if="!mfaTransaction && passkeySupport === 'insecure-context'" class="mt-3 text-center text-xs text-muted">
+          当前地址不是安全连接；通行密钥登录需要 HTTPS 或 localhost
+        </p>
+        <p v-else-if="!mfaTransaction && !passkeyAvailable" class="mt-3 text-center text-xs text-muted">
+          当前浏览器缺少通行密钥能力
         </p>
       </UCard>
 

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/yueli-official/foundation/go/identifier"
+	"github.com/yueli-official/identity/internal/authentication"
 	"github.com/yueli-official/identity/internal/model"
 	"github.com/yueli-official/identity/internal/user"
 )
@@ -499,6 +500,17 @@ func (m *Memory) GetSession(_ context.Context, id string) (model.Session, error)
 		return model.Session{}, ErrSessionNotFound
 	}
 	return s, nil
+}
+
+func (m *Memory) UpdateSessionAuthentication(_ context.Context, s model.Session) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.sessions[s.ID]; !ok {
+		return ErrSessionNotFound
+	}
+	s.Authentication = authentication.NormalizeLegacy(s.Authentication, s.CreatedAt)
+	m.sessions[s.ID] = s
+	return nil
 }
 
 func (m *Memory) DeleteSession(_ context.Context, id string) error {

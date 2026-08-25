@@ -203,6 +203,7 @@ type RoleRepo interface {
 
 type SessionStore interface {
 	CreateSession(ctx context.Context, s model.Session, ttl time.Duration) error
+	UpdateSessionAuthentication(ctx context.Context, s model.Session) error
 	GetSession(ctx context.Context, id string) (model.Session, error) // ErrSessionNotFound
 	DeleteSession(ctx context.Context, id string) error
 	ListSessionsByIdentity(ctx context.Context, identityID string) ([]model.Session, error)

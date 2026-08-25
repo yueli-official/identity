@@ -49,6 +49,14 @@ func (s *recoveringSessionStore) GetSession(ctx context.Context, id string) (mod
 	return sess, nil
 }
 
+func (s *recoveringSessionStore) UpdateSessionAuthentication(ctx context.Context, sess model.Session) error {
+	if err := s.durable.UpdateSessionAuthentication(ctx, sess); err != nil {
+		return err
+	}
+	_ = s.cache.UpdateSessionAuthentication(ctx, sess)
+	return nil
+}
+
 func (s *recoveringSessionStore) DeleteSession(ctx context.Context, id string) error {
 	_ = s.cache.DeleteSession(ctx, id)
 	return s.durable.DeleteSession(ctx, id)

@@ -12,6 +12,21 @@ export interface PasskeyEntry {
   lastUsedAt?: string;
 }
 
+export type PasskeySupport = 'supported' | 'insecure-context' | 'unsupported'
+
+export interface PasskeyCapabilities {
+  secureContext: boolean
+  credentialAPI: boolean
+  jsonHelpers: boolean
+}
+
+export function resolvePasskeySupport(capabilities: PasskeyCapabilities): PasskeySupport {
+  if (!capabilities.secureContext) return 'insecure-context'
+  return capabilities.credentialAPI && capabilities.jsonHelpers
+    ? 'supported'
+    : 'unsupported'
+}
+
 interface BeginPasskeyRegistration {
   ceremonyId: string;
   expiresAt: string;
@@ -55,13 +70,21 @@ export function usePasskeys() {
 
   onScopeDispose(() => activeCeremony?.abort());
 
-  const isSupported = () =>
-    import.meta.client &&
-    "PublicKeyCredential" in window &&
-    !!navigator.credentials &&
-    typeof PublicKeyCredential.parseCreationOptionsFromJSON === "function" &&
-    typeof PublicKeyCredential.parseRequestOptionsFromJSON === "function" &&
-    typeof PublicKeyCredential.prototype.toJSON === "function";
+  const support = (): PasskeySupport => {
+    if (!import.meta.client) return 'unsupported'
+    const credentialAPI = 'PublicKeyCredential' in window && !!navigator.credentials
+    const jsonHelpers = credentialAPI
+      && typeof PublicKeyCredential.parseCreationOptionsFromJSON === 'function'
+      && typeof PublicKeyCredential.parseRequestOptionsFromJSON === 'function'
+      && typeof PublicKeyCredential.prototype.toJSON === 'function'
+    return resolvePasskeySupport({
+      secureContext: window.isSecureContext,
+      credentialAPI,
+      jsonHelpers,
+    })
+  }
+
+  const isSupported = () => support() === 'supported'
 
   async function list() {
     return call<{ entries: PasskeyEntry[] }>("/api/v1/account/passkeys");
@@ -151,6 +174,7 @@ export function usePasskeys() {
 
   return {
     isSupported,
+    support,
     list,
     register,
     authenticate,

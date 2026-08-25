@@ -63,6 +63,20 @@ func (r *Redis) GetSession(ctx context.Context, id string) (model.Session, error
 	return s, nil
 }
 
+func (r *Redis) UpdateSessionAuthentication(ctx context.Context, s model.Session) error {
+	if _, err := r.GetSession(ctx, s.ID); err != nil {
+		return err
+	}
+	ttl := time.Duration(0)
+	if !s.ExpiresAt.IsZero() {
+		ttl = time.Until(s.ExpiresAt)
+		if ttl <= 0 {
+			return repo.ErrSessionNotFound
+		}
+	}
+	return r.CreateSession(ctx, s, ttl)
+}
+
 // DeleteSession removes the session key and prunes the per-identity index.
 func (r *Redis) DeleteSession(ctx context.Context, id string) error {
 	// Best-effort: remove from the identity index before deleting the session

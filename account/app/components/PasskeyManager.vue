@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { createAccountNotifier } from '~/utils/feedback'
-import type { PasskeyEntry } from '~/composables/usePasskeys'
+import type { PasskeyEntry, PasskeySupport } from '~/composables/usePasskeys'
 import { passkeyErrorMessage } from '~/composables/usePasskeys'
 
 const emit = defineEmits<{ changed: [] }>()
 const toast = createAccountNotifier(useToast())
 const passkeys = usePasskeys()
-const browserSupported = ref(false)
+const reauthentication = useAccountReauthentication()
+const support = ref<PasskeySupport>('unsupported')
+const browserSupported = computed(() => support.value === 'supported')
+const localhostURL = ref('')
 const adding = ref(false)
 const renaming = ref(false)
 const removing = ref(false)
@@ -23,7 +26,12 @@ const { data, pending, refresh } = await useAsyncData(
 const entries = computed(() => data.value.entries)
 
 onMounted(() => {
-  browserSupported.value = passkeys.isSupported()
+  support.value = passkeys.support()
+  if (support.value === 'insecure-context' && /^(?:192\.168\.|10\.|172\.(?:1[6-9]|2\d|3[01])\.)/.test(location.hostname)) {
+    const target = new URL(location.href)
+    target.hostname = 'localhost'
+    localhostURL.value = target.toString()
+  }
 })
 
 function defaultLabel() {
@@ -34,10 +42,11 @@ function defaultLabel() {
 async function addPasskey() {
   adding.value = true
   try {
-    await passkeys.register(defaultLabel())
+    await reauthentication.run(() => passkeys.register(defaultLabel()))
     await refresh()
     emit('changed')
   } catch (error) {
+    if (isAccountReauthenticationCancelled(error)) return
     toast.add({ title: '未能添加通行密钥', description: passkeyErrorMessage(error), color: 'error' })
   } finally {
     adding.value = false
@@ -77,11 +86,12 @@ async function confirmRemove() {
   if (!selected.value) return
   removing.value = true
   try {
-    await passkeys.remove(selected.value.id)
+    await reauthentication.run(() => passkeys.remove(selected.value!.id))
     await refresh()
     emit('changed')
     removeOpen.value = false
   } catch (error) {
+    if (isAccountReauthenticationCancelled(error)) return
     toast.add({
       title: '无法移除通行密钥',
       description: passkeyErrorMessage(error),
@@ -129,12 +139,33 @@ function formatDate(value?: string) {
     </template>
 
     <UAlert
-      v-if="!browserSupported"
+      v-if="support === 'insecure-context'"
       color="neutral"
       variant="soft"
       icon="i-tabler-browser-off"
-      title="当前浏览器不支持通行密钥"
-      description="你仍可查看和移除已有凭据；请使用较新的浏览器添加通行密钥。"
+      title="通行密钥需要 HTTPS 或 localhost"
+      description="当前页面使用局域网 HTTP，并不是 Chrome 版本问题。你仍可查看和移除已有凭据。"
+      class="mb-4"
+    >
+      <template v-if="localhostURL" #actions>
+        <UButton
+          :to="localhostURL"
+          external
+          color="neutral"
+          variant="outline"
+          size="xs"
+          label="使用 localhost 打开"
+        />
+      </template>
+    </UAlert>
+
+    <UAlert
+      v-else-if="support === 'unsupported'"
+      color="neutral"
+      variant="soft"
+      icon="i-tabler-browser-off"
+      title="当前浏览器缺少通行密钥能力"
+      description="请更新浏览器，或改用新版 Chrome、Edge 或 Safari。"
       class="mb-4"
     />
 

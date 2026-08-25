@@ -1,6 +1,7 @@
 import { generateKeyPairSync, sign, type KeyObject } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  refreshSingleFlight,
   safeReturnTo,
   seal,
   sessionFromTokens,
@@ -181,6 +182,28 @@ describe("sessionFromTokens", () => {
         config("cookie-budget"),
       ),
     ).toThrow(/3500 byte budget/);
+  });
+});
+
+describe("refreshSingleFlight", () => {
+  it("reuses a freshly rotated result for a late request carrying the stale cookie", async () => {
+    const fetchToken = vi.fn().mockResolvedValue({
+      access_token: "fresh-access",
+      refresh_token: "rotated-refresh",
+      expires_in: 600,
+    });
+    vi.stubGlobal("$fetch", fetchToken);
+    const cfg = config(`late-refresh-${Date.now()}`);
+    const staleRefresh = `stale-refresh-${Date.now()}`;
+
+    await expect(refreshSingleFlight(cfg, staleRefresh)).resolves.toMatchObject({
+      refresh_token: "rotated-refresh",
+    });
+    await expect(refreshSingleFlight(cfg, staleRefresh)).resolves.toMatchObject({
+      refresh_token: "rotated-refresh",
+    });
+
+    expect(fetchToken).toHaveBeenCalledTimes(1);
   });
 });
 

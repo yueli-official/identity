@@ -1,0 +1,59 @@
+{
+  "$schema": "../../asset/contracts/asset-consumer-declaration.schema.json",
+  "consumerKey": "account",
+  "namespaceKey": "account",
+  "displayName": "月离账户中心",
+  "bindings": [
+    { "kind": "service-client", "subject": "identity-svc" }
+  ],
+  "profiles": [
+    {
+      "key": "avatar",
+      "kind": "public-image",
+      "purpose": "用户头像",
+      "allowedMimes": ["image/jpeg", "image/png", "image/webp"],
+      "maxBytes": 8388608,
+      "maxPixels": 30000000,
+      "visibility": "public",
+      "metadataPolicy": "strip",
+      "keepOriginal": true,
+      "storageClass": "public-media",
+      "variants": [
+        {
+          "key": "thumbnail",
+          "width": 256,
+          "height": 256,
+          "mode": "fill",
+          "format": "webp",
+          "quality": 86,
+          "visibility": "public",
+          "metadataPolicy": "strip"
+        }
+      ]
+    },
+    {
+      "key": "cover",
+      "kind": "public-image",
+      "purpose": "用户资料封面",
+      "allowedMimes": ["image/jpeg", "image/png", "image/webp"],
+      "maxBytes": 8388608,
+      "maxPixels": 30000000,
+      "visibility": "public",
+      "metadataPolicy": "strip",
+      "keepOriginal": true,
+      "storageClass": "public-media",
+      "variants": [
+        {
+          "key": "cover",
+          "width": 1200,
+          "height": 400,
+          "mode": "fill",
+          "format": "webp",
+          "quality": 86,
+          "visibility": "public",
+          "metadataPolicy": "strip"
+        }
+      ]
+    }
+  ]
+}

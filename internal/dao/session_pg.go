@@ -30,25 +30,7 @@ func (p *PG) CreateSession(ctx context.Context, s model.Session, ttl time.Durati
 }
 
 func insertAuthenticationSessionTX(ctx context.Context, tx gdb.TX, s model.Session) error {
-	credentialRefs := s.Authentication.CredentialRefs
-	if credentialRefs == nil {
-		credentialRefs = []string{}
-	}
-	if _, err := tx.Model("authentication_events").Ctx(ctx).Data(g.Map{
-		"id":                 s.Authentication.EventID,
-		"identity_id":        s.IdentityID,
-		"session_id":         s.ID,
-		"authenticated_at":   s.Authentication.AuthenticatedAt,
-		"methods":            authentication.MethodStrings(s.Authentication.Methods),
-		"factor_classes":     authentication.FactorStrings(s.Authentication.FactorClasses),
-		"assurance_level":    s.Authentication.Level,
-		"assurance_profile":  s.Authentication.Profile,
-		"user_verified":      s.Authentication.UserVerified,
-		"phishing_resistant": s.Authentication.PhishingResistant,
-		"recovery":           s.Authentication.Recovery,
-		"credential_refs":    credentialRefs,
-		"policy_version":     s.Authentication.PolicyVersion,
-	}).Insert(); err != nil {
+	if err := insertAuthenticationEventTX(ctx, tx, s); err != nil {
 		return err
 	}
 	_, err := tx.Model(sessionsTable).Ctx(ctx).Data(g.Map{
@@ -63,6 +45,57 @@ func insertAuthenticationSessionTX(ctx context.Context, tx gdb.TX, s model.Sessi
 		"authentication_event_id": s.Authentication.EventID,
 	}).Insert()
 	return err
+}
+
+func insertAuthenticationEventTX(ctx context.Context, tx gdb.TX, s model.Session) error {
+	credentialRefs := s.Authentication.CredentialRefs
+	if credentialRefs == nil {
+		credentialRefs = []string{}
+	}
+	_, err := tx.Model("authentication_events").Ctx(ctx).Data(g.Map{
+		"id":                 s.Authentication.EventID,
+		"identity_id":        s.IdentityID,
+		"session_id":         s.ID,
+		"authenticated_at":   s.Authentication.AuthenticatedAt,
+		"methods":            authentication.MethodStrings(s.Authentication.Methods),
+		"factor_classes":     authentication.FactorStrings(s.Authentication.FactorClasses),
+		"assurance_level":    s.Authentication.Level,
+		"assurance_profile":  s.Authentication.Profile,
+		"user_verified":      s.Authentication.UserVerified,
+		"phishing_resistant": s.Authentication.PhishingResistant,
+		"recovery":           s.Authentication.Recovery,
+		"credential_refs":    credentialRefs,
+		"policy_version":     s.Authentication.PolicyVersion,
+	}).Insert()
+	return err
+}
+
+func (p *PG) UpdateSessionAuthentication(ctx context.Context, s model.Session) error {
+	s.Authentication = authentication.NormalizeLegacy(s.Authentication, s.CreatedAt)
+	return p.db.Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		tx = tx.Ctx(ctx)
+		if err := insertAuthenticationEventTX(ctx, tx, s); err != nil {
+			return err
+		}
+		result, err := tx.Model(sessionsTable).Ctx(ctx).
+			Where("id", s.ID).
+			Where("identity_id", s.IdentityID).
+			Data(g.Map{
+				"authentication_event_id": s.Authentication.EventID,
+				"last_seen":               time.Now().UTC(),
+			}).Update()
+		if err != nil {
+			return err
+		}
+		rows, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if rows == 0 {
+			return repo.ErrSessionNotFound
+		}
+		return nil
+	})
 }
 
 func (p *PG) GetSession(ctx context.Context, id string) (model.Session, error) {

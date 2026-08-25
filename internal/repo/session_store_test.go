@@ -60,6 +60,31 @@ func TestRecoveringSessionStoreWritesDurableFirst(t *testing.T) {
 	}
 }
 
+func TestRecoveringSessionStoreUpdatesAuthenticationInDurableAndCache(t *testing.T) {
+	ctx := context.Background()
+	cache := newMapSessionStore()
+	durable := newMapSessionStore()
+	store := repo.NewRecoveringSessionStore(cache, durable)
+	sess := model.Session{
+		ID: "00000000-0000-0000-0000-000000000005", IdentityID: "00000000-0000-0000-0000-000000000006",
+		CreatedAt: time.Now(), ExpiresAt: time.Now().Add(time.Hour),
+	}
+	if err := store.CreateSession(ctx, sess, time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	sess.Authentication.EventID = "fresh-authentication-event"
+	sess.Authentication.AuthenticatedAt = time.Now()
+	if err := store.UpdateSessionAuthentication(ctx, sess); err != nil {
+		t.Fatal(err)
+	}
+	for name, source := range map[string]repo.SessionStore{"cache": cache, "durable": durable} {
+		got, err := source.GetSession(ctx, sess.ID)
+		if err != nil || got.Authentication.EventID != "fresh-authentication-event" {
+			t.Fatalf("%s authentication not updated: %+v err=%v", name, got.Authentication, err)
+		}
+	}
+}
+
 type mapSessionStore struct {
 	sessions map[string]model.Session
 }
@@ -79,6 +104,14 @@ func (s *mapSessionStore) GetSession(_ context.Context, id string) (model.Sessio
 		return model.Session{}, repo.ErrSessionNotFound
 	}
 	return sess, nil
+}
+
+func (s *mapSessionStore) UpdateSessionAuthentication(_ context.Context, sess model.Session) error {
+	if _, ok := s.sessions[sess.ID]; !ok {
+		return repo.ErrSessionNotFound
+	}
+	s.sessions[sess.ID] = sess
+	return nil
 }
 
 func (s *mapSessionStore) DeleteSession(_ context.Context, id string) error {

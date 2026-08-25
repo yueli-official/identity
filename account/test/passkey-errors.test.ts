@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { passkeyErrorMessage } from '../app/composables/usePasskeys'
+import { passkeyErrorMessage, resolvePasskeySupport } from '../app/composables/usePasskeys'
 
 describe('passkeyErrorMessage', () => {
   it('distinguishes an explicit cancellation from browser timeout or unavailable credentials', () => {
@@ -22,5 +22,25 @@ describe('passkeyErrorMessage', () => {
         },
       },
     })).toContain('请改用其他登录方式')
+  })
+})
+
+describe('resolvePasskeySupport', () => {
+  it('distinguishes an insecure origin from a browser capability gap', () => {
+    expect(resolvePasskeySupport({
+      secureContext: false,
+      credentialAPI: false,
+      jsonHelpers: false,
+    })).toBe('insecure-context')
+    expect(resolvePasskeySupport({
+      secureContext: true,
+      credentialAPI: false,
+      jsonHelpers: false,
+    })).toBe('unsupported')
+    expect(resolvePasskeySupport({
+      secureContext: true,
+      credentialAPI: true,
+      jsonHelpers: true,
+    })).toBe('supported')
   })
 })

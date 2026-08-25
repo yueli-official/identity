@@ -317,24 +317,50 @@ export async function refreshTokens(
   });
 }
 
-// In-flight refreshes keyed by the refresh token, so concurrent requests on one
-// session (all reading the same sealed cookie near expiry) share a single token
-// grant instead of each POSTing /token. Without this, refresh-token ROTATION
-// makes the parallel grants invalidate each other. The dedup is per Nitro
-// instance (the cookie is stateless, so cross-instance dedup is out of scope).
-const inflightRefresh = new Map<string, Promise<TokenResponse>>();
+// Requests that started with the same sealed cookie can reach Nitro a little
+// after the first refresh has already completed. Refresh-token rotation makes
+// that old token permanently invalid, so removing the single-flight entry as
+// soon as the promise settles lets a late request erase the newly issued
+// browser cookie. Keep a successful result for a short replay grace window;
+// failures remain immediately retryable. The cache is still per Nitro instance.
+const REFRESH_REPLAY_GRACE_MS = 5_000;
+interface RefreshFlight {
+  promise: Promise<TokenResponse>;
+  expiresAt: number;
+}
+const refreshFlights = new Map<string, RefreshFlight>();
 
 export function refreshSingleFlight(
   cfg: OidcCfg,
   refresh: string,
 ): Promise<TokenResponse> {
-  const existing = inflightRefresh.get(refresh);
-  if (existing) return existing;
-  const p = refreshTokens(cfg, refresh).finally(() =>
-    inflightRefresh.delete(refresh),
+  const now = Date.now();
+  const existing = refreshFlights.get(refresh);
+  if (existing && existing.expiresAt > now) return existing.promise;
+  if (existing) refreshFlights.delete(refresh);
+
+  let flight!: RefreshFlight;
+  const promise = refreshTokens(cfg, refresh).then(
+    (tokens) => {
+      flight.expiresAt = Date.now() + REFRESH_REPLAY_GRACE_MS;
+      const timer = setTimeout(() => {
+        if (refreshFlights.get(refresh) === flight) {
+          refreshFlights.delete(refresh);
+        }
+      }, REFRESH_REPLAY_GRACE_MS);
+      timer.unref?.();
+      return tokens;
+    },
+    (error) => {
+      if (refreshFlights.get(refresh) === flight) {
+        refreshFlights.delete(refresh);
+      }
+      throw error;
+    },
   );
-  inflightRefresh.set(refresh, p);
-  return p;
+  flight = { promise, expiresAt: Number.POSITIVE_INFINITY };
+  refreshFlights.set(refresh, flight);
+  return promise;
 }
 
 // sessionFromTokens builds a Session from a token response.
