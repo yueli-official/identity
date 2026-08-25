@@ -33,4 +33,15 @@ describe("public profile routes", () => {
     expect(source).toContain("user.displayName");
     expect(source).not.toMatch(/user\.(?:email|roles|status|id)\b/);
   });
+
+  it("keeps public identity in one layered credential surface", () => {
+    if (!existsSync(profile)) return;
+
+    const source = readFileSync(profile, "utf8");
+    expect(source).toContain("data-public-user-profile");
+    expect(source).toContain("data-public-profile-shade");
+    expect(source).toContain("永久用户号");
+    expect(source).toContain('aria-label="公开链接"');
+    expect(source).not.toContain("资料由月离账户中心统一提供");
+  });
 });

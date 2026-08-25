@@ -3,6 +3,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     // Server-only secrets.
     sealSecret: "", // NUXT_SEAL_SECRET — AES key for the session cookie (required)
+    sealSecretPrevious: "", // NUXT_SEAL_SECRET_PREVIOUS — optional one-generation rotation bridge
     oidcClientSecret: "", // NUXT_OIDC_CLIENT_SECRET — server-only; empty for public PKCE clients
     downstreamBase: "", // NUXT_DOWNSTREAM_BASE — the backend service base URL
     guestSessionTtlSeconds: 0, // NUXT_GUEST_SESSION_TTL_SECONDS — consumer-selected; Identity clamps it

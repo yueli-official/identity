@@ -12,7 +12,7 @@ const initial = computed(() =>
 const avatarUrl = computed(() => userMediaUrl(props.user.avatar, "thumbnail"));
 const coverUrl = computed(() => userMediaUrl(props.user.cover, "cover"));
 const stableProfilePath = computed(
-  () => `/u/${encodeURIComponent(props.user.userKey)}`,
+  () => "/u/" + encodeURIComponent(props.user.userKey),
 );
 const links = computed(() =>
   (props.user.socialLinks || []).map((link) => ({
@@ -23,104 +23,122 @@ const links = computed(() =>
 </script>
 
 <template>
-  <!--
-  THESIS: 公开资料是一张可验证的身份凭证，不是社交数据面板；可修改 Handle 与永久用户号必须一眼分层。
-  OWN-WORLD: 沿用 Account 的 teal、中性色、柔和圆角与封面—头像语言；身份正文克制，永久键使用数据字体。
-  STORY: 访客先确认姓名与 Handle，再读简介，以永久用户号确认稳定身份，最后访问用户主动公开的链接。
-  FIRST VIEWPORT: 封面横贯顶部，头像压住封面边缘；姓名与 Handle 在左，永久用户号在右，简介紧随其后。
-  FORM: 七个既有视觉世界结构中的第四案“公开身份凭证”，采用稳定键侧栏；seed 341b984d。
-  FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
-  -->
-  <article class="mx-auto w-full max-w-2xl pb-6">
+  <article class="mx-auto w-full max-w-3xl pb-6" data-public-user-profile>
     <section
-      class="overflow-hidden rounded-2xl bg-default ring-1 ring-default"
+      class="overflow-hidden rounded-2xl border border-default bg-default"
       aria-labelledby="profile-name"
     >
-      <div class="relative h-36 overflow-hidden bg-primary/10 sm:h-48">
+      <div class="relative h-72 overflow-hidden bg-primary/10 sm:h-80">
         <img
           v-if="coverUrl"
           :src="coverUrl"
           alt=""
-          class="size-full object-cover"
-        >
+          class="absolute inset-0 size-full object-cover"
+        />
+        <div v-else class="public-profile-cover-fallback absolute inset-0" />
+        <div
+          class="public-profile-shade absolute inset-0"
+          data-public-profile-shade
+        />
+
+        <div class="absolute inset-x-0 bottom-0 p-5 sm:p-7">
+          <div class="flex min-w-0 items-end gap-4 sm:gap-5">
+            <UAvatar
+              :src="avatarUrl || undefined"
+              :text="initial"
+              :alt="user.displayName + '的头像'"
+              size="3xl"
+              class="size-24 shrink-0 shadow-lg ring-4 ring-white/90 sm:size-28"
+            />
+            <div class="min-w-0 pb-0.5">
+              <h1
+                id="profile-name"
+                class="font-display text-balance text-2xl font-semibold text-white sm:text-3xl"
+              >
+                {{ user.displayName }}
+              </h1>
+              <p
+                v-if="user.handle"
+                class="public-profile-handle mt-0.5 break-all text-sm sm:text-base"
+              >
+                @{{ user.handle }}
+              </p>
+              <p
+                v-if="user.bio"
+                class="public-profile-bio mt-2 line-clamp-3 max-w-[62ch] whitespace-pre-line text-pretty text-sm leading-6 sm:text-base"
+              >
+                {{ user.bio }}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="px-5 pb-6 sm:px-8 sm:pb-8">
-        <div class="-mt-12 w-fit rounded-full bg-default p-1 sm:-mt-14">
-          <UAvatar
-            :src="avatarUrl || undefined"
-            :text="initial"
-            :alt="`${user.displayName}的头像`"
-            size="3xl"
-            class="size-24 shadow-soft sm:size-28"
-          />
-        </div>
-
-        <div class="mt-4 flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-          <div class="min-w-0 flex-1">
-            <h1
-              id="profile-name"
-              class="font-display text-balance text-2xl font-semibold text-highlighted sm:text-3xl"
-            >
-              {{ user.displayName }}
-            </h1>
-            <p v-if="user.handle" class="mt-1 break-all text-base text-muted">
-              @{{ user.handle }}
-            </p>
-          </div>
-
-          <div class="min-w-0 rounded-xl bg-elevated px-4 py-3 sm:w-52 sm:shrink-0">
-            <p class="text-xs font-medium text-muted">永久用户号</p>
-            <NuxtLink
-              :to="stableProfilePath"
-              class="mt-1 flex min-h-7 items-center gap-2 rounded-sm font-mono text-sm font-semibold text-highlighted outline-none hover:text-primary focus-visible:ring-2 focus-visible:ring-primary"
-              :aria-label="`打开 ${user.displayName} 的永久资料地址`"
-            >
-              <UIcon name="i-tabler-link" class="size-4 shrink-0 text-primary" />
-              <span class="min-w-0 break-all">{{ user.userKey }}</span>
-            </NuxtLink>
-          </div>
-        </div>
-
-        <p
-          v-if="user.bio"
-          class="mt-6 max-w-[68ch] whitespace-pre-line text-pretty text-base leading-7 text-default"
-        >
-          {{ user.bio }}
-        </p>
-      </div>
-    </section>
-
-    <section v-if="links.length" class="mt-8" aria-labelledby="public-links-heading">
-      <h2
-        id="public-links-heading"
-        class="font-display text-lg font-semibold text-highlighted"
+      <div
+        class="flex min-h-16 flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7"
       >
-        公开链接
-      </h2>
-      <ul class="mt-3 grid gap-3 sm:grid-cols-2">
-        <li v-for="link in links" :key="`${link.label}:${link.url}`">
+        <div class="min-w-0">
+          <p class="text-xs font-medium text-muted">永久用户号</p>
+          <NuxtLink
+            :to="stableProfilePath"
+            class="mt-0.5 inline-flex min-h-7 max-w-full items-center gap-2 rounded-sm font-mono text-sm font-semibold text-highlighted outline-none transition-colors hover:text-primary focus-visible:ring-2 focus-visible:ring-primary"
+            :aria-label="'打开 ' + user.displayName + ' 的永久资料地址'"
+          >
+            <UIcon name="i-tabler-link" class="size-4 shrink-0 text-primary" />
+            <span class="min-w-0 break-all">{{ user.userKey }}</span>
+          </NuxtLink>
+        </div>
+
+        <nav
+          v-if="links.length"
+          class="flex min-w-0 flex-wrap gap-1.5 sm:justify-end"
+          aria-label="公开链接"
+        >
           <UButton
+            v-for="link in links"
+            :key="link.label + ':' + link.url"
             :to="link.url"
             external
             target="_blank"
             rel="noopener noreferrer"
             color="neutral"
-            variant="outline"
-            size="lg"
-            block
+            variant="soft"
+            size="sm"
             :icon="link.platform.icon"
             trailing-icon="i-tabler-arrow-up-right"
             :label="link.label"
-            class="min-h-12 justify-between"
+            class="min-h-9"
           />
-        </li>
-      </ul>
+        </nav>
+      </div>
     </section>
-
-    <p class="mt-8 flex items-center justify-center gap-2 text-center text-xs text-muted">
-      <UIcon name="i-tabler-shield-check" class="size-4 text-primary" />
-      资料由月离账户中心统一提供
-    </p>
   </article>
 </template>
+
+<style scoped>
+.public-profile-cover-fallback {
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--ui-primary) 34%, transparent),
+    color-mix(in oklab, var(--ui-primary) 12%, var(--ui-bg-elevated)) 52%,
+    var(--ui-bg-elevated)
+  );
+}
+
+.public-profile-shade {
+  background: linear-gradient(
+    to top,
+    rgb(0 0 0 / 0.84) 0%,
+    rgb(0 0 0 / 0.34) 46%,
+    rgb(0 0 0 / 0.06) 100%
+  );
+}
+
+.public-profile-handle {
+  color: rgb(255 255 255 / 0.76);
+}
+
+.public-profile-bio {
+  color: rgb(255 255 255 / 0.88);
+}
+</style>

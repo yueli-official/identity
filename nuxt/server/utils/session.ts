@@ -1,54 +1,79 @@
-import type { H3Event } from 'h3'
-import type { Session } from './oidc'
+import type { H3Event } from "h3";
+import type { Session } from "./oidc";
+import { decodeProductSession, encodeProductSession } from "./product-session";
 
 interface SessionOptions {
-  clearOnRefreshFailure?: boolean
+  clearOnRefreshFailure?: boolean;
 }
 
 function refreshFailureCode(error: unknown): string {
-  if (!error || typeof error !== 'object') return ''
+  if (!error || typeof error !== "object") return "";
   const value = error as {
-    data?: { error?: unknown; code?: unknown }
-    failure?: { code?: unknown }
-  }
-  const candidate = value.data?.error || value.data?.code || value.failure?.code
-  return typeof candidate === 'string' ? candidate : ''
+    data?: { error?: unknown; code?: unknown };
+    failure?: { code?: unknown };
+  };
+  const candidate =
+    value.data?.error || value.data?.code || value.failure?.code;
+  return typeof candidate === "string" ? candidate : "";
 }
 
-export async function sessionForEvent(event: H3Event, _options: SessionOptions = {}): Promise<Session | null> {
-  const cfg = oidcConfig(event)
-  const session = unseal<Session>(getCookie(event, cfg.cookies.session), cfg.sealSecret)
-  if (!session) return null
+export async function sessionForEvent(
+  event: H3Event,
+  _options: SessionOptions = {},
+): Promise<Session | null> {
+  const cfg = oidcConfig(event);
+  const decoded = decodeProductSession(
+    getCookie(event, cfg.cookies.session),
+    cfg,
+  );
+  if (!decoded) return null;
+  const session = decoded.session;
 
   if (Date.now() <= session.exp - 30_000) {
-    return session
+    if (decoded.needsMigration) {
+      setCookie(
+        event,
+        cfg.cookies.session,
+        encodeProductSession(session, cfg),
+        {
+          httpOnly: true,
+          secure: cfg.cookieSecure,
+          sameSite: "lax",
+          path: "/",
+          maxAge: 60 * 60 * 24 * 7,
+        },
+      );
+    }
+    return session;
   }
   if (!session.refresh) {
-    deleteCookie(event, cfg.cookies.session, { path: '/' })
-    return null
+    deleteCookie(event, cfg.cookies.session, { path: "/" });
+    return null;
   }
 
   try {
-    const tok = await refreshSingleFlight(cfg, session.refresh)
-    const next = sessionFromTokens(tok, session)
-    setCookie(event, cfg.cookies.session, seal(next, cfg.sealSecret), {
+    const tok = await refreshSingleFlight(cfg, session.refresh);
+    const next = sessionFromTokens(tok, session);
+    setCookie(event, cfg.cookies.session, encodeProductSession(next, cfg), {
       httpOnly: true,
       secure: cfg.cookieSecure,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 60 * 60 * 24 * 7
-    })
-    return next
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7,
+    });
+    return next;
   } catch (error) {
-    if (refreshFailureCode(error) === 'invalid_grant') {
-      deleteCookie(event, cfg.cookies.session, { path: '/' })
-      return null
+    if (refreshFailureCode(error) === "invalid_grant") {
+      deleteCookie(event, cfg.cookies.session, { path: "/" });
+      return null;
     }
-    throw error
+    throw error;
   }
 }
 
-export async function sessionAuthHeaders(event: H3Event): Promise<Record<string, string>> {
-  const session = await sessionForEvent(event)
-  return session?.access ? { authorization: `Bearer ${session.access}` } : {}
+export async function sessionAuthHeaders(
+  event: H3Event,
+): Promise<Record<string, string>> {
+  const session = await sessionForEvent(event);
+  return session?.access ? { authorization: `Bearer ${session.access}` } : {};
 }

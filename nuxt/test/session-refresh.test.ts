@@ -22,6 +22,7 @@ describe("OIDC BFF session refresh", () => {
     oidcClientSecret: "",
     downstreamBase: "https://gallery-api.test",
     sealSecret: "session-test-secret",
+    sealSecretPrevious: "previous-session-test-secret",
     cookies: productCookieNames("gallery-main-web"),
   };
 
@@ -36,7 +37,10 @@ describe("OIDC BFF session refresh", () => {
     vi.stubGlobal("refreshSingleFlight", () => $fetch("/oauth2/token"));
     vi.stubGlobal(
       "sessionFromTokens",
-      (tokens: { access_token: string; refresh_token?: string }, previous: Session) => ({
+      (
+        tokens: { access_token: string; refresh_token?: string },
+        previous: Session,
+      ) => ({
         ...previous,
         access: tokens.access_token,
         refresh: tokens.refresh_token || previous.refresh,
@@ -45,23 +49,25 @@ describe("OIDC BFF session refresh", () => {
     );
   });
 
-  function expiredCookie(refresh?: string) {
+  function expiredCookie(refresh?: string, secret = runtime.sealSecret) {
     const session: Session = {
       access: "expired-access",
       refresh,
       exp: Date.now() - 60_000,
       user: { sub: "user-1", name: "测试用户", roles: ["admin"] },
     };
-    return seal(session, runtime.sealSecret);
+    return seal(session, secret);
   }
 
   it("does not erase the login cookie when Identity is temporarily unavailable", async () => {
     vi.stubGlobal("getCookie", () => expiredCookie("refresh-1"));
     vi.stubGlobal(
       "$fetch",
-      vi.fn().mockRejectedValue(
-        Object.assign(new Error("network unavailable"), { statusCode: 503 }),
-      ),
+      vi
+        .fn()
+        .mockRejectedValue(
+          Object.assign(new Error("network unavailable"), { statusCode: 503 }),
+        ),
     );
 
     await expect(
@@ -93,6 +99,30 @@ describe("OIDC BFF session refresh", () => {
       expect.objectContaining({ maxAge: 7 * 24 * 60 * 60 }),
     );
     expect(deleteCookie).not.toHaveBeenCalled();
+  });
+
+  it("renews a session sealed with the previous key and migrates it to the current key", async () => {
+    vi.stubGlobal("getCookie", () =>
+      expiredCookie("refresh-1", runtime.sealSecretPrevious),
+    );
+    vi.stubGlobal(
+      "$fetch",
+      vi.fn().mockResolvedValue({
+        access_token: "fresh-access",
+        refresh_token: "refresh-2",
+        expires_in: 600,
+      }),
+    );
+
+    await expect(sessionForEvent({} as never)).resolves.toMatchObject({
+      access: "fresh-access",
+      refresh: "refresh-2",
+    });
+    const migrated = setCookie.mock.calls.at(-1)?.[2];
+    expect(unseal<Session>(migrated, runtime.sealSecret)).toMatchObject({
+      access: "fresh-access",
+      refresh: "refresh-2",
+    });
   });
 
   it("clears a refresh token only when Identity says it is permanently invalid", async () => {

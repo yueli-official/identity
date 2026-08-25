@@ -12,35 +12,36 @@ import {
   randomBytes,
   verify as verifySignature,
 } from "node:crypto";
-import type { H3Event } from 'h3'
+import type { H3Event } from "h3";
 
 export interface OidcCfg {
-  issuer: string
-  clientId: string
-  clientSecret: string
-  redirectUri: string
-  postLogoutRedirectUri: string
-  scopes: string
-  authorizeEndpoint: string
-  tokenEndpoint: string
-  jwksEndpoint: string
-  endSessionEndpoint: string
-  downstreamBase: string
-  sealSecret: string
-  cookieSecure: boolean
-  cookies: ProductCookieNames
+  issuer: string;
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+  postLogoutRedirectUri: string;
+  scopes: string;
+  authorizeEndpoint: string;
+  tokenEndpoint: string;
+  jwksEndpoint: string;
+  endSessionEndpoint: string;
+  downstreamBase: string;
+  sealSecret: string;
+  sealSecretPrevious?: string;
+  cookieSecure: boolean;
+  cookies: ProductCookieNames;
 }
 
 export interface ProductCookieNames {
-  session: string
-  transaction: string
+  session: string;
+  transaction: string;
 }
 
 export interface Session {
-  access: string
-  refresh?: string
-  exp: number // epoch ms
-  user: { sub: string; userKey?: string; email?: string; name?: string; avatar?: string; roles?: string[] }
+  access: string;
+  refresh?: string;
+  exp: number; // epoch ms
+  user: { sub: string; userKey?: string; email?: string; name?: string };
 }
 
 // OAuth client identifiers are stable, case-sensitive registration identities.
@@ -49,84 +50,96 @@ export interface Session {
 // that normalize to the same label remain isolated.
 export function productCookieNames(clientId: string): ProductCookieNames {
   if (!clientId.trim()) {
-    throw new Error('OIDC client ID is required for the product session namespace')
+    throw new Error(
+      "OIDC client ID is required for the product session namespace",
+    );
   }
-  const label = clientId
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .replace(/-web$/g, '')
-    .slice(0, 40)
-    .replace(/-+$/g, '') || 'client'
-  const namespace = createHash('sha256').update(clientId).digest('hex').slice(0, 12)
+  const label =
+    clientId
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .replace(/-web$/g, "")
+      .slice(0, 40)
+      .replace(/-+$/g, "") || "client";
+  const namespace = createHash("sha256")
+    .update(clientId)
+    .digest("hex")
+    .slice(0, 12);
   return {
     session: `ys_${label}_${namespace}`,
     transaction: `yt_${label}_${namespace}`,
-  }
+  };
 }
 
 export function oidcConfig(event: H3Event): OidcCfg {
-  const rc = useRuntimeConfig(event)
-  const issuer = (rc.public.oidcIssuer as string).replace(/\/$/, '')
-  const clientId = rc.public.oidcClientId as string
+  const rc = useRuntimeConfig(event);
+  const issuer = (rc.public.oidcIssuer as string).replace(/\/$/, "");
+  const clientId = rc.public.oidcClientId as string;
   return {
     issuer,
     clientId,
     clientSecret: rc.oidcClientSecret as string,
     redirectUri: rc.public.oidcRedirectUri as string,
     postLogoutRedirectUri: rc.public.oidcPostLogoutRedirectUri as string,
-    scopes: (rc.public.oidcScopes as string) || 'openid profile email roles offline_access',
-    authorizeEndpoint: issuer + '/oauth2/authorize',
-    tokenEndpoint: issuer + '/oauth2/token',
-    jwksEndpoint: issuer + '/oauth2/jwks.json',
-    endSessionEndpoint: issuer + '/oauth2/end_session',
-    downstreamBase: (rc.downstreamBase as string).replace(/\/$/, ''),
+    scopes:
+      (rc.public.oidcScopes as string) ||
+      "openid profile email roles offline_access",
+    authorizeEndpoint: issuer + "/oauth2/authorize",
+    tokenEndpoint: issuer + "/oauth2/token",
+    jwksEndpoint: issuer + "/oauth2/jwks.json",
+    endSessionEndpoint: issuer + "/oauth2/end_session",
+    downstreamBase: (rc.downstreamBase as string).replace(/\/$/, ""),
     sealSecret: rc.sealSecret as string,
+    sealSecretPrevious: (rc.sealSecretPrevious as string) || "",
     cookieSecure: Boolean(rc.authCookieSecure),
     cookies: productCookieNames(clientId),
-  }
+  };
 }
 
 function b64url(b: Buffer) {
-  return b.toString('base64url')
+  return b.toString("base64url");
 }
 
 // PKCE (S256): a random verifier + its sha256 challenge.
 export function pkce() {
-  const verifier = b64url(randomBytes(32))
-  const challenge = b64url(createHash('sha256').update(verifier).digest())
-  return { verifier, challenge }
+  const verifier = b64url(randomBytes(32));
+  const challenge = b64url(createHash("sha256").update(verifier).digest());
+  return { verifier, challenge };
 }
 
 export function randomToken(n = 16) {
-  return b64url(randomBytes(n))
+  return b64url(randomBytes(n));
 }
 
 function keyOf(secret: string) {
-  return createHash('sha256').update(secret).digest() // 32 bytes for AES-256
+  return createHash("sha256").update(secret).digest(); // 32 bytes for AES-256
 }
 
 // seal encrypts+authenticates a JSON value into a compact base64url token.
 export function seal(data: unknown, secret: string): string {
-  const iv = randomBytes(12)
-  const c = createCipheriv('aes-256-gcm', keyOf(secret), iv)
-  const enc = Buffer.concat([c.update(JSON.stringify(data), 'utf8'), c.final()])
-  return b64url(Buffer.concat([iv, c.getAuthTag(), enc]))
+  const iv = randomBytes(12);
+  const c = createCipheriv("aes-256-gcm", keyOf(secret), iv);
+  const enc = Buffer.concat([
+    c.update(JSON.stringify(data), "utf8"),
+    c.final(),
+  ]);
+  return b64url(Buffer.concat([iv, c.getAuthTag(), enc]));
 }
 
 export function unseal<T>(token: string | undefined, secret: string): T | null {
-  if (!token) return null
+  if (!token) return null;
   try {
-    const buf = Buffer.from(token, 'base64url')
-    const iv = buf.subarray(0, 12)
-    const tag = buf.subarray(12, 28)
-    const enc = buf.subarray(28)
-    const d = createDecipheriv('aes-256-gcm', keyOf(secret), iv)
-    d.setAuthTag(tag)
-    const dec = Buffer.concat([d.update(enc), d.final()]).toString('utf8')
-    return JSON.parse(dec) as T
+    const buf = Buffer.from(token, "base64url");
+    const iv = buf.subarray(0, 12);
+    const tag = buf.subarray(12, 28);
+    const enc = buf.subarray(28);
+    const d = createDecipheriv("aes-256-gcm", keyOf(secret), iv);
+    d.setAuthTag(tag);
+    const dec = Buffer.concat([d.update(enc), d.final()]).toString("utf8");
+    return JSON.parse(dec) as T;
   } catch {
-    return null
+    return null;
   }
 }
 
@@ -228,7 +241,8 @@ export async function verifyIdentityIdToken(
 ): Promise<VerifiedIdentityClaims> {
   if (!token) throw new Error("Identity did not return an ID Token");
   const parts = token.split(".");
-  if (parts.length !== 3) throw new Error("Identity returned an invalid ID Token");
+  if (parts.length !== 3)
+    throw new Error("Identity returned an invalid ID Token");
   const encodedHeader = parts[0]!;
   const encodedClaims = parts[1]!;
   const encodedSignature = parts[2]!;
@@ -262,38 +276,45 @@ export async function verifyIdentityIdToken(
 }
 
 interface TokenResponse {
-  access_token: string
-  refresh_token?: string
-  id_token?: string
-  expires_in?: number
+  access_token: string;
+  refresh_token?: string;
+  id_token?: string;
+  expires_in?: number;
 }
 
-export async function exchangeCode(cfg: OidcCfg, code: string, verifier: string): Promise<TokenResponse> {
+export async function exchangeCode(
+  cfg: OidcCfg,
+  code: string,
+  verifier: string,
+): Promise<TokenResponse> {
   return await $fetch<TokenResponse>(cfg.tokenEndpoint, {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      grant_type: 'authorization_code',
+      grant_type: "authorization_code",
       code,
       redirect_uri: cfg.redirectUri,
       client_id: cfg.clientId,
       code_verifier: verifier,
-      ...(cfg.clientSecret ? { client_secret: cfg.clientSecret } : {})
-    }).toString()
-  })
+      ...(cfg.clientSecret ? { client_secret: cfg.clientSecret } : {}),
+    }).toString(),
+  });
 }
 
-export async function refreshTokens(cfg: OidcCfg, refresh: string): Promise<TokenResponse> {
+export async function refreshTokens(
+  cfg: OidcCfg,
+  refresh: string,
+): Promise<TokenResponse> {
   return await $fetch<TokenResponse>(cfg.tokenEndpoint, {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      grant_type: 'refresh_token',
+      grant_type: "refresh_token",
       refresh_token: refresh,
       client_id: cfg.clientId,
-      ...(cfg.clientSecret ? { client_secret: cfg.clientSecret } : {})
-    }).toString()
-  })
+      ...(cfg.clientSecret ? { client_secret: cfg.clientSecret } : {}),
+    }).toString(),
+  });
 }
 
 // In-flight refreshes keyed by the refresh token, so concurrent requests on one
@@ -301,14 +322,19 @@ export async function refreshTokens(cfg: OidcCfg, refresh: string): Promise<Toke
 // grant instead of each POSTing /token. Without this, refresh-token ROTATION
 // makes the parallel grants invalidate each other. The dedup is per Nitro
 // instance (the cookie is stateless, so cross-instance dedup is out of scope).
-const inflightRefresh = new Map<string, Promise<TokenResponse>>()
+const inflightRefresh = new Map<string, Promise<TokenResponse>>();
 
-export function refreshSingleFlight(cfg: OidcCfg, refresh: string): Promise<TokenResponse> {
-  const existing = inflightRefresh.get(refresh)
-  if (existing) return existing
-  const p = refreshTokens(cfg, refresh).finally(() => inflightRefresh.delete(refresh))
-  inflightRefresh.set(refresh, p)
-  return p
+export function refreshSingleFlight(
+  cfg: OidcCfg,
+  refresh: string,
+): Promise<TokenResponse> {
+  const existing = inflightRefresh.get(refresh);
+  if (existing) return existing;
+  const p = refreshTokens(cfg, refresh).finally(() =>
+    inflightRefresh.delete(refresh),
+  );
+  inflightRefresh.set(refresh, p);
+  return p;
 }
 
 // sessionFromTokens builds a Session from a token response.
@@ -325,21 +351,47 @@ export function sessionFromTokens(
     access: tok.access_token,
     refresh: tok.refresh_token || prev?.refresh,
     exp: Date.now() + (tok.expires_in ?? 600) * 1000,
-    user: prev?.user || {
-      sub: claims!.sub,
-      userKey: claims!.user_key || claims!.sub,
-      email: claims!.email,
-      name:
-        claims!.name || claims!.preferred_username || claims!.email,
-      avatar: claims!.picture,
-      roles: Array.isArray(claims!.roles) ? claims!.roles : [],
-    }
-  }
+    user: compactSessionUser(
+      prev?.user || {
+        sub: claims!.sub,
+        userKey: claims!.user_key || claims!.sub,
+        email: claims!.email,
+        name: claims!.name || claims!.preferred_username || claims!.email,
+      },
+    ),
+  };
+}
+
+function boundedOptionalText(
+  value: unknown,
+  maxLength: number,
+): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const text = value.trim();
+  return text ? text.slice(0, maxLength) : undefined;
+}
+
+export function compactSessionUser(user: Session["user"]): Session["user"] {
+  return {
+    sub: user.sub,
+    userKey: boundedOptionalText(user.userKey, 160),
+    email: boundedOptionalText(user.email, 320),
+    name: boundedOptionalText(user.name, 160),
+  };
+}
+
+export function compactSession(session: Session): Session {
+  return {
+    access: session.access,
+    refresh: session.refresh,
+    exp: session.exp,
+    user: compactSessionUser(session.user),
+  };
 }
 
 // safeReturnTo only allows same-origin relative paths (open-redirect guard).
 export function safeReturnTo(raw: string | undefined | null): string {
-  if (!raw || raw[0] !== '/') return '/'
+  if (!raw || raw[0] !== "/") return "/";
   let candidate = raw;
   for (let pass = 0; pass < 8; pass += 1) {
     if (
@@ -359,5 +411,5 @@ export function safeReturnTo(raw: string | undefined | null): string {
     }
     if (pass === 7) return "/";
   }
-  return raw
+  return raw;
 }

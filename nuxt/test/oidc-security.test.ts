@@ -1,15 +1,13 @@
-import {
-  generateKeyPairSync,
-  sign,
-  type KeyObject,
-} from "node:crypto";
+import { generateKeyPairSync, sign, type KeyObject } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   safeReturnTo,
+  seal,
   sessionFromTokens,
   verifyIdentityIdToken,
   type OidcCfg,
 } from "../server/utils/oidc";
+import { encodeProductSession } from "../server/utils/product-session";
 
 function encode(value: unknown): string {
   return Buffer.from(JSON.stringify(value)).toString("base64url");
@@ -110,9 +108,9 @@ describe("verifyIdentityIdToken", () => {
       nonce: "nonce-1",
     });
 
-    await expect(
-      verifyIdentityIdToken(token, cfg, "nonce-1"),
-    ).rejects.toThrow("signature is invalid");
+    await expect(verifyIdentityIdToken(token, cfg, "nonce-1")).rejects.toThrow(
+      "signature is invalid",
+    );
   });
 });
 
@@ -134,6 +132,55 @@ describe("sessionFromTokens", () => {
       sub: "pairwise-subject",
       userKey: "TestA123",
     });
+  });
+
+  it("keeps the sealed product session within budget when mutable profile claims are oversized", () => {
+    const session = sessionFromTokens(
+      {
+        access_token: "a".repeat(1400),
+        refresh_token: "r".repeat(96),
+        expires_in: 600,
+      },
+      undefined,
+      {
+        iss: "https://identity.test",
+        sub: "pairwise-subject",
+        user_key: "TestA123",
+        aud: "blog-main-web",
+        exp: Math.floor(Date.now() / 1000) + 300,
+        nonce: "nonce",
+        email: `${"e".repeat(600)}@example.com`,
+        name: "名".repeat(1000),
+        picture: `https://identity.test/${"avatar/".repeat(400)}`,
+        roles: Array.from(
+          { length: 100 },
+          (_, index) => `role-${index}-${"x".repeat(40)}`,
+        ),
+      },
+    );
+    const value = seal(session, "test-seal-secret-at-least-32-bytes");
+
+    expect(
+      Buffer.byteLength(`ys_blog-main_0123456789ab=${value}`),
+    ).toBeLessThanOrEqual(3500);
+    expect(session.user.name?.length).toBeLessThanOrEqual(160);
+    expect(session.user.email?.length).toBeLessThanOrEqual(320);
+    expect(session.user).not.toHaveProperty("avatar");
+    expect(session.user).not.toHaveProperty("roles");
+  });
+
+  it("rejects a product session before the browser can silently discard an oversized cookie", () => {
+    expect(() =>
+      encodeProductSession(
+        {
+          access: "a".repeat(4000),
+          refresh: "refresh",
+          exp: Date.now() + 600_000,
+          user: { sub: "user-1", userKey: "TestA123" },
+        },
+        config("cookie-budget"),
+      ),
+    ).toThrow(/3500 byte budget/);
   });
 });
 
