@@ -59,6 +59,50 @@ describe("OIDC BFF session refresh", () => {
     return seal(session, secret);
   }
 
+  function activeCookie(secret = runtime.sealSecret) {
+    const session: Session = {
+      access: "active-access",
+      refresh: "refresh-1",
+      exp: Date.now() + 600_000,
+      user: { sub: "user-1", name: "测试用户" },
+    };
+    return seal(session, secret);
+  }
+
+  it("migrates a decodable legacy shared cookie into the product namespace", async () => {
+    const legacy = activeCookie();
+    vi.stubGlobal("getCookie", (_event: unknown, name: string) =>
+      name === "rs_session" ? legacy : undefined,
+    );
+
+    await expect(sessionForEvent({} as never)).resolves.toMatchObject({
+      access: "active-access",
+      user: { sub: "user-1" },
+    });
+    expect(setCookie).toHaveBeenCalledWith(
+      expect.anything(),
+      runtime.cookies.session,
+      expect.any(String),
+      expect.objectContaining({ maxAge: 7 * 24 * 60 * 60 }),
+    );
+    expect(deleteCookie).toHaveBeenCalledWith(
+      expect.anything(),
+      "rs_session",
+      { path: "/" },
+    );
+  });
+
+  it("leaves an unrelated legacy cookie untouched", async () => {
+    const legacy = activeCookie("another-product-secret");
+    vi.stubGlobal("getCookie", (_event: unknown, name: string) =>
+      name === "rs_session" ? legacy : undefined,
+    );
+
+    await expect(sessionForEvent({} as never)).resolves.toBeNull();
+    expect(setCookie).not.toHaveBeenCalled();
+    expect(deleteCookie).not.toHaveBeenCalled();
+  });
+
   it("does not erase the login cookie when Identity is temporarily unavailable", async () => {
     vi.stubGlobal("getCookie", () => expiredCookie("refresh-1"));
     vi.stubGlobal(
