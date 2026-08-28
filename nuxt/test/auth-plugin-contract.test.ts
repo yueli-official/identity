@@ -8,6 +8,11 @@ const plugin = readFileSync(
 );
 
 describe("auth hydration reconciliation", () => {
+  it("does not recursively refresh while an auth endpoint error page is rendering", () => {
+    expect(plugin).toContain("useRequestURL().pathname");
+    expect(plugin).toMatch(/startsWith\(["']\/auth\/["']\)/);
+  });
+
   it("reconciles the browser cookie even when SSR already populated the user", () => {
     expect(plugin).toContain("if (import.meta.client)");
     expect(plugin).toMatch(/if \(import\.meta\.client\) \{[\s\S]*?await refresh\(\)/);
