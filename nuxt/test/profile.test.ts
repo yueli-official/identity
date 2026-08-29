@@ -79,7 +79,7 @@ describe("mergePublicUser", () => {
       ),
     ).resolves.toMatchObject({
       name: "月离",
-      avatar: "/media/31Pj0mXv7cfR5fdZIUvra?format=webp&name=thumbnail",
+      avatar: "https://identity.example/media/31Pj0mXv7cfR5fdZIUvra?format=webp&name=thumbnail",
     });
     expect(fetchProfile).toHaveBeenCalledWith(
       "https://identity.example/api/v1/users/TestA123",

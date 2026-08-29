@@ -76,21 +76,23 @@ export function createCachedProfileFetcher<T>(
   };
 }
 
-function mediaUrl(reference: MediaRef | undefined, rendition: string): string | undefined {
+function mediaUrl(reference: MediaRef | undefined, rendition: string, mediaOrigin = ""): string | undefined {
   if (!reference?.mediaKey) return undefined;
-  return `/media/${encodeURIComponent(reference.mediaKey)}?format=webp&name=${rendition}`;
+  const path = `/media/${encodeURIComponent(reference.mediaKey)}?format=webp&name=${rendition}`;
+  return mediaOrigin ? new URL(path, `${mediaOrigin.replace(/\/$/, "")}/`).toString() : path;
 }
 
 export function mergePublicUser<T extends SessionDisplayUser>(
   user: T,
   profile: PublicUser,
+  mediaOrigin = "",
 ): T {
 	if (profile.userKey !== (user.userKey || user.sub)) return user;
 
   return {
     ...user,
     name: profile.displayName || user.name,
-		avatar: mediaUrl(profile.avatar, "thumbnail"),
+		avatar: mediaUrl(profile.avatar, "thumbnail", mediaOrigin),
   };
 }
 
@@ -105,7 +107,7 @@ export async function resolveLatestDisplayUser<T extends SessionDisplayUser>(
     const response = await fetchProfile(
 		`${issuer.replace(/\/$/, "")}/api/v1/users/${encodeURIComponent(user.userKey || user.sub)}`,
 	);
-	return response.user ? mergePublicUser(user, response.user) : user;
+	return response.user ? mergePublicUser(user, response.user, issuer) : user;
   } catch {
     return user;
   }
