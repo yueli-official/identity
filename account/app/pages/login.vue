@@ -239,13 +239,13 @@ function cancelPasskeyLogin() {
 
         <UForm v-else :schema="schema" :state="state" class="space-y-4" @submit="onSubmit">
           <UFormField name="email" label="邮箱">
-            <UInput v-model="state.email" type="email" autocomplete="email" placeholder="you@example.com" class="w-full" />
+            <UInput v-model="state.email" type="email" autocomplete="email" placeholder="you@example.com" aria-label="邮箱" class="w-full" />
           </UFormField>
           <UFormField name="password" label="密码">
             <template #hint>
               <ULink to="/forgot" class="text-primary text-sm">忘记密码?</ULink>
             </template>
-            <UInput v-model="state.password" type="password" autocomplete="current-password" class="w-full" />
+            <UInput v-model="state.password" type="password" autocomplete="current-password" aria-label="密码" class="w-full" />
           </UFormField>
           <UAlert v-if="error" color="error" variant="soft" :title="error" />
           <UButton type="submit" label="登录" block size="lg" :loading="loading" />

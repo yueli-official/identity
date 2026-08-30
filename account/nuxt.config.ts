@@ -35,8 +35,9 @@ export default defineNuxtConfig({
   },
   css: ["~/assets/css/main.css"],
   vite: {
+    resolve: { dedupe: ["vue", "vue-router"] },
     optimizeDeps: {
-      include: ["zod"],
+      include: ["@yueli/http-runtime", "zod"],
     },
   },
   // The local dev server does not publish Nuxt's generated app-manifest at
