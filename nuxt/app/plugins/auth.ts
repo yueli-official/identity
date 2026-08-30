@@ -13,7 +13,7 @@ export default defineNuxtPlugin(async () => {
   // the browser receives the rotated or product-scoped cookie. The refresh
   // replay grace keeps an SSR-rotated refresh token valid for this late call.
   if (import.meta.client) {
-    await refresh()
+    onNuxtReady(() => { void refresh() })
     return
   }
   if (!user.value) await refresh()

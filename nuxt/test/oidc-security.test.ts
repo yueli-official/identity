@@ -1,6 +1,7 @@
 import { generateKeyPairSync, sign, type KeyObject } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  accessTokenRoles,
   refreshSingleFlight,
   safeReturnTo,
   seal,
@@ -28,6 +29,17 @@ function signedToken(
   ).toString("base64url");
   return `${header}.${payload}.${signature}`;
 }
+
+describe("accessTokenRoles", () => {
+  it("projects bounded unique role claims without storing them in the product session user", () => {
+    const token = `${encode({ alg: "RS256" })}.${encode({
+      roles: ["admin", "user", "admin", "", 42],
+    })}.signature`;
+
+    expect(accessTokenRoles(token)).toEqual(["admin", "user"]);
+    expect(accessTokenRoles("not-a-jwt")).toEqual([]);
+  });
+});
 
 function config(suffix: string): OidcCfg {
   const issuer = `https://identity-${suffix}.test`;

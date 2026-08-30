@@ -178,6 +178,32 @@ function decodeJwtPart<T>(part: string): T {
   return JSON.parse(Buffer.from(part, "base64url").toString("utf8")) as T;
 }
 
+// Product sessions keep the access token inside an authenticated seal and do
+// not duplicate mutable role claims in the cookie's display-user projection.
+// Re-project only a small, well-formed role list when serving /auth/session;
+// product APIs remain the authority for access control.
+export function accessTokenRoles(token: string): string[] {
+  const parts = token.split(".");
+  if (parts.length !== 3 || !parts[1]) return [];
+
+  try {
+    const claims = decodeJwtPart<{ roles?: unknown }>(parts[1]);
+    if (!Array.isArray(claims.roles)) return [];
+
+    const roles = new Set<string>();
+    for (const value of claims.roles) {
+      if (typeof value !== "string") continue;
+      const role = value.trim();
+      if (!role || role.length > 128) continue;
+      roles.add(role);
+      if (roles.size >= 64) break;
+    }
+    return [...roles];
+  } catch {
+    return [];
+  }
+}
+
 async function fetchJwks(
   cfg: OidcCfg,
   forceRefresh = false,

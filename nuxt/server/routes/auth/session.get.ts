@@ -4,6 +4,7 @@ import {
 	resolveLatestDisplayUser,
 	type PublicUserResponse,
 } from "../../utils/profile";
+import { accessTokenRoles } from "../../utils/oidc";
 
 const fetchLatestProfile = createCachedProfileFetcher(
   (url) => $fetch<PublicUserResponse>(url, { timeout: 500 }),
@@ -14,8 +15,10 @@ const fetchLatestProfile = createCachedProfileFetcher(
 );
 
 export default defineEventHandler(async (event) => {
+  const cfg = oidcConfig(event);
+  const hadProductSession = Boolean(getCookie(event, cfg.cookies.session));
   const s = await sessionForEvent(event, { clearOnRefreshFailure: true });
-  if (!s?.user) return { user: null };
+  if (!s?.user) return { user: null, reauthenticate: hadProductSession };
 
   try {
     await claimGuestSessionForEvent(event, s.access);
@@ -25,9 +28,9 @@ export default defineEventHandler(async (event) => {
 
   const issuer = String(useRuntimeConfig(event).public.oidcIssuer || "");
   const user = await resolveLatestDisplayUser(
-    s.user,
+    { ...s.user, roles: accessTokenRoles(s.access) },
     issuer,
     fetchLatestProfile,
   );
-  return { user };
+  return { user, reauthenticate: false };
 });
