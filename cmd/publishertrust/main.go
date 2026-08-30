@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"time"
 
@@ -53,6 +54,15 @@ func main() {
 	if err := applyRequestedTransition(keys, strings.TrimSpace(*activateKey), *disable); err != nil {
 		fatal("key transition", err)
 	}
+	if strings.TrimSpace(*activateKey) == "" && !*disable {
+		if existing, ok := reusableTrustManifest(
+			*manifestPath, *rootPublic, strings.TrimSpace(*issuer),
+			strings.TrimSpace(*policy), *version, keys, root.TrustRoot(),
+		); ok {
+			printTrustManifest("already current", existing)
+			return
+		}
+	}
 	manifest, err := publisher.SignTrustManifest(context.Background(), publisher.TrustManifest{
 		Schema:          publisher.TrustManifestSchema,
 		ManifestVersion: *version,
@@ -75,10 +85,45 @@ func main() {
 	); err != nil {
 		fatal("write trust bundle", err)
 	}
+	printTrustManifest("written", verified)
+}
+
+func reusableTrustManifest(
+	manifestPath, rootPath, issuer, policy string,
+	version uint64,
+	keys []publisher.VerificationKey,
+	root publisher.TrustRoot,
+) (publisher.VerifiedTrustManifest, bool) {
+	activeKeyID := ""
+	for _, key := range keys {
+		if key.Status == publisher.KeyStatusActive {
+			activeKeyID = key.KeyID
+			break
+		}
+	}
+	verified, err := publisher.ReadTrustManifest(
+		manifestPath, rootPath, issuer, activeKeyID, version,
+	)
+	if err != nil {
+		return publisher.VerifiedTrustManifest{}, false
+	}
+	manifest := verified.Manifest
+	if manifest.ManifestVersion != version ||
+		manifest.Issuer != issuer ||
+		manifest.PolicyVersion != policy ||
+		manifest.RootKeyID != root.KeyID ||
+		!reflect.DeepEqual(manifest.Keys, keys) {
+		return publisher.VerifiedTrustManifest{}, false
+	}
+	return verified, true
+}
+
+func printTrustManifest(action string, verified publisher.VerifiedTrustManifest) {
+	manifest := verified.Manifest
 	fmt.Printf(
-		"publisher trust manifest v%d written (root=%s, snapshot=%s)\nstep-up resource: publisher:trust-manifest:%s\n",
-		manifest.ManifestVersion, manifest.RootKeyID, verified.SnapshotHash,
-		verified.SnapshotHash,
+		"publisher trust manifest v%d %s (root=%s, snapshot=%s)\nstep-up resource: publisher:trust-manifest:%s\n",
+		manifest.ManifestVersion, action, manifest.RootKeyID,
+		verified.SnapshotHash, verified.SnapshotHash,
 	)
 }
 
