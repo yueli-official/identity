@@ -68,6 +68,22 @@ func TestOIDCSessionMigrationHasCoreTables(t *testing.T) {
 	}
 }
 
+func TestOIDCRefreshReplayReceiptMigrationPersistsEncryptedShortLivedResult(t *testing.T) {
+	up, err := os.ReadFile("0031_oidc_refresh_replay_receipts.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(up)
+	for _, want := range []string{"CREATE TABLE oidc_refresh_replay_receipts", "request_id TEXT", "response_ciphertext BYTEA", "expires_at TIMESTAMPTZ"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("0031 up missing %q", want)
+		}
+	}
+	if _, err := os.Stat("0031_oidc_refresh_replay_receipts.down.sql"); err != nil {
+		t.Errorf("0031 down missing: %v", err)
+	}
+}
+
 func TestIdentitySessionMigrationHasDurableLoginSessions(t *testing.T) {
 	up, err := os.ReadFile("0011_identity_sessions.up.sql")
 	if err != nil {

@@ -66,6 +66,10 @@ type e2eEnv struct {
 //
 // The server is registered for automatic shutdown via t.Cleanup.
 func setupE2E(t *testing.T, clientID string) *e2eEnv {
+	return setupE2EWithRefreshReplay(t, clientID, 0)
+}
+
+func setupE2EWithRefreshReplay(t *testing.T, clientID string, replayGrace time.Duration) *e2eEnv {
 	t.Helper()
 	ctx := context.Background()
 
@@ -132,6 +136,17 @@ func setupE2E(t *testing.T, clientID string) *e2eEnv {
 		provider, mgr, svc, r, base, base+"/login", base+"/media", false,
 		[]byte("0123456789abcdef0123456789abcdef"),
 	)
+	if replayGrace > 0 {
+		if err := ctl.EnableRefreshReplay(store, []byte("0123456789abcdef0123456789abcdef"), replayGrace); err != nil {
+			t.Fatalf("EnableRefreshReplay: %v", err)
+		}
+	}
+	restartedCtl := controller.NewOIDC(provider, mgr, svc, r, base, base+"/login", base+"/media", false, []byte("0123456789abcdef0123456789abcdef"))
+	if replayGrace > 0 {
+		if err := restartedCtl.EnableRefreshReplay(store, []byte("0123456789abcdef0123456789abcdef"), replayGrace); err != nil {
+			t.Fatalf("EnableRefreshReplay restarted controller: %v", err)
+		}
+	}
 
 	// 5. Start GoFrame server on the pre-chosen port (NO identityruntime.APIMiddleware), with
 	//    the full OIDC route set.
@@ -142,6 +157,7 @@ func setupE2E(t *testing.T, clientID string) *e2eEnv {
 	s.BindHandler("GET:/oauth2/jwks.json", ctl.JWKS)
 	s.BindHandler("GET:/oauth2/authorize", ctl.Authorize)
 	s.BindHandler("POST:/oauth2/token", ctl.Token)
+	s.BindHandler("POST:/oauth2/token-restarted", restartedCtl.Token)
 	s.BindHandler("ALL:/oauth2/userinfo", ctl.Userinfo)
 	s.BindHandler("POST:/oauth2/revoke", ctl.Revoke)
 	s.BindHandler("ALL:/oauth2/end_session", ctl.EndSession)
@@ -247,20 +263,26 @@ func exchangeCode(t *testing.T, env *e2eEnv, clientID, code, verifier string) (i
 // refreshToken POSTs /oauth2/token with the refresh_token grant (public client;
 // no PKCE on refresh) and returns the raw HTTP status, body, and parsed set.
 func refreshToken(t *testing.T, env *e2eEnv, clientID, rt string) (int, []byte, tokenSet) {
+	return refreshTokenAt(t, env, "/oauth2/token", clientID, rt)
+}
+func refreshTokenAt(t *testing.T, env *e2eEnv, path, clientID, rt string) (int, []byte, tokenSet) {
 	t.Helper()
 	form := url.Values{
 		"grant_type":    {"refresh_token"},
 		"refresh_token": {rt},
 		"client_id":     {clientID},
 	}
-	return postToken(t, env, form)
+	return postTokenAt(t, env, path, form)
 }
 
 // postToken POSTs a form to /oauth2/token and parses the JSON body.
 func postToken(t *testing.T, env *e2eEnv, form url.Values) (int, []byte, tokenSet) {
+	return postTokenAt(t, env, "/oauth2/token", form)
+}
+func postTokenAt(t *testing.T, env *e2eEnv, path string, form url.Values) (int, []byte, tokenSet) {
 	t.Helper()
 	req, err := http.NewRequestWithContext(env.ctx, http.MethodPost,
-		env.base+"/oauth2/token", strings.NewReader(form.Encode()))
+		env.base+path, strings.NewReader(form.Encode()))
 	if err != nil {
 		t.Fatalf("build token request: %v", err)
 	}
@@ -823,6 +845,51 @@ func TestOIDCRotationReplayKillsFamily(t *testing.T) {
 		t.Fatalf("rt2 still usable after family revocation: %s", rt2Body)
 	}
 	t.Logf("rt2 also dead after replay (status=%d) — family revocation confirmed", rt2Status)
+}
+
+func TestOIDCRotationResponseSurvivesConsumerLoss(t *testing.T) {
+	const clientID = "consumer-restart-web"
+	env := setupE2EWithRefreshReplay(t, clientID, 50*time.Millisecond)
+	p := newPKCE(t)
+	code := authorizeForCode(t, env, clientID, "openid profile email roles offline_access", p)
+	status, body, initial := exchangeCode(t, env, clientID, code, p.verifier)
+	assertValidTokenResponse(t, status, body, initial, true)
+	firstStatus, firstBody, first := refreshToken(t, env, clientID, initial.RefreshToken)
+	assertValidTokenResponse(t, firstStatus, firstBody, first, false)
+	retryStatus, retryBody, retry := refreshTokenAt(t, env, "/oauth2/token-restarted", clientID, initial.RefreshToken)
+	assertValidTokenResponse(t, retryStatus, retryBody, retry, false)
+	if retry.AccessToken != first.AccessToken || retry.RefreshToken != first.RefreshToken {
+		t.Fatalf("delivery retry minted a different token response: first=%+v retry=%+v", first, retry)
+	}
+	time.Sleep(75 * time.Millisecond)
+	lateStatus, lateBody, _ := refreshToken(t, env, clientID, initial.RefreshToken)
+	if lateStatus == http.StatusOK || !strings.Contains(string(lateBody), "invalid_grant") {
+		t.Fatalf("old refresh token remained replayable after delivery grace: %d %s", lateStatus, lateBody)
+	}
+	activeStatus, activeBody, _ := refreshToken(t, env, clientID, first.RefreshToken)
+	if activeStatus == http.StatusOK {
+		t.Fatalf("late replay did not revoke the active token family: %s", activeBody)
+	}
+}
+
+func TestOIDCRefreshReplayReceiptCannotBypassLogout(t *testing.T) {
+	const clientID = "logout-during-delivery-grace-web"
+	env := setupE2EWithRefreshReplay(t, clientID, 5*time.Second)
+	p := newPKCE(t)
+	code := authorizeForCode(t, env, clientID, "openid profile email roles offline_access", p)
+	status, body, initial := exchangeCode(t, env, clientID, code, p.verifier)
+	assertValidTokenResponse(t, status, body, initial, true)
+	refreshStatus, refreshBody, _ := refreshToken(t, env, clientID, initial.RefreshToken)
+	if refreshStatus != http.StatusOK {
+		t.Fatalf("initial refresh: %d %s", refreshStatus, refreshBody)
+	}
+	if err := env.svc.Logout(env.ctx, env.sid); err != nil {
+		t.Fatalf("logout: %v", err)
+	}
+	replayStatus, replayBody, _ := refreshTokenAt(t, env, "/oauth2/token-restarted", clientID, initial.RefreshToken)
+	if replayStatus == http.StatusOK || !strings.Contains(string(replayBody), "invalid_grant") {
+		t.Fatalf("refresh replay receipt bypassed logout: %d %s", replayStatus, replayBody)
+	}
 }
 
 // TestOIDCRevoke is the RFC 7009 path: a freshly minted refresh

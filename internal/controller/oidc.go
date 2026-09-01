@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
@@ -23,15 +24,19 @@ import (
 
 // OIDCController handles the OAuth2/OIDC protocol endpoints.
 type OIDCController struct {
-	provider     fosite.OAuth2Provider
-	keys         *oidc.Manager
-	svc          *logic.Service
-	issuer       string
-	loginURL     string
-	mediaBaseURL string
-	clients      repo.ClientRepo
-	secureCookie bool
-	reauthSecret []byte
+	provider           fosite.OAuth2Provider
+	keys               *oidc.Manager
+	svc                *logic.Service
+	issuer             string
+	loginURL           string
+	mediaBaseURL       string
+	clients            repo.ClientRepo
+	secureCookie       bool
+	reauthSecret       []byte
+	refreshReplayStore oidc.RefreshReplayStore
+	refreshReplayCodec *oidc.RefreshReplayCodec
+	refreshReplayGrace time.Duration
+	now                func() time.Time
 }
 
 const (
@@ -58,11 +63,25 @@ func NewOIDC(
 	secureCookie bool,
 	reauthSecret []byte,
 ) *OIDCController {
-	return &OIDCController{
+	controller := &OIDCController{
 		provider: p, keys: keys, svc: svc, clients: clients,
 		issuer: issuer, loginURL: loginURL, mediaBaseURL: mediaBaseURL, secureCookie: secureCookie,
 		reauthSecret: slices.Clone(reauthSecret),
+		now:          time.Now,
 	}
+	return controller
+}
+
+func (c *OIDCController) EnableRefreshReplay(store oidc.RefreshReplayStore, secret []byte, grace time.Duration) error {
+	if store == nil || grace <= 0 {
+		return errors.New("refresh replay store and positive grace are required")
+	}
+	codec, err := oidc.NewRefreshReplayCodec(secret)
+	if err != nil {
+		return err
+	}
+	c.refreshReplayStore, c.refreshReplayCodec, c.refreshReplayGrace = store, codec, grace
+	return nil
 }
 
 // discoveryDoc builds the OIDC discovery document (testable without HTTP).
@@ -320,6 +339,24 @@ func (c *OIDCController) Token(r *ghttp.Request) {
 	ctx := r.Context()
 	w := r.Response.RawWriter()
 	req := r.Request
+	refresh, clientID := refreshReplayInput(req)
+	if refresh != "" && c.refreshReplayStore != nil {
+		key := c.refreshReplayCodec.Digest(clientID, refresh)
+		receipt, found, replayErr := c.refreshReplayStore.GetRefreshReplay(ctx, key, clientID, c.now().UTC())
+		if replayErr != nil {
+			writeTokenJSON(w, http.StatusServiceUnavailable, []byte(`{"error":"temporarily_unavailable"}`))
+			return
+		}
+		if found {
+			body, err := c.refreshReplayCodec.Open(key, receipt.ResponseCiphertext)
+			if err != nil {
+				writeTokenJSON(w, http.StatusServiceUnavailable, []byte(`{"error":"temporarily_unavailable"}`))
+				return
+			}
+			writeTokenJSON(w, http.StatusOK, body)
+			return
+		}
+	}
 
 	session := oidc.EmptySession()
 	accessReq, err := c.provider.NewAccessRequest(ctx, req, session)
@@ -337,7 +374,41 @@ func (c *OIDCController) Token(r *ghttp.Request) {
 		c.provider.WriteAccessError(ctx, w, accessReq, err)
 		return
 	}
+	if refresh != "" && c.refreshReplayStore != nil {
+		body, marshalErr := json.Marshal(resp.ToMap())
+		if marshalErr != nil {
+			c.provider.WriteAccessError(ctx, w, accessReq, fosite.ErrServerError.WithWrap(marshalErr))
+			return
+		}
+		key := c.refreshReplayCodec.Digest(clientID, refresh)
+		ciphertext, sealErr := c.refreshReplayCodec.Seal(key, body)
+		if sealErr == nil {
+			receiptContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
+			_ = c.refreshReplayStore.PutRefreshReplay(receiptContext, oidc.RefreshReplayReceipt{KeyDigest: key, ClientID: clientID, RequestID: accessReq.GetID(), ResponseCiphertext: ciphertext, ExpiresAt: c.now().UTC().Add(c.refreshReplayGrace)})
+			cancel()
+		}
+		writeTokenJSON(w, http.StatusOK, body)
+		return
+	}
 	c.provider.WriteAccessResponse(ctx, w, accessReq, resp)
+}
+
+func refreshReplayInput(request *http.Request) (string, string) {
+	if request == nil || request.ParseForm() != nil || request.Form.Get("grant_type") != "refresh_token" {
+		return "", ""
+	}
+	clientID := request.Form.Get("client_id")
+	if basicID, _, ok := request.BasicAuth(); clientID == "" && ok {
+		clientID = basicID
+	}
+	return request.Form.Get("refresh_token"), clientID
+}
+func writeTokenJSON(writer http.ResponseWriter, status int, body []byte) {
+	writer.Header().Set("Cache-Control", "no-store")
+	writer.Header().Set("Pragma", "no-cache")
+	writer.Header().Set("Content-Type", "application/json;charset=UTF-8")
+	writer.WriteHeader(status)
+	_, _ = writer.Write(body)
 }
 
 // refreshRolesClaim re-fetches the identity's current roles and overwrites the

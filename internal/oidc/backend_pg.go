@@ -137,6 +137,28 @@ func (b *pgBackend) RevokeRefreshBySubject(ctx context.Context, subject string) 
 	return err
 }
 
+func (b *pgBackend) PutRefreshReplay(ctx context.Context, receipt RefreshReplayReceipt) error {
+	_, _ = b.model(ctx, "oidc_refresh_replay_receipts").Where("expires_at <= ?", time.Now().UTC()).Delete()
+	_, err := b.model(ctx, "oidc_refresh_replay_receipts").OnConflict("key_digest").Data(gdb.Map{
+		"key_digest": receipt.KeyDigest, "client_id": receipt.ClientID, "request_id": receipt.RequestID,
+		"response_ciphertext": receipt.ResponseCiphertext, "expires_at": receipt.ExpiresAt,
+	}).Save()
+	return err
+}
+func (b *pgBackend) GetRefreshReplay(ctx context.Context, key, client string, now time.Time) (RefreshReplayReceipt, bool, error) {
+	row, err := b.db.GetOne(ctx, `SELECT receipts.key_digest, receipts.client_id, receipts.request_id, receipts.response_ciphertext, receipts.expires_at
+		FROM oidc_refresh_replay_receipts AS receipts
+		WHERE receipts.key_digest=$1 AND receipts.client_id=$2 AND receipts.expires_at>$3
+		AND EXISTS (SELECT 1 FROM oidc_refresh_tokens AS tokens WHERE tokens.request_id=receipts.request_id AND tokens.active=TRUE AND (tokens.expires_at IS NULL OR tokens.expires_at>$3))`, key, client, now)
+	if err != nil {
+		return RefreshReplayReceipt{}, false, err
+	}
+	if row.IsEmpty() {
+		return RefreshReplayReceipt{}, false, nil
+	}
+	return RefreshReplayReceipt{KeyDigest: key, ClientID: client, RequestID: row["request_id"].String(), ResponseCiphertext: row["response_ciphertext"].Bytes(), ExpiresAt: row["expires_at"].Time()}, true, nil
+}
+
 // ── Transactional ─────────────────────────────────────────────────────────────
 
 func (b *pgBackend) BeginTX(ctx context.Context) (context.Context, error) {

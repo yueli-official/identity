@@ -38,6 +38,34 @@ func cleanupRefresh(ctx context.Context, db gdb.DB, sig string) {
 	_, _ = db.Model("oidc_refresh_tokens").Ctx(ctx).Where("signature", sig).Delete()
 }
 
+func TestPGBackendRefreshReplayReceiptRoundTrip(t *testing.T) {
+	db := newTestDB(t)
+	ctx := context.Background()
+	be := NewPGBackend(db)
+	key, requestID, signature := "receipt-pg-key", "receipt-pg-family", "receipt-pg-active"
+	t.Cleanup(func() {
+		_, _ = db.Model("oidc_refresh_replay_receipts").Ctx(ctx).Where("key_digest", key).Delete()
+		cleanupRefresh(ctx, db, signature)
+	})
+	if err := be.PutRefresh(ctx, signature, RefreshRecord{RequestID: requestID, ClientID: "site-web", Subject: "sub", Active: true, ExpiresAt: time.Now().Add(time.Hour), Data: []byte("{}")}); err != nil {
+		t.Fatal(err)
+	}
+	receipt := RefreshReplayReceipt{KeyDigest: key, ClientID: "site-web", RequestID: requestID, ResponseCiphertext: []byte("ciphertext"), ExpiresAt: time.Now().Add(time.Minute)}
+	if err := be.PutRefreshReplay(ctx, receipt); err != nil {
+		t.Fatal(err)
+	}
+	got, found, err := be.GetRefreshReplay(ctx, key, "site-web", time.Now())
+	if err != nil || !found || got.RequestID != requestID || string(got.ResponseCiphertext) != "ciphertext" {
+		t.Fatalf("got/found/error = %#v/%v/%v", got, found, err)
+	}
+	if err := be.DeactivateRefresh(ctx, signature); err != nil {
+		t.Fatal(err)
+	}
+	if _, found, err := be.GetRefreshReplay(ctx, key, "site-web", time.Now()); err != nil || found {
+		t.Fatalf("revoked family receipt found/error = %v/%v", found, err)
+	}
+}
+
 // TestPGBackendGenericRoundTrip exercises PutGeneric/GetGeneric/DeactivateGeneric/DeleteGeneric.
 func TestPGBackendGenericRoundTrip(t *testing.T) {
 	db := newTestDB(t)

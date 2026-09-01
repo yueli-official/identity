@@ -681,6 +681,9 @@ func main() {
 		provider, mgr, svc, repositories.clients, issuer, loginURL, publicMediaBaseURL,
 		secureCookie, []byte(globalSecret),
 	)
+	if err := oidcCtl.EnableRefreshReplay(oidcStore, []byte(globalSecret), 2*time.Minute); err != nil {
+		panic(fmt.Sprintf("identity OIDC refresh replay: %v", err))
+	}
 	guestCtl := controller.NewGuest(guest.New(repositories.guestStore, repositories.clients, repositories.store, mgr, guest.Config{
 		Issuer:         issuer,
 		MaxSessionTTL:  g.Cfg().MustGet(ctx, "guest.maxSessionTtl", "720h").Duration(),

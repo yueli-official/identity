@@ -59,6 +59,8 @@ type Backend interface {
 	RevokeRefreshByRequestID(ctx context.Context, requestID string) error // family
 	RevokeRefreshBySession(ctx context.Context, sessionID string) error   // passive logout (single session)
 	RevokeRefreshBySubject(ctx context.Context, subject string) error     // logout-all
+	PutRefreshReplay(ctx context.Context, receipt RefreshReplayReceipt) error
+	GetRefreshReplay(ctx context.Context, keyDigest, clientID string, now time.Time) (RefreshReplayReceipt, bool, error)
 
 	// transaction (no-op on memory)
 	BeginTX(ctx context.Context) (context.Context, error)

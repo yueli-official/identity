@@ -3,16 +3,49 @@ package oidc
 import (
 	"context"
 	"sync"
+	"time"
 )
 
 type memBackend struct {
 	mu      sync.Mutex
 	generic map[string]Record        // key: kind + "\x00" + signature
 	refresh map[string]RefreshRecord // key: signature
+	replays map[string]RefreshReplayReceipt
 }
 
 func newMemBackend() *memBackend {
-	return &memBackend{generic: map[string]Record{}, refresh: map[string]RefreshRecord{}}
+	return &memBackend{generic: map[string]Record{}, refresh: map[string]RefreshRecord{}, replays: map[string]RefreshReplayReceipt{}}
+}
+
+func (b *memBackend) PutRefreshReplay(_ context.Context, receipt RefreshReplayReceipt) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for key, value := range b.replays {
+		if !value.ExpiresAt.After(time.Now().UTC()) {
+			delete(b.replays, key)
+		}
+	}
+	b.replays[receipt.KeyDigest] = receipt
+	return nil
+}
+func (b *memBackend) GetRefreshReplay(_ context.Context, key, client string, now time.Time) (RefreshReplayReceipt, bool, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	value, ok := b.replays[key]
+	if !ok || value.ClientID != client || !value.ExpiresAt.After(now) {
+		return RefreshReplayReceipt{}, false, nil
+	}
+	active := false
+	for _, refresh := range b.refresh {
+		if refresh.Active && refresh.RequestID == value.RequestID {
+			active = true
+			break
+		}
+	}
+	if !active {
+		return RefreshReplayReceipt{}, false, nil
+	}
+	return value, true, nil
 }
 
 // NewMemBackend is the exported constructor for the in-memory Backend. It lets
