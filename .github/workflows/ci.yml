@@ -39,6 +39,7 @@ jobs:
         env:
           GOWORK: "off"
           GF_GCFG_FILE: manifest/config/config.example.yaml
+          GF_OIDC_GLOBALSECRET: openapi-export-only-secret-32-bytes-minimum
           PLATFORM_OPENAPI_OUTPUT: contracts/openapi.json
         run: |
           go run ./cmd/identity
