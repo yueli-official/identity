@@ -59,7 +59,7 @@ describe("Asset management surface", () => {
 
   it("renders public previews through the same-origin media facade", () => {
     expect(page).toContain("function assetPreviewURL(asset: AssetItem)");
-    expect(page).toContain("`/media/${asset.mediaKey}?format=${encodeURIComponent(format)}&name=${encodeURIComponent(variant.key)}`");
+    expect(page).toContain("`/media/${asset.mediaKey}?format=${encodeURIComponent(format)}&name=${encodeURIComponent(variant.key)}&v=1`");
     expect(library).toContain(':src="previewFor(asset)"');
     expect(library).not.toContain(':src="asset.cdnUrl"');
     expect(library).not.toContain("publicBaseUrl");

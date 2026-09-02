@@ -26,7 +26,7 @@ func TestUserinfoScopeGating(t *testing.T) {
 	if full["name"] != "A" {
 		t.Fatalf("name = %v", full["name"])
 	}
-	if full["picture"] != "https://account.example/media/31Pj0mXv7cfR5fdZIUvra?format=webp&name=thumbnail" {
+	if full["picture"] != "https://account.example/media/31Pj0mXv7cfR5fdZIUvra?format=webp&name=thumbnail&v=1" {
 		t.Fatalf("picture = %v", full["picture"])
 	}
 	if _, ok := full["roles"]; !ok {

@@ -78,7 +78,7 @@ export function createCachedProfileFetcher<T>(
 
 function mediaUrl(reference: MediaRef | undefined, rendition: string, mediaOrigin = ""): string | undefined {
   if (!reference?.mediaKey) return undefined;
-  const path = `/media/${encodeURIComponent(reference.mediaKey)}?format=webp&name=${rendition}`;
+  const path = `/media/${encodeURIComponent(reference.mediaKey)}?format=webp&name=${rendition}&v=1`;
   return mediaOrigin ? new URL(path, `${mediaOrigin.replace(/\/$/, "")}/`).toString() : path;
 }
 

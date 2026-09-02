@@ -105,5 +105,5 @@ func profilePictureURL(publicMediaBaseURL, mediaKey string) string {
 	if mediaKey == "" {
 		return ""
 	}
-	return strings.TrimRight(publicMediaBaseURL, "/") + "/" + mediaKey + "?format=webp&name=thumbnail"
+	return strings.TrimRight(publicMediaBaseURL, "/") + "/" + mediaKey + "?format=webp&name=thumbnail&v=1"
 }

@@ -663,7 +663,7 @@ function assetPreviewURL(asset: AssetItem) {
   })[0]
   if (!variant) return ''
   const format = variant.format.toLowerCase() === 'jpeg' ? 'jpg' : variant.format.toLowerCase()
-  return `/media/${asset.mediaKey}?format=${encodeURIComponent(format)}&name=${encodeURIComponent(variant.key)}`
+  return `/media/${asset.mediaKey}?format=${encodeURIComponent(format)}&name=${encodeURIComponent(variant.key)}&v=1`
 }
 function assetActions(asset: AssetItem): DropdownMenuItem[][] {
   return [

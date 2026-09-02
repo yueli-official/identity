@@ -27,7 +27,7 @@ describe("mergePublicUser", () => {
       sub: "TestA123",
       email: "old@example.com",
       name: "新名称",
-      avatar: "/media/31Pj0mXv7cfR5fdZIUvra?format=webp&name=thumbnail",
+      avatar: "/media/31Pj0mXv7cfR5fdZIUvra?format=webp&name=thumbnail&v=1",
       roles: ["member"],
     });
   });
@@ -79,7 +79,7 @@ describe("mergePublicUser", () => {
       ),
     ).resolves.toMatchObject({
       name: "月离",
-      avatar: "https://identity.example/media/31Pj0mXv7cfR5fdZIUvra?format=webp&name=thumbnail",
+      avatar: "https://identity.example/media/31Pj0mXv7cfR5fdZIUvra?format=webp&name=thumbnail&v=1",
     });
     expect(fetchProfile).toHaveBeenCalledWith(
       "https://identity.example/api/v1/users/TestA123",
