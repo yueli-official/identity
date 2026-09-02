@@ -31,6 +31,10 @@ jobs:
         env:
           GOWORK: "off"
         run: go vet ./...
+      - name: Scan reachable vulnerabilities
+        env:
+          GOWORK: "off"
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
       - name: Check error catalog
         env:
           GOWORK: "off"
