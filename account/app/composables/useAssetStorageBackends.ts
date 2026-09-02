@@ -62,7 +62,6 @@ export function useAssetStorageBackends(options: UseAssetStorageBackendsOptions)
       bucketPrivate: detail?.bucketPrivate || defaults.bucketPrivate,
       accessKey: detail?.accessKey || defaults.accessKey,
       secretKey: defaults.secretKey,
-      publicBaseUrl: detail?.publicBaseUrl || defaults.publicBaseUrl,
       pathStyle: detail?.pathStyle ?? defaults.pathStyle,
       useSsl: detail?.useSsl ?? defaults.useSsl
     })

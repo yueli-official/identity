@@ -45,7 +45,6 @@ export interface AssetStorageBackendDetail {
   bucketPrivate: string
   accessKey: string
   hasSecretKey: boolean
-  publicBaseUrl: string
   pathStyle: boolean
   useSsl: boolean
   secretVersion: number
@@ -65,7 +64,6 @@ export interface AssetStorageBackendForm {
   bucketPrivate: string
   accessKey: string
   secretKey: string
-  publicBaseUrl: string
   pathStyle: boolean
   useSsl: boolean
 }
@@ -126,7 +124,6 @@ export interface AssetItem {
   deliveryPolicy: string
   storageBackend: string
   refCount: number
-  cdnUrl?: string
   securityState: 'legacy_unverified' | 'quarantined' | 'ready' | 'rejected' | string
   scanStatus: 'legacy_unverified' | 'pending' | 'running' | 'failed' | 'clean' | 'malicious' | 'policy_rejected' | 'admin_rejected' | string
   detectedMime?: string

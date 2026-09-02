@@ -7,7 +7,6 @@ import type {
 } from '~/types/asset-admin'
 import {
   cosEndpointForRegion,
-  cosPublicBaseURL,
   normalizeStorageBackendForSubmit,
   storageBackendDefaultsForType,
 } from '~/utils/asset-storage-backend'
@@ -54,7 +53,6 @@ const cosBucket = computed({
   }
 })
 const cosEndpoint = computed(() => cosEndpointForRegion(form.region))
-const cosPublicURL = computed(() => cosPublicBaseURL(cosBucket.value, form.region))
 
 const canSave = computed(() => Boolean(
   form.name.trim()
@@ -173,9 +171,6 @@ function briefDate(value?: string) {
           </UFormField>
           <UFormField v-if="!isCOS" label="Endpoint" required>
             <UInput v-model="form.endpoint" placeholder="localhost:9000" class="w-full" :disabled="loading" />
-          </UFormField>
-          <UFormField label="公开访问 Base URL">
-            <UInput v-model="form.publicBaseUrl" :placeholder="isCOS ? cosPublicURL || '自动生成' : 'https://cdn.example.com'" class="w-full" :disabled="loading" />
           </UFormField>
           <UFormField v-if="isCOS" label="Bucket" required>
             <UInput v-model="cosBucket" placeholder="bucket-1250000000" class="w-full" :disabled="loading" />

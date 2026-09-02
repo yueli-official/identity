@@ -15,7 +15,6 @@ describe("Tencent COS storage backend form", () => {
       bucketPrivate: "",
       accessKey: "",
       secretKey: "",
-      publicBaseUrl: "",
       pathStyle: false,
       useSsl: true,
     });
@@ -33,7 +32,6 @@ describe("Tencent COS storage backend form", () => {
         bucketPrivate: "",
         accessKey: "secret-id",
         secretKey: "secret-key",
-        publicBaseUrl: "",
         pathStyle: true,
         useSsl: false,
       }),
@@ -41,8 +39,6 @@ describe("Tencent COS storage backend form", () => {
       endpoint: "",
       bucketPublic: "blog-1300000000",
       bucketPrivate: "blog-1300000000",
-      publicBaseUrl:
-        "https://blog-1300000000.cos.ap-shanghai.myqcloud.com",
       pathStyle: false,
       useSsl: true,
     });
@@ -63,6 +59,8 @@ describe("Tencent COS storage backend form", () => {
     expect(source).toMatch(
       /<UFormField\s+v-if="!isCOS"\s+label="Endpoint"/u,
     );
+    expect(source).not.toContain("publicBaseUrl");
+    expect(source).not.toContain("公开访问 Base URL");
     expect(source).toMatch(
       /<UCheckbox\s+v-if="!isCOS"[\s\S]*?label="Path-style endpoint"/u,
     );

@@ -62,5 +62,6 @@ describe("Asset management surface", () => {
     expect(page).toContain("`/media/${asset.mediaKey}?format=${encodeURIComponent(format)}&name=${encodeURIComponent(variant.key)}`");
     expect(library).toContain(':src="previewFor(asset)"');
     expect(library).not.toContain(':src="asset.cdnUrl"');
+    expect(library).not.toContain("publicBaseUrl");
   });
 });
