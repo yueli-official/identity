@@ -38,6 +38,7 @@ jobs:
       - name: Check OpenAPI contract
         env:
           GOWORK: "off"
+          GF_GCFG_FILE: manifest/config/config.example.yaml
           PLATFORM_OPENAPI_OUTPUT: contracts/openapi.json
         run: |
           go run ./cmd/identity
