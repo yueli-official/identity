@@ -27,10 +27,21 @@ jobs:
         env:
           GOWORK: "off"
         run: go test ./...
+      - name: Vet
+        env:
+          GOWORK: "off"
+        run: go vet ./...
       - name: Check error catalog
         env:
           GOWORK: "off"
         run: go run ./cmd/errorcatalog --check
+      - name: Check OpenAPI contract
+        env:
+          GOWORK: "off"
+          PLATFORM_OPENAPI_OUTPUT: contracts/openapi.json
+        run: |
+          go run ./cmd/identity
+          git diff --exit-code -- contracts/openapi.json
       - name: Build
         env:
           GOWORK: "off"

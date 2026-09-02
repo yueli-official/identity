@@ -46,6 +46,10 @@
       "status": 409
     },
     {
+      "code": "identity.external_login_provider_invalid",
+      "status": 400
+    },
+    {
       "code": "identity.forbidden",
       "status": 403
     },
@@ -134,8 +138,16 @@
       "status": 404
     },
     {
+      "code": "identity.oauth_binding_required",
+      "status": 409
+    },
+    {
       "code": "identity.oauth_email_conflict",
       "status": 409
+    },
+    {
+      "code": "identity.oauth_email_unverified",
+      "status": 401
     },
     {
       "code": "identity.oauth_failed",
@@ -164,6 +176,10 @@
     {
       "code": "identity.pat_expired",
       "status": 401
+    },
+    {
+      "code": "identity.pat_insufficient_scope",
+      "status": 403
     },
     {
       "code": "identity.pat_invalid",

@@ -1,0 +1,6069 @@
+{
+  "components": {
+    "schemas": {
+      "github.com.yueli-official.foundation.go.capability.Capability": {
+        "properties": {
+          "adapter": {
+            "format": "string",
+            "type": "string"
+          },
+          "configuration": {
+            "format": "capability.Configuration",
+            "type": "string"
+          },
+          "contractVersion": {
+            "format": "string",
+            "type": "string"
+          },
+          "effective": {
+            "format": "bool",
+            "type": "boolean"
+          },
+          "enablement": {
+            "format": "capability.Enablement",
+            "type": "string"
+          },
+          "health": {
+            "format": "capability.Health",
+            "type": "string"
+          },
+          "key": {
+            "format": "string",
+            "type": "string"
+          },
+          "lastCheckedAt": {
+            "format": "*time.Time",
+            "type": "string"
+          },
+          "links": {
+            "format": "[]capability.Link",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.foundation.go.capability.Link",
+              "description": ""
+            },
+            "type": "array"
+          },
+          "operations": {
+            "format": "[]string",
+            "items": {
+              "format": "string",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "providerInstance": {
+            "format": "string",
+            "type": "string"
+          },
+          "requiredConfig": {
+            "format": "[]capability.ConfigField",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.foundation.go.capability.ConfigField",
+              "description": ""
+            },
+            "type": "array"
+          },
+          "support": {
+            "format": "capability.Support",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.foundation.go.capability.ConfigField": {
+        "properties": {
+          "key": {
+            "format": "string",
+            "type": "string"
+          },
+          "rotatedAt": {
+            "format": "*time.Time",
+            "type": "string"
+          },
+          "secret": {
+            "format": "bool",
+            "type": "boolean"
+          },
+          "state": {
+            "format": "capability.ConfigState",
+            "type": "string"
+          },
+          "version": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.foundation.go.capability.Link": {
+        "properties": {
+          "href": {
+            "format": "string",
+            "type": "string"
+          },
+          "rel": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.foundation.go.capability.Manifest": {
+        "properties": {
+          "apiVersion": {
+            "format": "string",
+            "type": "string"
+          },
+          "capabilities": {
+            "format": "[]capability.Capability",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.foundation.go.capability.Capability",
+              "description": ""
+            },
+            "type": "array"
+          },
+          "generatedAt": {
+            "format": "time.Time",
+            "type": "string"
+          },
+          "kind": {
+            "format": "string",
+            "type": "string"
+          },
+          "links": {
+            "format": "[]capability.Link",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.foundation.go.capability.Link",
+              "description": ""
+            },
+            "type": "array"
+          },
+          "providers": {
+            "format": "[]capability.Provider",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.foundation.go.capability.Provider",
+              "description": ""
+            },
+            "type": "array"
+          },
+          "redaction": {
+            "$ref": "#/components/schemas/github.com.yueli-official.foundation.go.capability.RedactionMetadata",
+            "description": ""
+          },
+          "service": {
+            "$ref": "#/components/schemas/github.com.yueli-official.foundation.go.capability.ServiceMetadata",
+            "description": ""
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.foundation.go.capability.Provider": {
+        "properties": {
+          "adapter": {
+            "format": "string",
+            "type": "string"
+          },
+          "capabilityKeys": {
+            "format": "[]string",
+            "items": {
+              "format": "string",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "configuration": {
+            "format": "capability.Configuration",
+            "type": "string"
+          },
+          "effective": {
+            "format": "bool",
+            "type": "boolean"
+          },
+          "enablement": {
+            "format": "capability.Enablement",
+            "type": "string"
+          },
+          "health": {
+            "format": "capability.Health",
+            "type": "string"
+          },
+          "key": {
+            "format": "string",
+            "type": "string"
+          },
+          "lastCheckedAt": {
+            "format": "*time.Time",
+            "type": "string"
+          },
+          "links": {
+            "format": "[]capability.Link",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.foundation.go.capability.Link",
+              "description": ""
+            },
+            "type": "array"
+          },
+          "mode": {
+            "format": "string",
+            "type": "string"
+          },
+          "operations": {
+            "format": "[]string",
+            "items": {
+              "format": "string",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "registered": {
+            "format": "bool",
+            "type": "boolean"
+          },
+          "requiredConfig": {
+            "format": "[]capability.ConfigField",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.foundation.go.capability.ConfigField",
+              "description": ""
+            },
+            "type": "array"
+          },
+          "verifiedCompatibility": {
+            "format": "[]string",
+            "items": {
+              "format": "string",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.foundation.go.capability.RedactionMetadata": {
+        "properties": {
+          "policy": {
+            "format": "string",
+            "type": "string"
+          },
+          "version": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.foundation.go.capability.ServiceMetadata": {
+        "properties": {
+          "buildSha": {
+            "format": "string",
+            "type": "string"
+          },
+          "deployment": {
+            "format": "string",
+            "type": "string"
+          },
+          "name": {
+            "format": "string",
+            "type": "string"
+          },
+          "version": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.foundation.go.privacy.ArtifactRef": {
+        "properties": {
+          "digest": {
+            "format": "string",
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "time.Time",
+            "type": "string"
+          },
+          "key": {
+            "format": "string",
+            "type": "string"
+          },
+          "mediaType": {
+            "format": "string",
+            "type": "string"
+          },
+          "provider": {
+            "format": "string",
+            "type": "string"
+          },
+          "sizeBytes": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.foundation.go.privacy.DatasetOutcome": {
+        "properties": {
+          "artifacts": {
+            "format": "[]privacy.ArtifactRef",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.foundation.go.privacy.ArtifactRef",
+              "description": ""
+            },
+            "type": "array"
+          },
+          "count": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "dataset": {
+            "format": "privacy.DatasetKey",
+            "type": "string"
+          },
+          "disposition": {
+            "format": "privacy.OwnerDisposition",
+            "type": "string"
+          },
+          "reason": {
+            "format": "privacy.ReasonCode",
+            "type": "string"
+          },
+          "reviewAfter": {
+            "format": "*time.Time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.foundation.go.privacy.OwnerReceipt": {
+        "properties": {
+          "commandFingerprint": {
+            "format": "string",
+            "type": "string"
+          },
+          "fingerprint": {
+            "format": "string",
+            "type": "string"
+          },
+          "id": {
+            "format": "string",
+            "type": "string"
+          },
+          "owner": {
+            "$ref": "#/components/schemas/github.com.yueli-official.foundation.go.privacy.OwnerRef",
+            "description": ""
+          },
+          "protocolVersion": {
+            "format": "uint64",
+            "type": "integer"
+          },
+          "recordedAt": {
+            "format": "time.Time",
+            "type": "string"
+          },
+          "replay": {
+            "format": "bool",
+            "type": "boolean"
+          },
+          "requestId": {
+            "format": "privacy.RightsRequestID",
+            "type": "string"
+          },
+          "results": {
+            "format": "[]privacy.DatasetOutcome",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.foundation.go.privacy.DatasetOutcome",
+              "description": ""
+            },
+            "type": "array"
+          },
+          "retryAfter": {
+            "format": "*time.Time",
+            "type": "string"
+          },
+          "sequence": {
+            "format": "uint64",
+            "type": "integer"
+          },
+          "taskId": {
+            "format": "privacy.OwnerTaskID",
+            "type": "string"
+          },
+          "terminal": {
+            "format": "bool",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.foundation.go.privacy.OwnerRef": {
+        "properties": {
+          "digest": {
+            "format": "string",
+            "type": "string"
+          },
+          "key": {
+            "format": "privacy.OwnerKey",
+            "type": "string"
+          },
+          "revision": {
+            "format": "privacy.Revision",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.foundation.go.privacy.OwnerTaskView": {
+        "properties": {
+          "attempt": {
+            "format": "uint32",
+            "type": "integer"
+          },
+          "id": {
+            "format": "privacy.OwnerTaskID",
+            "type": "string"
+          },
+          "nextAttemptAt": {
+            "format": "*time.Time",
+            "type": "string"
+          },
+          "owner": {
+            "$ref": "#/components/schemas/github.com.yueli-official.foundation.go.privacy.OwnerRef",
+            "description": ""
+          },
+          "phase": {
+            "format": "privacy.TaskPhase",
+            "type": "string"
+          },
+          "receipt": {
+            "$ref": "#/components/schemas/github.com.yueli-official.foundation.go.privacy.OwnerReceipt",
+            "description": ""
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.foundation.go.privacy.RightsRequestView": {
+        "properties": {
+          "deadline": {
+            "format": "time.Time",
+            "type": "string"
+          },
+          "fingerprint": {
+            "format": "string",
+            "type": "string"
+          },
+          "id": {
+            "format": "privacy.RightsRequestID",
+            "type": "string"
+          },
+          "operation": {
+            "format": "privacy.RightsOperation",
+            "type": "string"
+          },
+          "overdue": {
+            "format": "bool",
+            "type": "boolean"
+          },
+          "phase": {
+            "format": "privacy.RequestPhase",
+            "type": "string"
+          },
+          "replay": {
+            "format": "bool",
+            "type": "boolean"
+          },
+          "requestedAt": {
+            "format": "time.Time",
+            "type": "string"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/github.com.yueli-official.foundation.go.privacy.RightsSummary",
+            "description": ""
+          },
+          "tasks": {
+            "format": "[]privacy.OwnerTaskView",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.foundation.go.privacy.OwnerTaskView",
+              "description": ""
+            },
+            "type": "array"
+          },
+          "updatedAt": {
+            "format": "time.Time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.foundation.go.privacy.RightsSummary": {
+        "properties": {
+          "noRecords": {
+            "format": "int",
+            "type": "integer"
+          },
+          "pending": {
+            "format": "int",
+            "type": "integer"
+          },
+          "performed": {
+            "format": "int",
+            "type": "integer"
+          },
+          "refused": {
+            "format": "int",
+            "type": "integer"
+          },
+          "retained": {
+            "format": "int",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminApplyPublisherTrustManifestReq": {
+        "properties": {
+          "manifest": {
+            "format": "json.RawMessage",
+            "items": {
+              "format": "uint8",
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "manifest"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminApplyPublisherTrustManifestRes": {
+        "properties": {
+          "activeKeyId": {
+            "format": "string",
+            "type": "string"
+          },
+          "manifestVersion": {
+            "format": "uint64",
+            "type": "integer"
+          },
+          "signingEnabled": {
+            "format": "bool",
+            "type": "boolean"
+          },
+          "snapshotHash": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminCapabilitiesReq": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminCapabilitiesRes": {
+        "properties": {
+          "manifest": {
+            "$ref": "#/components/schemas/github.com.yueli-official.foundation.go.capability.Manifest",
+            "description": ""
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminCapabilityReq": {
+        "properties": {
+          "key": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminCapabilityRes": {
+        "properties": {
+          "capability": {
+            "$ref": "#/components/schemas/github.com.yueli-official.foundation.go.capability.Capability",
+            "description": ""
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminCheckExternalLoginProviderReq": {
+        "properties": {
+          "key": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminCheckExternalLoginProviderRes": {
+        "properties": {
+          "healthy": {
+            "format": "bool",
+            "type": "boolean"
+          },
+          "message": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminCreateUserReq": {
+        "properties": {
+          "displayName": {
+            "format": "string",
+            "type": "string"
+          },
+          "email": {
+            "format": "string",
+            "type": "string"
+          },
+          "password": {
+            "format": "string",
+            "type": "string"
+          },
+          "roles": {
+            "format": "[]string",
+            "items": {
+              "format": "string",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminCreateUserRes": {
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AdminUserDTO",
+            "description": ""
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminDeleteUserReq": {
+        "properties": {
+          "userKey": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "required": [
+          "userKey"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminDeleteUserRes": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminExternalLoginProvidersReq": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminExternalLoginProvidersRes": {
+        "properties": {
+          "entries": {
+            "format": "[]v1.ExternalLoginProviderView",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.ExternalLoginProviderView",
+              "description": ""
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminGetUserReq": {
+        "properties": {
+          "userKey": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "required": [
+          "userKey"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminGetUserRes": {
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AdminUserDTO",
+            "description": ""
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminGrantRoleReq": {
+        "properties": {
+          "role": {
+            "format": "string",
+            "type": "string"
+          },
+          "userKey": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "required": [
+          "userKey",
+          "role"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminGrantRoleRes": {
+        "properties": {
+          "roles": {
+            "format": "[]string",
+            "items": {
+              "format": "string",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminListAuditReq": {
+        "properties": {
+          "event": {
+            "format": "string",
+            "type": "string"
+          },
+          "limit": {
+            "format": "int",
+            "type": "integer"
+          },
+          "offset": {
+            "format": "int",
+            "type": "integer"
+          },
+          "userKey": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminListAuditRes": {
+        "properties": {
+          "entries": {
+            "format": "[]v1.AuditEntry",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AuditEntry",
+              "description": ""
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminListUsersReq": {
+        "properties": {
+          "keyword": {
+            "format": "string",
+            "type": "string"
+          },
+          "order": {
+            "format": "string",
+            "type": "string"
+          },
+          "orderBy": {
+            "format": "string",
+            "type": "string"
+          },
+          "page": {
+            "format": "int",
+            "type": "integer"
+          },
+          "role": {
+            "format": "string",
+            "type": "string"
+          },
+          "size": {
+            "format": "int",
+            "type": "integer"
+          },
+          "status": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminListUsersRes": {
+        "properties": {
+          "list": {
+            "format": "[]v1.AdminUserDTO",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AdminUserDTO",
+              "description": ""
+            },
+            "type": "array"
+          },
+          "total": {
+            "format": "int",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminPreparePublisherKeyReq": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminPreparePublisherKeyRes": {
+        "properties": {
+          "keys": {
+            "format": "[]v1.PublisherTrustManifestKey",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PublisherTrustManifestKey",
+              "description": ""
+            },
+            "type": "array"
+          },
+          "prepared": {
+            "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PublisherTrustManifestKey",
+            "description": ""
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminProviderHealthCheckReq": {
+        "properties": {
+          "key": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminProviderHealthCheckRes": {
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/github.com.yueli-official.foundation.go.capability.Provider",
+            "description": ""
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminProviderReq": {
+        "properties": {
+          "key": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminProviderRes": {
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/github.com.yueli-official.foundation.go.capability.Provider",
+            "description": ""
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminProvidersReq": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminProvidersRes": {
+        "properties": {
+          "items": {
+            "format": "[]capability.Provider",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.foundation.go.capability.Provider",
+              "description": ""
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminResetPasswordReq": {
+        "properties": {
+          "newPassword": {
+            "format": "string",
+            "type": "string"
+          },
+          "userKey": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "required": [
+          "userKey",
+          "newPassword"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminResetPasswordRes": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminRevokeRoleReq": {
+        "properties": {
+          "role": {
+            "format": "string",
+            "type": "string"
+          },
+          "userKey": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "required": [
+          "userKey"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminRevokeRoleRes": {
+        "properties": {
+          "roles": {
+            "format": "[]string",
+            "items": {
+              "format": "string",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminSaveExternalLoginProviderReq": {
+        "properties": {
+          "clientId": {
+            "format": "string",
+            "type": "string"
+          },
+          "clientSecret": {
+            "format": "string",
+            "type": "string"
+          },
+          "enabled": {
+            "format": "bool",
+            "type": "boolean"
+          },
+          "key": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminSaveExternalLoginProviderRes": {
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.ExternalLoginProviderView",
+            "description": ""
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminUpdateStatusReq": {
+        "properties": {
+          "status": {
+            "format": "string",
+            "type": "string"
+          },
+          "userKey": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "required": [
+          "userKey",
+          "status"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminUpdateStatusRes": {
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AdminUserDTO",
+            "description": ""
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminUserDTO": {
+        "properties": {
+          "avatar": {
+            "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.MediaRef",
+            "description": ""
+          },
+          "createdAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "displayName": {
+            "format": "string",
+            "type": "string"
+          },
+          "email": {
+            "format": "string",
+            "type": "string"
+          },
+          "emailVerified": {
+            "format": "bool",
+            "type": "boolean"
+          },
+          "handle": {
+            "format": "string",
+            "type": "string"
+          },
+          "roles": {
+            "format": "[]string",
+            "items": {
+              "format": "string",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "status": {
+            "format": "string",
+            "type": "string"
+          },
+          "userKey": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminUserStatsReq": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AdminUserStatsRes": {
+        "properties": {
+          "active": {
+            "format": "int",
+            "type": "integer"
+          },
+          "deleted": {
+            "format": "int",
+            "type": "integer"
+          },
+          "disabled": {
+            "format": "int",
+            "type": "integer"
+          },
+          "total": {
+            "format": "int",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AuditEntry": {
+        "properties": {
+          "actorEmail": {
+            "format": "string",
+            "type": "string"
+          },
+          "actorUserKey": {
+            "format": "string",
+            "type": "string"
+          },
+          "clientId": {
+            "format": "string",
+            "type": "string"
+          },
+          "detail": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/interface",
+              "description": ""
+            },
+            "format": "map[string]interface {}",
+            "type": "object"
+          },
+          "event": {
+            "format": "string",
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "ip": {
+            "format": "string",
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "requestId": {
+            "format": "string",
+            "type": "string"
+          },
+          "result": {
+            "format": "string",
+            "type": "string"
+          },
+          "targetUserKey": {
+            "format": "string",
+            "type": "string"
+          },
+          "userAgent": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AuthorizeGitHubSubmissionReq": {
+        "properties": {
+          "artifact": {
+            "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PublisherArtifact",
+            "description": ""
+          },
+          "attestation": {
+            "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.GitHubSubmissionAttestation",
+            "description": ""
+          },
+          "audience": {
+            "format": "string",
+            "maxLength": 512,
+            "type": "string"
+          },
+          "consumerInstance": {
+            "format": "string",
+            "maxLength": 512,
+            "type": "string"
+          },
+          "namespace": {
+            "format": "string",
+            "maxLength": 256,
+            "type": "string"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.GitHubSubmissionProvenance",
+            "description": ""
+          }
+        },
+        "required": [
+          "audience",
+          "consumerInstance",
+          "namespace",
+          "artifact",
+          "attestation",
+          "provenance"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.AuthorizeGitHubSubmissionRes": {
+        "properties": {
+          "authorized": {
+            "format": "bool",
+            "type": "boolean"
+          },
+          "bindingId": {
+            "format": "string",
+            "type": "string"
+          },
+          "bindingVerifiedAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "manifest": {
+            "format": "json.RawMessage",
+            "items": {
+              "format": "uint8",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "manifestDigest": {
+            "format": "string",
+            "type": "string"
+          },
+          "publisherSubject": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.BatchUsersReq": {
+        "properties": {
+          "ids": {
+            "format": "string",
+            "maxLength": 2699,
+            "type": "string"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.BatchUsersRes": {
+        "properties": {
+          "users": {
+            "format": "[]v1.PublicUser",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PublicUser",
+              "description": ""
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.BeginGitHubBindingReq": {
+        "properties": {
+          "returnTo": {
+            "format": "string",
+            "maxLength": 1024,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.BeginGitHubBindingRes": {
+        "properties": {
+          "authorizationUrl": {
+            "format": "string",
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.ChangePasswordReq": {
+        "properties": {
+          "currentPassword": {
+            "format": "string",
+            "type": "string"
+          },
+          "newPassword": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.ChangePasswordRes": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.CreatePATReq": {
+        "properties": {
+          "expiresInDays": {
+            "format": "int",
+            "type": "integer"
+          },
+          "name": {
+            "format": "string",
+            "type": "string"
+          },
+          "scopes": {
+            "format": "[]string",
+            "items": {
+              "format": "string",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "scopes"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.CreatePATRes": {
+        "properties": {
+          "createdAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "name": {
+            "format": "string",
+            "type": "string"
+          },
+          "scopes": {
+            "format": "[]string",
+            "items": {
+              "format": "string",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "token": {
+            "format": "string",
+            "type": "string"
+          },
+          "tokenPrefix": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.CredentialsReq": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.CredentialsRes": {
+        "properties": {
+          "hasPassword": {
+            "format": "bool",
+            "type": "boolean"
+          },
+          "oauth": {
+            "format": "[]v1.OAuthCredentialDTO",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.OAuthCredentialDTO",
+              "description": ""
+            },
+            "type": "array"
+          },
+          "passkeyCount": {
+            "format": "int",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.EmailVerifyReq": {
+        "properties": {
+          "token": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.EmailVerifyRequestReq": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.EmailVerifyRequestRes": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.EmailVerifyRes": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.ExternalLoginProviderView": {
+        "properties": {
+          "clientId": {
+            "format": "string",
+            "type": "string"
+          },
+          "configured": {
+            "format": "bool",
+            "type": "boolean"
+          },
+          "enabled": {
+            "format": "bool",
+            "type": "boolean"
+          },
+          "key": {
+            "format": "string",
+            "type": "string"
+          },
+          "label": {
+            "format": "string",
+            "type": "string"
+          },
+          "lastHealthCheckedAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "lastHealthError": {
+            "format": "string",
+            "type": "string"
+          },
+          "lastHealthOk": {
+            "format": "*bool",
+            "type": "boolean"
+          },
+          "redirectUrl": {
+            "format": "string",
+            "type": "string"
+          },
+          "registrationPolicy": {
+            "format": "string",
+            "type": "string"
+          },
+          "secretVersion": {
+            "format": "int",
+            "type": "integer"
+          },
+          "updatedAt": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.GetUserByHandleReq": {
+        "properties": {
+          "handle": {
+            "format": "string",
+            "maxLength": 30,
+            "minLength": 3,
+            "type": "string"
+          }
+        },
+        "required": [
+          "handle"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.GetUserByHandleRes": {
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PublicUser",
+            "description": ""
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.GetUserReq": {
+        "properties": {
+          "userKey": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "required": [
+          "userKey"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.GetUserRes": {
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PublicUser",
+            "description": ""
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.GitHubBindingDTO": {
+        "properties": {
+          "avatarUrl": {
+            "format": "string",
+            "type": "string"
+          },
+          "blockedAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "id": {
+            "format": "string",
+            "type": "string"
+          },
+          "lastVerifiedAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "login": {
+            "format": "string",
+            "type": "string"
+          },
+          "providerAccountId": {
+            "format": "string",
+            "type": "string"
+          },
+          "providerNodeId": {
+            "format": "string",
+            "type": "string"
+          },
+          "status": {
+            "format": "string",
+            "type": "string"
+          },
+          "unboundAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "verifiedAt": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.GitHubSubmissionAttestation": {
+        "properties": {
+          "attestationId": {
+            "format": "string",
+            "type": "string"
+          },
+          "envelope": {
+            "format": "json.RawMessage",
+            "items": {
+              "format": "uint8",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "issuedAt": {
+            "format": "string",
+            "maxLength": 64,
+            "type": "string"
+          },
+          "issuer": {
+            "format": "string",
+            "maxLength": 512,
+            "type": "string"
+          },
+          "keyId": {
+            "format": "string",
+            "maxLength": 256,
+            "type": "string"
+          },
+          "publisherSubject": {
+            "format": "string",
+            "maxLength": 128,
+            "type": "string"
+          },
+          "statementDigest": {
+            "format": "string",
+            "maxLength": 64,
+            "minLength": 64,
+            "type": "string"
+          }
+        },
+        "required": [
+          "attestationId",
+          "issuer",
+          "publisherSubject",
+          "statementDigest",
+          "keyId",
+          "envelope",
+          "issuedAt"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.GitHubSubmissionProvenance": {
+        "properties": {
+          "headCommitSha": {
+            "format": "string",
+            "maxLength": 64,
+            "type": "string"
+          },
+          "providerAccountId": {
+            "format": "string",
+            "maxLength": 40,
+            "type": "string"
+          },
+          "pullRequestNumber": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "repositoryFullName": {
+            "format": "string",
+            "maxLength": 256,
+            "type": "string"
+          },
+          "repositoryId": {
+            "format": "string",
+            "maxLength": 40,
+            "type": "string"
+          },
+          "repositoryNodeId": {
+            "format": "string",
+            "maxLength": 128,
+            "type": "string"
+          }
+        },
+        "required": [
+          "providerAccountId",
+          "repositoryId",
+          "repositoryFullName",
+          "pullRequestNumber",
+          "headCommitSha"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.GuestSessionClaimReq": {
+        "properties": {
+          "audience": {
+            "format": "string",
+            "type": "string"
+          },
+          "clientId": {
+            "format": "string",
+            "type": "string"
+          },
+          "sessionToken": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "required": [
+          "clientId",
+          "sessionToken",
+          "audience"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.GuestSessionClaimRes": {
+        "properties": {
+          "claimToken": {
+            "format": "string",
+            "type": "string"
+          },
+          "claimedAt": {
+            "format": "time.Time",
+            "type": "string"
+          },
+          "subjectId": {
+            "format": "string",
+            "type": "string"
+          },
+          "userKey": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.GuestSessionCreateReq": {
+        "properties": {
+          "clientId": {
+            "format": "string",
+            "type": "string"
+          },
+          "requestedTtlSeconds": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "clientId",
+          "requestedTtlSeconds"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.GuestSessionCreateRes": {
+        "properties": {
+          "effectiveTtlSeconds": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "expiresAt": {
+            "format": "time.Time",
+            "type": "string"
+          },
+          "sessionToken": {
+            "format": "string",
+            "type": "string"
+          },
+          "subjectId": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.GuestTokenReq": {
+        "properties": {
+          "audience": {
+            "format": "string",
+            "type": "string"
+          },
+          "clientId": {
+            "format": "string",
+            "type": "string"
+          },
+          "sessionToken": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "required": [
+          "clientId",
+          "sessionToken",
+          "audience"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.GuestTokenRes": {
+        "properties": {
+          "accessToken": {
+            "format": "string",
+            "type": "string"
+          },
+          "expiresInSeconds": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.IssuePublisherAttestationReq": {
+        "properties": {
+          "artifact": {
+            "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PublisherArtifact",
+            "description": ""
+          },
+          "audience": {
+            "format": "string",
+            "maxLength": 512,
+            "type": "string"
+          },
+          "consumerInstance": {
+            "format": "string",
+            "maxLength": 512,
+            "type": "string"
+          },
+          "idempotencyKey": {
+            "format": "string",
+            "maxLength": 200,
+            "minLength": 16,
+            "type": "string"
+          },
+          "namespace": {
+            "format": "string",
+            "maxLength": 256,
+            "type": "string"
+          }
+        },
+        "required": [
+          "idempotencyKey",
+          "audience",
+          "consumerInstance",
+          "namespace",
+          "artifact"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.IssuePublisherAttestationRes": {
+        "properties": {
+          "attestationId": {
+            "format": "string",
+            "type": "string"
+          },
+          "envelope": {
+            "format": "json.RawMessage",
+            "items": {
+              "format": "uint8",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "issuedAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "issuer": {
+            "format": "string",
+            "type": "string"
+          },
+          "keyId": {
+            "format": "string",
+            "type": "string"
+          },
+          "publisherSubject": {
+            "format": "string",
+            "type": "string"
+          },
+          "statementDigest": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.ListGitHubBindingsReq": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.ListGitHubBindingsRes": {
+        "properties": {
+          "bindings": {
+            "format": "[]v1.GitHubBindingDTO",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.GitHubBindingDTO",
+              "description": ""
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.ListPATReq": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.ListPATRes": {
+        "properties": {
+          "entries": {
+            "format": "[]v1.PATEntry",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PATEntry",
+              "description": ""
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.ListPasskeysReq": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.ListPasskeysRes": {
+        "properties": {
+          "entries": {
+            "format": "[]v1.PasskeyEntry",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PasskeyEntry",
+              "description": ""
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.ListTOTPReq": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.ListTOTPRes": {
+        "properties": {
+          "entries": {
+            "format": "[]v1.TOTPEntry",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.TOTPEntry",
+              "description": ""
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.LoginReq": {
+        "properties": {
+          "abuseAttemptId": {
+            "format": "string",
+            "type": "string"
+          },
+          "challengeProof": {
+            "format": "string",
+            "type": "string"
+          },
+          "email": {
+            "format": "string",
+            "type": "string"
+          },
+          "password": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.LoginRes": {
+        "properties": {
+          "email": {
+            "format": "string",
+            "type": "string"
+          },
+          "mfaExpiresAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "mfaMethods": {
+            "format": "[]string",
+            "items": {
+              "format": "string",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "mfaRequired": {
+            "format": "bool",
+            "type": "boolean"
+          },
+          "mfaTransaction": {
+            "format": "string",
+            "type": "string"
+          },
+          "userKey": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.LogoutAllReq": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.LogoutAllRes": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.LogoutOthersReq": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.LogoutOthersRes": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.LogoutReq": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.LogoutRes": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.MeReq": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.MeRes": {
+        "properties": {
+          "avatar": {
+            "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.MediaRef",
+            "description": ""
+          },
+          "bio": {
+            "format": "string",
+            "type": "string"
+          },
+          "cover": {
+            "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.MediaRef",
+            "description": ""
+          },
+          "displayName": {
+            "format": "string",
+            "type": "string"
+          },
+          "email": {
+            "format": "string",
+            "type": "string"
+          },
+          "emailVerified": {
+            "format": "bool",
+            "type": "boolean"
+          },
+          "handle": {
+            "format": "string",
+            "type": "string"
+          },
+          "roles": {
+            "format": "[]string",
+            "items": {
+              "format": "string",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "socialLinks": {
+            "format": "[]v1.SocialLinkDTO",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.SocialLinkDTO",
+              "description": ""
+            },
+            "type": "array"
+          },
+          "userKey": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.MediaRef": {
+        "properties": {
+          "mediaKey": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mediaKey"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.OAuthCredentialDTO": {
+        "properties": {
+          "email": {
+            "format": "string",
+            "type": "string"
+          },
+          "provider": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.OpenErasureReq": {
+        "properties": {
+          "idempotencyKey": {
+            "format": "string",
+            "maxLength": 200,
+            "minLength": 16,
+            "type": "string"
+          },
+          "requestedAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "statusToken": {
+            "format": "string",
+            "maxLength": 200,
+            "minLength": 32,
+            "type": "string"
+          }
+        },
+        "required": [
+          "idempotencyKey",
+          "statusToken",
+          "requestedAt"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.OpenErasureRes": {
+        "properties": {
+          "request": {
+            "$ref": "#/components/schemas/github.com.yueli-official.foundation.go.privacy.RightsRequestView",
+            "description": ""
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PATEntry": {
+        "properties": {
+          "createdAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "lastUsedAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "name": {
+            "format": "string",
+            "type": "string"
+          },
+          "scopes": {
+            "format": "[]string",
+            "items": {
+              "format": "string",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "tokenPrefix": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PATScopeCatalogReq": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PATScopeCatalogRes": {
+        "properties": {
+          "entries": {
+            "format": "[]v1.PATScopeEntry",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PATScopeEntry",
+              "description": ""
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PATScopeEntry": {
+        "properties": {
+          "description": {
+            "format": "string",
+            "type": "string"
+          },
+          "key": {
+            "format": "string",
+            "type": "string"
+          },
+          "label": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PATUserInfoReq": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PATUserInfoRes": {
+        "properties": {
+          "avatar": {
+            "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.MediaRef",
+            "description": ""
+          },
+          "bio": {
+            "format": "string",
+            "type": "string"
+          },
+          "cover": {
+            "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.MediaRef",
+            "description": ""
+          },
+          "displayName": {
+            "format": "string",
+            "type": "string"
+          },
+          "email": {
+            "format": "string",
+            "type": "string"
+          },
+          "emailVerified": {
+            "format": "*bool",
+            "type": "boolean"
+          },
+          "handle": {
+            "format": "string",
+            "type": "string"
+          },
+          "socialLinks": {
+            "format": "[]v1.SocialLinkDTO",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.SocialLinkDTO",
+              "description": ""
+            },
+            "type": "array"
+          },
+          "userKey": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PasskeyEntry": {
+        "properties": {
+          "attachment": {
+            "format": "string",
+            "type": "string"
+          },
+          "backupEligible": {
+            "format": "bool",
+            "type": "boolean"
+          },
+          "backupState": {
+            "format": "bool",
+            "type": "boolean"
+          },
+          "createdAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "id": {
+            "format": "string",
+            "type": "string"
+          },
+          "label": {
+            "format": "string",
+            "type": "string"
+          },
+          "lastUsedAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "status": {
+            "format": "string",
+            "type": "string"
+          },
+          "transports": {
+            "format": "[]string",
+            "items": {
+              "format": "string",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PasskeyLoginBeginReq": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PasskeyLoginBeginRes": {
+        "properties": {
+          "ceremonyId": {
+            "format": "string",
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "options": {
+            "format": "json.RawMessage",
+            "items": {
+              "format": "uint8",
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PasskeyLoginFinishReq": {
+        "properties": {
+          "ceremonyId": {
+            "format": "string",
+            "type": "string"
+          },
+          "response": {
+            "format": "json.RawMessage",
+            "items": {
+              "format": "uint8",
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "ceremonyId",
+          "response"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PasskeyLoginFinishRes": {
+        "properties": {
+          "email": {
+            "format": "string",
+            "type": "string"
+          },
+          "userKey": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PasskeyRegistrationBeginReq": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PasskeyRegistrationBeginRes": {
+        "properties": {
+          "ceremonyId": {
+            "format": "string",
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "options": {
+            "format": "json.RawMessage",
+            "items": {
+              "format": "uint8",
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PasskeyRegistrationFinishReq": {
+        "properties": {
+          "ceremonyId": {
+            "format": "string",
+            "type": "string"
+          },
+          "label": {
+            "format": "string",
+            "maxLength": 100,
+            "type": "string"
+          },
+          "response": {
+            "format": "json.RawMessage",
+            "items": {
+              "format": "uint8",
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "ceremonyId",
+          "response"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PasskeyRegistrationFinishRes": {
+        "properties": {
+          "passkey": {
+            "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PasskeyEntry",
+            "description": ""
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PasswordForgotReq": {
+        "properties": {
+          "email": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PasswordForgotRes": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PasswordPolicyReq": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PasswordPolicyRes": {
+        "properties": {
+          "blocklist": {
+            "format": "bool",
+            "type": "boolean"
+          },
+          "maxLength": {
+            "format": "int",
+            "type": "integer"
+          },
+          "minLength": {
+            "format": "int",
+            "type": "integer"
+          },
+          "normalization": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PasswordResetReq": {
+        "properties": {
+          "password": {
+            "format": "string",
+            "type": "string"
+          },
+          "token": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "password"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PasswordResetRes": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PrivacyRequestStatusReq": {
+        "properties": {
+          "id": {
+            "format": "string",
+            "type": "string"
+          },
+          "statusToken": {
+            "format": "string",
+            "maxLength": 200,
+            "minLength": 32,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "statusToken"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PrivacyRequestStatusRes": {
+        "properties": {
+          "request": {
+            "$ref": "#/components/schemas/github.com.yueli-official.foundation.go.privacy.RightsRequestView",
+            "description": ""
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PublicExternalLoginProvider": {
+        "properties": {
+          "key": {
+            "format": "string",
+            "type": "string"
+          },
+          "label": {
+            "format": "string",
+            "type": "string"
+          },
+          "registrationPolicy": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PublicExternalLoginProvidersReq": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PublicExternalLoginProvidersRes": {
+        "properties": {
+          "entries": {
+            "format": "[]v1.PublicExternalLoginProvider",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PublicExternalLoginProvider",
+              "description": ""
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PublicUser": {
+        "properties": {
+          "avatar": {
+            "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.MediaRef",
+            "description": ""
+          },
+          "bio": {
+            "format": "string",
+            "type": "string"
+          },
+          "cover": {
+            "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.MediaRef",
+            "description": ""
+          },
+          "displayName": {
+            "format": "string",
+            "type": "string"
+          },
+          "handle": {
+            "format": "string",
+            "type": "string"
+          },
+          "socialLinks": {
+            "format": "[]v1.SocialLinkDTO",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.SocialLinkDTO",
+              "description": ""
+            },
+            "type": "array"
+          },
+          "userKey": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PublisherArtifact": {
+        "properties": {
+          "identity": {
+            "format": "string",
+            "maxLength": 256,
+            "type": "string"
+          },
+          "kind": {
+            "format": "string",
+            "maxLength": 256,
+            "type": "string"
+          },
+          "mediaType": {
+            "format": "string",
+            "maxLength": 256,
+            "type": "string"
+          },
+          "name": {
+            "format": "string",
+            "maxLength": 512,
+            "type": "string"
+          },
+          "sha256": {
+            "format": "string",
+            "maxLength": 64,
+            "minLength": 64,
+            "type": "string"
+          },
+          "uri": {
+            "format": "string",
+            "maxLength": 1024,
+            "type": "string"
+          },
+          "version": {
+            "format": "string",
+            "maxLength": 256,
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "identity",
+          "version",
+          "name",
+          "uri",
+          "mediaType",
+          "sha256"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PublisherTrustManifestKey": {
+        "properties": {
+          "algorithm": {
+            "format": "string",
+            "type": "string"
+          },
+          "compromisedAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "keyId": {
+            "format": "string",
+            "type": "string"
+          },
+          "publicJwk": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/interface",
+              "description": ""
+            },
+            "format": "map[string]interface {}",
+            "type": "object"
+          },
+          "purpose": {
+            "format": "string",
+            "type": "string"
+          },
+          "retiredAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "revocationReason": {
+            "format": "string",
+            "type": "string"
+          },
+          "revokedAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "status": {
+            "format": "string",
+            "type": "string"
+          },
+          "validFrom": {
+            "format": "string",
+            "type": "string"
+          },
+          "validUntil": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PublisherTrustManifestReq": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PublisherTrustManifestRes": {
+        "properties": {
+          "issuedAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "issuer": {
+            "format": "string",
+            "type": "string"
+          },
+          "keys": {
+            "format": "[]v1.PublisherTrustManifestKey",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PublisherTrustManifestKey",
+              "description": ""
+            },
+            "type": "array"
+          },
+          "manifestSignature": {
+            "format": "string",
+            "type": "string"
+          },
+          "manifestVersion": {
+            "format": "uint64",
+            "type": "integer"
+          },
+          "policyVersion": {
+            "format": "string",
+            "type": "string"
+          },
+          "rootKeyId": {
+            "format": "string",
+            "type": "string"
+          },
+          "schema": {
+            "format": "string",
+            "type": "string"
+          },
+          "snapshotHash": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PublisherVerificationKey": {
+        "properties": {
+          "activatedAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "algorithm": {
+            "format": "string",
+            "type": "string"
+          },
+          "keyId": {
+            "format": "string",
+            "type": "string"
+          },
+          "publicJwk": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/interface",
+              "description": ""
+            },
+            "format": "map[string]interface {}",
+            "type": "object"
+          },
+          "purpose": {
+            "format": "string",
+            "type": "string"
+          },
+          "retiredAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "status": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PublisherVerificationKeysReq": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.PublisherVerificationKeysRes": {
+        "properties": {
+          "keys": {
+            "format": "[]v1.PublisherVerificationKey",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PublisherVerificationKey",
+              "description": ""
+            },
+            "type": "array"
+          },
+          "manifestVersion": {
+            "format": "int",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.ReauthenticateReq": {
+        "properties": {
+          "password": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "required": [
+          "password"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.ReauthenticateRes": {
+        "properties": {
+          "authenticatedAt": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.RecoveryLoginReq": {
+        "properties": {
+          "code": {
+            "format": "string",
+            "maxLength": 32,
+            "minLength": 16,
+            "type": "string"
+          },
+          "transactionId": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "required": [
+          "transactionId",
+          "code"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.RecoveryLoginRes": {
+        "properties": {
+          "email": {
+            "format": "string",
+            "type": "string"
+          },
+          "restricted": {
+            "format": "bool",
+            "type": "boolean"
+          },
+          "userKey": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.RecoverySessionReq": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.RecoverySessionRes": {
+        "properties": {
+          "expiresAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "userKey": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.RegisterReq": {
+        "properties": {
+          "abuseAttemptId": {
+            "format": "string",
+            "type": "string"
+          },
+          "challengeProof": {
+            "format": "string",
+            "type": "string"
+          },
+          "displayName": {
+            "format": "string",
+            "type": "string"
+          },
+          "email": {
+            "format": "string",
+            "type": "string"
+          },
+          "password": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.RegisterRes": {
+        "properties": {
+          "email": {
+            "format": "string",
+            "type": "string"
+          },
+          "userKey": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.RenamePasskeyReq": {
+        "properties": {
+          "id": {
+            "format": "string",
+            "type": "string"
+          },
+          "label": {
+            "format": "string",
+            "maxLength": 100,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.RenamePasskeyRes": {
+        "properties": {
+          "passkey": {
+            "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PasskeyEntry",
+            "description": ""
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.RevokePATReq": {
+        "properties": {
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.RevokePATRes": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.RevokePasskeyReq": {
+        "properties": {
+          "id": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.RevokePasskeyRes": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.RevokeSessionReq": {
+        "properties": {
+          "id": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.RevokeSessionRes": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.RevokeTOTPReq": {
+        "properties": {
+          "id": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.RevokeTOTPRes": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.SessionEntry": {
+        "properties": {
+          "createdAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "current": {
+            "format": "bool",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "string",
+            "type": "string"
+          },
+          "ip": {
+            "format": "string",
+            "type": "string"
+          },
+          "lastSeen": {
+            "format": "string",
+            "type": "string"
+          },
+          "userAgent": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.SessionListReq": {
+        "properties": {
+          "limit": {
+            "format": "int",
+            "type": "integer"
+          },
+          "offset": {
+            "format": "int",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.SessionListRes": {
+        "properties": {
+          "current": {
+            "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.SessionEntry",
+            "description": ""
+          },
+          "entries": {
+            "format": "[]v1.SessionEntry",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.SessionEntry",
+              "description": ""
+            },
+            "type": "array"
+          },
+          "total": {
+            "format": "int",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.SetPasswordReq": {
+        "properties": {
+          "newPassword": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "required": [
+          "newPassword"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.SetPasswordRes": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.SocialLinkDTO": {
+        "properties": {
+          "label": {
+            "format": "string",
+            "type": "string"
+          },
+          "url": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.StepUpBeginReq": {
+        "properties": {
+          "action": {
+            "format": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "audience": {
+            "format": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "requirement": {
+            "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.StepUpRequirement",
+            "description": ""
+          },
+          "resource": {
+            "format": "string",
+            "maxLength": 2048,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "audience",
+          "action",
+          "resource"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.StepUpBeginRes": {
+        "properties": {
+          "expiresAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "methods": {
+            "format": "[]string",
+            "items": {
+              "format": "string",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "proof": {
+            "format": "string",
+            "type": "string"
+          },
+          "satisfied": {
+            "format": "bool",
+            "type": "boolean"
+          },
+          "transactionId": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.StepUpRequirement": {
+        "properties": {
+          "freshWithinSeconds": {
+            "format": "int",
+            "maximum": 3600,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "minimumFactorCount": {
+            "format": "int",
+            "maximum": 3,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "minimumLevel": {
+            "format": "string",
+            "type": "string"
+          },
+          "minimumProfile": {
+            "format": "string",
+            "type": "string"
+          },
+          "phishingResistant": {
+            "format": "bool",
+            "type": "boolean"
+          },
+          "userVerification": {
+            "format": "bool",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.StepUpTOTPFinishReq": {
+        "properties": {
+          "code": {
+            "format": "string",
+            "type": "string"
+          },
+          "transactionId": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "required": [
+          "transactionId",
+          "code"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.StepUpTOTPFinishRes": {
+        "properties": {
+          "proof": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.TOTPEnrollmentBeginReq": {
+        "properties": {
+          "label": {
+            "format": "string",
+            "maxLength": 100,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.TOTPEnrollmentBeginRes": {
+        "properties": {
+          "authenticatorId": {
+            "format": "string",
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "secret": {
+            "format": "string",
+            "type": "string"
+          },
+          "uri": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.TOTPEnrollmentFinishReq": {
+        "properties": {
+          "authenticatorId": {
+            "format": "string",
+            "type": "string"
+          },
+          "code": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "required": [
+          "authenticatorId",
+          "code"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.TOTPEnrollmentFinishRes": {
+        "properties": {
+          "authenticator": {
+            "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.TOTPEntry",
+            "description": ""
+          },
+          "recoveryCodes": {
+            "format": "[]string",
+            "items": {
+              "format": "string",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.TOTPEntry": {
+        "properties": {
+          "createdAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "id": {
+            "format": "string",
+            "type": "string"
+          },
+          "label": {
+            "format": "string",
+            "type": "string"
+          },
+          "lastUsedAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "status": {
+            "format": "string",
+            "type": "string"
+          },
+          "verifiedAt": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.TOTPLoginReq": {
+        "properties": {
+          "code": {
+            "format": "string",
+            "type": "string"
+          },
+          "transactionId": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "required": [
+          "transactionId",
+          "code"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.TOTPLoginRes": {
+        "properties": {
+          "email": {
+            "format": "string",
+            "type": "string"
+          },
+          "userKey": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.UnbindCredentialReq": {
+        "properties": {
+          "provider": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.UnbindCredentialRes": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.UnbindGitHubBindingReq": {
+        "properties": {
+          "bindingId": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "required": [
+          "bindingId"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.UnbindGitHubBindingRes": {
+        "properties": {
+          "binding": {
+            "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.GitHubBindingDTO",
+            "description": ""
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.UpdateProfileReq": {
+        "properties": {
+          "bio": {
+            "format": "string",
+            "type": "string"
+          },
+          "displayName": {
+            "format": "string",
+            "type": "string"
+          },
+          "handle": {
+            "format": "string",
+            "type": "string"
+          },
+          "locale": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "required": [
+          "displayName"
+        ],
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.UpdateProfileRes": {
+        "properties": {
+          "avatar": {
+            "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.MediaRef",
+            "description": ""
+          },
+          "bio": {
+            "format": "string",
+            "type": "string"
+          },
+          "cover": {
+            "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.MediaRef",
+            "description": ""
+          },
+          "displayName": {
+            "format": "string",
+            "type": "string"
+          },
+          "handle": {
+            "format": "string",
+            "type": "string"
+          },
+          "locale": {
+            "format": "string",
+            "type": "string"
+          },
+          "socialLinks": {
+            "format": "[]v1.SocialLinkDTO",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.SocialLinkDTO",
+              "description": ""
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.UpdateSocialLinksReq": {
+        "properties": {
+          "socialLinks": {
+            "format": "[]v1.SocialLinkDTO",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.SocialLinkDTO",
+              "description": ""
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.UpdateSocialLinksRes": {
+        "properties": {
+          "socialLinks": {
+            "format": "[]v1.SocialLinkDTO",
+            "items": {
+              "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.SocialLinkDTO",
+              "description": ""
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.UploadAvatarReq": {
+        "properties": {
+          "file": {
+            "format": "*ghttp.UploadFile",
+            "type": "file"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.UploadAvatarRes": {
+        "properties": {
+          "avatar": {
+            "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.MediaRef",
+            "description": ""
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.UploadCoverReq": {
+        "properties": {
+          "file": {
+            "format": "*ghttp.UploadFile",
+            "type": "file"
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.UploadCoverRes": {
+        "properties": {
+          "cover": {
+            "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.MediaRef",
+            "description": ""
+          }
+        },
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.VerifyPATReq": {
+        "properties": {},
+        "type": "object"
+      },
+      "github.com.yueli-official.identity.api.v1.VerifyPATRes": {
+        "properties": {
+          "expiresAt": {
+            "format": "string",
+            "type": "string"
+          },
+          "scopes": {
+            "format": "[]string",
+            "items": {
+              "format": "string",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "userKey": {
+            "format": "string",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "interface": {
+        "properties": {},
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "AdminAuth": {
+        "bearerFormat": "JWT",
+        "description": "Admin session cookie or an Identity access token with platform capability scope.",
+        "scheme": "bearer",
+        "type": "http"
+      },
+      "MachineAuth": {
+        "bearerFormat": "JWT",
+        "description": "Identity-issued service access token with the endpoint scope.",
+        "scheme": "bearer",
+        "type": "http"
+      },
+      "UserAuth": {
+        "bearerFormat": "JWT",
+        "description": "Identity user access token.",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "title": "",
+    "version": ""
+  },
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/internal/publisher/github-submissions": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AuthorizeGitHubSubmissionReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AuthorizeGitHubSubmissionRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "MachineAuth": []
+          }
+        ],
+        "summary": "Authorize and build a GitHub PR submission manifest",
+        "tags": [
+          "publisher,github,internal"
+        ]
+      }
+    },
+    "/api/v1/account/github-bindings": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.ListGitHubBindingsRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "UserAuth": []
+          }
+        ],
+        "summary": "List GitHub binding history",
+        "tags": [
+          "publisher,github"
+        ]
+      }
+    },
+    "/api/v1/account/github-bindings/authorization": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.BeginGitHubBindingReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.BeginGitHubBindingRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "UserAuth": []
+          }
+        ],
+        "summary": "Begin GitHub account ownership verification",
+        "tags": [
+          "publisher,github"
+        ]
+      }
+    },
+    "/api/v1/account/github-bindings/{bindingId}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "bindingId",
+            "required": true,
+            "schema": {
+              "format": "string",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.UnbindGitHubBindingRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "UserAuth": []
+          }
+        ],
+        "summary": "Unbind a GitHub account while retaining history",
+        "tags": [
+          "publisher,github"
+        ]
+      }
+    },
+    "/api/v1/account/mfa/totp": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.ListTOTPRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "List TOTP authenticators",
+        "tags": [
+          "mfa"
+        ]
+      }
+    },
+    "/api/v1/account/mfa/totp/enrollment/begin": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.TOTPEnrollmentBeginReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.TOTPEnrollmentBeginRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Begin TOTP enrollment",
+        "tags": [
+          "mfa"
+        ]
+      }
+    },
+    "/api/v1/account/mfa/totp/enrollment/finish": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.TOTPEnrollmentFinishReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.TOTPEnrollmentFinishRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Finish TOTP enrollment",
+        "tags": [
+          "mfa"
+        ]
+      }
+    },
+    "/api/v1/account/mfa/totp/{id}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "string",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.RevokeTOTPRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Remove a TOTP authenticator",
+        "tags": [
+          "mfa"
+        ]
+      }
+    },
+    "/api/v1/account/passkeys": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.ListPasskeysRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "List passkeys",
+        "tags": [
+          "passkeys"
+        ]
+      }
+    },
+    "/api/v1/account/passkeys/registration/begin": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PasskeyRegistrationBeginReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PasskeyRegistrationBeginRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Begin passkey registration",
+        "tags": [
+          "passkeys"
+        ]
+      }
+    },
+    "/api/v1/account/passkeys/registration/finish": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PasskeyRegistrationFinishReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PasskeyRegistrationFinishRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Finish passkey registration",
+        "tags": [
+          "passkeys"
+        ]
+      }
+    },
+    "/api/v1/account/passkeys/{id}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "string",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.RevokePasskeyRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Remove a passkey",
+        "tags": [
+          "passkeys"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "string",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "label": {
+                    "format": "string",
+                    "maxLength": 100,
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.RenamePasskeyRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Rename a passkey",
+        "tags": [
+          "passkeys"
+        ]
+      }
+    },
+    "/api/v1/account/publisher-attestations": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.IssuePublisherAttestationReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.IssuePublisherAttestationRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "UserAuth": []
+          }
+        ],
+        "summary": "Issue a publisher attestation",
+        "tags": [
+          "publisher"
+        ]
+      }
+    },
+    "/api/v1/account/recovery": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.RecoverySessionRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Inspect a restricted recovery session",
+        "tags": [
+          "mfa"
+        ]
+      }
+    },
+    "/api/v1/admin/audit": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "userKey",
+            "schema": {
+              "format": "string",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "event",
+            "schema": {
+              "format": "string",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "format": "int",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "format": "int",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AdminListAuditRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "List audit logs (admin only)",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/capabilities": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AdminCapabilitiesRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "AdminAuth": []
+          }
+        ],
+        "summary": "List identity capabilities",
+        "tags": [
+          "identity-admin"
+        ]
+      }
+    },
+    "/api/v1/admin/capabilities/{key}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "format": "string",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AdminCapabilityRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "AdminAuth": []
+          }
+        ],
+        "summary": "Get an identity capability",
+        "tags": [
+          "identity-admin"
+        ]
+      }
+    },
+    "/api/v1/admin/login-providers": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AdminExternalLoginProvidersRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "List external login provider configuration",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/login-providers/{key}": {
+      "put": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "format": "string",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "clientId": {
+                    "format": "string",
+                    "type": "string"
+                  },
+                  "clientSecret": {
+                    "format": "string",
+                    "type": "string"
+                  },
+                  "enabled": {
+                    "format": "bool",
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AdminSaveExternalLoginProviderRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Configure an external login provider",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/login-providers/{key}/health-check": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "format": "string",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AdminCheckExternalLoginProviderRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Check external login provider connectivity",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/providers": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AdminProvidersRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "AdminAuth": []
+          }
+        ],
+        "summary": "List identity providers",
+        "tags": [
+          "identity-admin"
+        ]
+      }
+    },
+    "/api/v1/admin/providers/{key}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "format": "string",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AdminProviderRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "AdminAuth": []
+          }
+        ],
+        "summary": "Get an identity provider",
+        "tags": [
+          "identity-admin"
+        ]
+      }
+    },
+    "/api/v1/admin/providers/{key}/health-check": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "format": "string",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AdminProviderHealthCheckRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "AdminAuth": []
+          }
+        ],
+        "summary": "Probe an identity provider without a business action",
+        "tags": [
+          "identity-admin"
+        ]
+      }
+    },
+    "/api/v1/admin/publisher/keys": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AdminPreparePublisherKeyReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AdminPreparePublisherKeyRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Prepare a publisher signing key for prepublication",
+        "tags": [
+          "admin,publisher"
+        ]
+      }
+    },
+    "/api/v1/admin/publisher/trust-manifest": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AdminApplyPublisherTrustManifestReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AdminApplyPublisherTrustManifestRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Apply a root-signed publisher trust manifest",
+        "tags": [
+          "admin,publisher"
+        ]
+      }
+    },
+    "/api/v1/admin/users": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "keyword",
+            "schema": {
+              "format": "string",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "format": "string",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "role",
+            "schema": {
+              "format": "string",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "orderBy",
+            "schema": {
+              "format": "string",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "order",
+            "schema": {
+              "format": "string",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "format": "int",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "schema": {
+              "format": "int",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AdminListUsersRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "List users (admin only)",
+        "tags": [
+          "admin"
+        ]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AdminCreateUserReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AdminCreateUserRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Create a user (admin only)",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/users/stats": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AdminUserStatsRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "User counts by status (admin only)",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{userKey}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userKey",
+            "required": true,
+            "schema": {
+              "format": "string",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AdminDeleteUserRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Delete a user (admin only)",
+        "tags": [
+          "admin"
+        ]
+      },
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userKey",
+            "required": true,
+            "schema": {
+              "format": "string",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AdminGetUserRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Get a user (admin only)",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{userKey}/password": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userKey",
+            "required": true,
+            "schema": {
+              "format": "string",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "newPassword": {
+                    "format": "string",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "newPassword"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AdminResetPasswordRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Reset a user's password (admin only)",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{userKey}/roles": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userKey",
+            "required": true,
+            "schema": {
+              "format": "string",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "role": {
+                    "format": "string",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "role"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AdminGrantRoleRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Grant a role (admin only)",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{userKey}/roles/{role}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userKey",
+            "required": true,
+            "schema": {
+              "format": "string",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "role",
+            "required": true,
+            "schema": {
+              "format": "string",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AdminRevokeRoleRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Revoke a role (admin only)",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{userKey}/status": {
+      "put": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userKey",
+            "required": true,
+            "schema": {
+              "format": "string",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "status": {
+                    "format": "string",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "status"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.AdminUpdateStatusRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Set user status (admin only)",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/auth/email/verify": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.EmailVerifyReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.EmailVerifyRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Consume an email-verification token",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/email/verify-request": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.EmailVerifyRequestReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.EmailVerifyRequestRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Send an email-verification link to the logged-in user",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.LoginReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.LoginRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Email+password login",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.LogoutReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.LogoutRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Log out current session",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/logout-all": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.LogoutAllReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.LogoutAllRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Log out all sessions",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/v1/auth/logout-others": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.LogoutOthersReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.LogoutOthersRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Log out other sessions",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/v1/auth/mfa/recovery": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.RecoveryLoginReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.RecoveryLoginRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Use a recovery code for restricted account recovery",
+        "tags": [
+          "mfa"
+        ]
+      }
+    },
+    "/api/v1/auth/mfa/totp": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.TOTPLoginReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.TOTPLoginRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Complete login with a TOTP code",
+        "tags": [
+          "mfa"
+        ]
+      }
+    },
+    "/api/v1/auth/oauth/providers": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PublicExternalLoginProvidersRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "List enabled external login providers",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/passkeys/login/begin": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PasskeyLoginBeginReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PasskeyLoginBeginRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Begin discoverable passkey login",
+        "tags": [
+          "passkeys"
+        ]
+      }
+    },
+    "/api/v1/auth/passkeys/login/finish": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PasskeyLoginFinishReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PasskeyLoginFinishRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Finish discoverable passkey login",
+        "tags": [
+          "passkeys"
+        ]
+      }
+    },
+    "/api/v1/auth/password-policy": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PasswordPolicyRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Get the active password creation policy",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/password/change": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.ChangePasswordReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.ChangePasswordRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Change own password",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/v1/auth/password/forgot": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PasswordForgotReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PasswordForgotRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Request a password-reset email",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/password/reset": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PasswordResetReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PasswordResetRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Reset password via token",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/password/set": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.SetPasswordReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.SetPasswordRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Set an initial password",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/v1/auth/reauthenticate": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.ReauthenticateReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.ReauthenticateRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Refresh current session authentication with the account password",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/v1/auth/register": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.RegisterReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.RegisterRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Register with email+password",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/step-up/begin": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.StepUpBeginReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.StepUpBeginRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Begin an action-bound step-up",
+        "tags": [
+          "step-up"
+        ]
+      }
+    },
+    "/api/v1/auth/step-up/totp": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.StepUpTOTPFinishReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.StepUpTOTPFinishRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Finish an action-bound TOTP step-up",
+        "tags": [
+          "step-up"
+        ]
+      }
+    },
+    "/api/v1/guest/sessions": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.GuestSessionCreateReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.GuestSessionCreateRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Create a durable guest session",
+        "tags": [
+          "guest-session"
+        ]
+      }
+    },
+    "/api/v1/guest/sessions/claim": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.GuestSessionClaimReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.GuestSessionClaimRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "UserAuth": []
+          }
+        ],
+        "summary": "Claim a guest session after sign-in",
+        "tags": [
+          "guest-session"
+        ]
+      }
+    },
+    "/api/v1/guest/tokens": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.GuestTokenReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.GuestTokenRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Issue a short-lived resource token for a guest session",
+        "tags": [
+          "guest-session"
+        ]
+      }
+    },
+    "/api/v1/pat": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.ListPATRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "List my personal access tokens",
+        "tags": [
+          "pat"
+        ]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.CreatePATReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.CreatePATRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Create a personal access token",
+        "tags": [
+          "pat"
+        ]
+      }
+    },
+    "/api/v1/pat/scopes": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PATScopeCatalogRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "List supported personal access token scopes",
+        "tags": [
+          "pat"
+        ]
+      }
+    },
+    "/api/v1/pat/userinfo": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PATUserInfoRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Read own account information with a PAT",
+        "tags": [
+          "pat"
+        ]
+      }
+    },
+    "/api/v1/pat/verify": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.VerifyPATReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.VerifyPATRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Verify a PAT (resource servers)",
+        "tags": [
+          "pat"
+        ]
+      }
+    },
+    "/api/v1/pat/{id}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.RevokePATRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Revoke a personal access token",
+        "tags": [
+          "pat"
+        ]
+      }
+    },
+    "/api/v1/privacy/requests/{id}/status": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "string",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "statusToken": {
+                    "format": "string",
+                    "maxLength": 200,
+                    "minLength": 32,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "statusToken"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PrivacyRequestStatusRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Get and advance a privacy request",
+        "tags": [
+          "privacy"
+        ]
+      }
+    },
+    "/api/v1/publisher/trust-manifest": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PublisherTrustManifestRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Get the root-signed publisher trust manifest",
+        "tags": [
+          "publisher"
+        ]
+      }
+    },
+    "/api/v1/publisher/verification-keys": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.PublisherVerificationKeysRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Get publisher attestation verification keys",
+        "tags": [
+          "publisher"
+        ]
+      }
+    },
+    "/api/v1/session/avatar": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.UploadAvatarReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.UploadAvatarRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Upload own avatar",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/v1/session/cover": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.UploadCoverReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.UploadCoverRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Upload own cover banner",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/v1/session/credentials": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.CredentialsRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "List own login credentials",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/v1/session/credentials/{provider}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "format": "string",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.UnbindCredentialRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Unbind an oauth credential",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/v1/session/list": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "format": "int",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "format": "int",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.SessionListRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "List own login sessions",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/v1/session/me": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.MeRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Current identity",
+        "tags": [
+          "session"
+        ]
+      }
+    },
+    "/api/v1/session/privacy/erasure": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.OpenErasureReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.OpenErasureRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Open an account erasure request",
+        "tags": [
+          "privacy"
+        ]
+      }
+    },
+    "/api/v1/session/profile": {
+      "put": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.UpdateProfileReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.UpdateProfileRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Update own profile",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/v1/session/profile/social-links": {
+      "put": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.UpdateSocialLinksReq",
+                "description": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.UpdateSocialLinksRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Replace own social links",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/v1/session/{id}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "string",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.RevokeSessionRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Revoke one session",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/v1/users": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "ids",
+            "required": true,
+            "schema": {
+              "format": "string",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.BatchUsersRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Public users by stable keys (csv)",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/v1/users/by-handle/{handle}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "handle",
+            "required": true,
+            "schema": {
+              "format": "string",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.GetUserByHandleRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Public user by current or historical handle",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/v1/users/{userKey}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userKey",
+            "required": true,
+            "schema": {
+              "format": "string",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github.com.yueli-official.identity.api.v1.GetUserRes",
+                  "description": ""
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Public user by stable key",
+        "tags": [
+          "users"
+        ]
+      }
+    }
+  }
+}
