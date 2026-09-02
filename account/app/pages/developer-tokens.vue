@@ -3,6 +3,7 @@ import * as z from "zod";
 import type { FormSubmitEvent } from "@nuxt/ui";
 import { PageHeader } from "@yueli/ui/admin";
 import { createAccountNotifier } from "~/utils/feedback";
+import { pageErrorMessage } from "~/utils/api-errors";
 
 definePageMeta({ middleware: "auth", layout: "account" });
 useSeoMeta({ title: "开发者令牌" });

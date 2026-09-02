@@ -2,6 +2,8 @@
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import { safeReturnTo } from '~/utils/returnTo'
+import { externalLoginProviderMeta } from '~/utils/external-login'
+import { PASSWORD_HINT } from '~/utils/password'
 
 definePageMeta({ layout: 'auth' })
 

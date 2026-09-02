@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { PageHeader } from "@yueli/ui/admin";
 import { createAccountNotifier } from "~/utils/feedback";
+import { externalLoginProviderMeta } from "~/utils/external-login";
 
 definePageMeta({ middleware: "auth", layout: "account" });
 useSeoMeta({ title: "登录方式" });

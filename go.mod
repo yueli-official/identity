@@ -1,6 +1,6 @@
 module github.com/yueli-official/identity
 
-go 1.25.12
+go 1.25.13
 
 require (
 	github.com/go-jose/go-jose/v3 v3.0.5

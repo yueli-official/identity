@@ -3,6 +3,7 @@ import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { PasskeySupport } from '~/composables/usePasskeys'
 import { safeReturnTo } from '~/utils/returnTo'
+import { externalLoginProviderMeta } from '~/utils/external-login'
 
 definePageMeta({ layout: 'auth', middleware: 'guest' })
 

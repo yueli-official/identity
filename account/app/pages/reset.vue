@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
+import { PASSWORD_HINT } from '~/utils/password'
 
 definePageMeta({ layout: 'auth' })
 

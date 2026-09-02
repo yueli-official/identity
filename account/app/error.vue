@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { clearError } from "#app";
+import { pageErrorMessage } from "~/utils/api-errors";
+
 const props = defineProps<{
   error: { statusCode: number; message: string; data?: unknown }
 }>()

@@ -10,6 +10,7 @@ import {
 import { CollectionPanel } from '@yueli/ui/collection/pattern'
 import { useVueCollectionWorkflow } from '@yueli/ui/collection/vue'
 import { createVueRouterCollectionQuerySync } from '@yueli/ui/collection/vue-router'
+import { PASSWORD_HINT, passwordMeetsLengthPolicy } from '~/utils/password'
 import { PageHeader } from '@yueli/ui/admin'
 import { useMinimumLoading } from '@yueli/ui/feedback'
 import { abs } from '~/utils/date'

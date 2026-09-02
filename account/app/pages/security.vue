@@ -5,6 +5,7 @@ import { PageHeader } from "@yueli/ui/admin";
 import { createAccountNotifier } from "~/utils/feedback";
 import { useActionFeedback } from "@yueli/ui/feedback";
 import { ActionFeedbackButton } from "@yueli/ui/feedback/pattern";
+import { PASSWORD_HINT } from "~/utils/password";
 
 definePageMeta({ middleware: "auth", layout: "account" });
 useSeoMeta({ title: "账户安全" });

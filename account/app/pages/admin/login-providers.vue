@@ -2,6 +2,8 @@
 import * as z from "zod";
 import type { FormSubmitEvent } from "@nuxt/ui";
 import { PageHeader } from "@yueli/ui/admin";
+import { pageErrorMessage } from "~/utils/api-errors";
+import { externalLoginProviderMeta } from "~/utils/external-login";
 
 definePageMeta({ layout: "admin", middleware: "admin" });
 useSeoMeta({ title: "登录配置" });
